@@ -247,13 +247,8 @@ extension DiffDocument {
         doc.maxLineNumber = max(oldNo, newNo)
     }
 
-    /// "@@ -12,5 +12,7 @@ ..." -> (12, 12). Combined diffs have several "-" ranges; the first wins.
-    public static func parseHunkHeader(_ line: Substring) -> (Int, Int) {
-        let r = parseHunkRanges(line)
-        return (r.oldStart, r.newStart)
-    }
-
-    /// Starts and line counts of a hunk header; a missing count means 1.
+    /// Starts and line counts of a hunk header ("@@ -12,5 +12,7 @@ ..."); a
+    /// missing count means 1. Combined diffs have several "-" ranges; the first wins.
     public static func parseHunkRanges(_ line: Substring) -> (oldStart: Int, oldCount: Int, newStart: Int, newCount: Int) {
         func range(_ part: Substring) -> (Int, Int)? {
             let nums = part.dropFirst().split(separator: ",", omittingEmptySubsequences: false)

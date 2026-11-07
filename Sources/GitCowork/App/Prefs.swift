@@ -7,27 +7,28 @@ enum Prefs {
         static let terminalApp = "terminalApp"
         static let hostOverrides = "hostOverrides"
         static let recentRepos = "recentRepos"
-        /// Remote that tasks and reviews (refs/cowork/main) sync with. Empty: the
-        /// current branch's upstream remote, else origin.
-        static let coworkRemote = "cowork.remote"
         /// Fetch/push refs/cowork/main about once a minute while the app is in front.
+        /// (Which remote is `git config cowork.remote` in each repo; see CoworkRemote.)
         static let coworkAutoSync = "cowork.autoSync"
         /// `git fetch --all --prune` every 5 minutes while the app is in front.
         static let autoFetch = "git.autoFetch"
         /// Ask GitHub once a day whether a newer release exists.
         static let checkForUpdates = "updates.check"
         static let lastUpdateCheck = "updates.lastCheck"
+
+        // Git, accounts, cowork
+        /// Signed-in accounts (JSON; tokens are in the Keychain).
+        static let accounts = "accounts"
+        /// OAuth client ID entered for a self-hosted server.
+        static func oauthClientID(_ host: String) -> String { "oauth.clientID.\(host)" }
+        /// Inbox items already shown in the UI / sent as notifications, per repository.
+        static func coworkSeen(_ repo: String) -> String { "cowork.seen.\(repo)" }
+        static func coworkNotified(_ repo: String) -> String { "cowork.notified.\(repo)" }
     }
 
     static var editorApp: String { UserDefaults.standard.string(forKey: Key.editorApp) ?? "Visual Studio Code" }
     static var terminalApp: String { UserDefaults.standard.string(forKey: Key.terminalApp) ?? "Terminal" }
     static var hostOverrides: String { UserDefaults.standard.string(forKey: Key.hostOverrides) ?? "" }
-
-    /// Remote name from Settings, or nil to use the default (upstream remote, else origin).
-    static var coworkRemote: String? {
-        let s = (UserDefaults.standard.string(forKey: Key.coworkRemote) ?? "").trimmingCharacters(in: .whitespaces)
-        return s.isEmpty ? nil : s
-    }
 
     static var coworkAutoSync: Bool { UserDefaults.standard.object(forKey: Key.coworkAutoSync) as? Bool ?? true }
     static var autoFetch: Bool { UserDefaults.standard.object(forKey: Key.autoFetch) as? Bool ?? true }

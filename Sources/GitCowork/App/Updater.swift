@@ -1,4 +1,5 @@
 import AppKit
+import CoworkKit
 import Foundation
 import GitCoworkCore
 import Observation
@@ -37,7 +38,8 @@ final class Updater {
 
     private var apiBase: String {
         #if DEBUG
-        if let base = ProcessInfo.processInfo.environment["GITCOWORK_UPDATE_API_BASE"] { return base }
+        // Same variable install.sh reads, so one setting points both at a test server.
+        if let base = ProcessInfo.processInfo.environment["GIT_COWORK_API_BASE"] { return base }
         #endif
         return "https://api.github.com/repos/\(repository)"
     }
@@ -75,17 +77,14 @@ final class Updater {
         request.setValue("git-cowork/\(current)", forHTTPHeaderField: "User-Agent")
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200,
-                  let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let tag = obj["tag_name"] as? String, let version = SemanticVersion(tag) else {
+            guard (response as? HTTPURLResponse)?.statusCode == 200, let release = GitHubRelease.parse(data) else {
                 error = L("Couldn't read the newest release from GitHub.")
                 return false
             }
             UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Prefs.Key.lastUpdateCheck)
             error = nil
-            available = version > current
-                ? Release(version: version, page: (obj["html_url"] as? String).flatMap(URL.init(string:)),
-                          notes: obj["body"] as? String ?? "")
+            available = release.version > current && !release.prerelease
+                ? Release(version: release.version, page: release.page, notes: release.notes)
                 : nil
             return true
         } catch {
@@ -130,43 +129,50 @@ final class Updater {
         error = nil
         defer { installing = false }
 
-        var env = ProcessInfo.processInfo.environment
-        env["GIT_COWORK_VERSION"] = available.version.description
-        env["GIT_COWORK_PREFIX"] = URL(fileURLWithPath: Bundle.main.bundlePath).deletingLastPathComponent().path
-        env["GIT_COWORK_REPO"] = repository
-        #if DEBUG
-        for key in ["GIT_COWORK_DOWNLOAD_BASE", "GIT_COWORK_API_BASE"] {
-            if let v = ProcessInfo.processInfo.environment[key] { env[key] = v }
-        }
-        #endif
-
-        let result: (status: Int32, output: String) = await withCheckedContinuation { cont in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let p = Process()
-                p.executableURL = URL(fileURLWithPath: "/bin/bash")
-                p.arguments = [script.path]
-                p.environment = env
-                let pipe = Pipe()
-                p.standardOutput = pipe
-                p.standardError = pipe
-                p.standardInput = FileHandle.nullDevice
-                do { try p.run() } catch {
-                    cont.resume(returning: (-1, error.localizedDescription))
-                    return
-                }
-                let out = pipe.fileHandleForReading.readDataToEndOfFile()
-                p.waitUntilExit()
-                cont.resume(returning: (p.terminationStatus, String(decoding: out, as: UTF8.self)))
-            }
-        }
-        guard result.status == 0 else {
-            let lines = result.output.split(separator: "\n").suffix(3).joined(separator: "\n")
+        let result = await Subprocess.run("/bin/bash", [script.path], env: installEnvironment(for: available),
+                                          timeout: 600)
+        guard result.ok else {
+            let output = result.errorText.isEmpty ? result.text : result.errorText
+            let lines = output.split(separator: "\n").suffix(3).joined(separator: "\n")
             error = lines.isEmpty ? L("The update didn't install.") : lines
             return
         }
         installed = available.version.description
         self.available = nil
         if restart { relaunch() }
+    }
+
+    /// Only what install.sh needs, not the app's whole environment (which
+    /// could carry BASH_ENV or test settings into the script).
+    private func installEnvironment(for release: Release) -> [String: String] {
+        let mine = ProcessInfo.processInfo.environment
+        var env: [String: String] = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
+        for key in ["HOME", "TMPDIR", "USER", "LANG"] { env[key] = mine[key] }
+        env["GIT_COWORK_VERSION"] = release.version.description
+        env["GIT_COWORK_PREFIX"] = URL(fileURLWithPath: Bundle.main.bundlePath).deletingLastPathComponent().path
+        env["GIT_COWORK_REPO"] = repository
+        if let bindir = existingLinkFolder() { env["GIT_COWORK_BINDIR"] = bindir }
+        #if DEBUG
+        for key in ["GIT_COWORK_DOWNLOAD_BASE", "GIT_COWORK_API_BASE"] {
+            if let v = mine[key] { env[key] = v }
+        }
+        #endif
+        return env
+    }
+
+    /// The folder of the `git-cowork` link into this app, when it isn't in
+    /// install.sh's default (~/.local/bin), so the update refreshes that link
+    /// instead of making a second one.
+    private func existingLinkFolder() -> String? {
+        let fm = FileManager.default
+        let defaultDir = NSHomeDirectory() + "/.local/bin"
+        if (try? fm.destinationOfSymbolicLink(atPath: defaultDir + "/git-cowork")) != nil { return nil }
+        let helper = Bundle.main.bundlePath + "/Contents/Helpers/git-cowork"
+        let path = GitRunner.shared.environment["PATH"] ?? ""
+        for dir in path.split(separator: ":").map(String.init) where dir != defaultDir {
+            if (try? fm.destinationOfSymbolicLink(atPath: dir + "/git-cowork")) == helper { return dir }
+        }
+        return nil
     }
 
     /// Quits and opens the (now updated) app again.

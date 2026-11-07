@@ -27,12 +27,6 @@ enum CoworkSelfTest {
         if !cond { failures += 1 }
     }
 
-    private static func sh(_ args: [String], in dir: URL) async -> String {
-        let r = await GitRunner.shared.execute(args, in: dir)
-        if r.exitCode != 0 { print("  git \(args.joined(separator: " ")) -> \(r.stderr)") }
-        return r.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
     static func run(in dir: URL) async -> Bool {
         let fm = FileManager.default
         // Only ever delete a folder this test created itself (it holds a marker file).

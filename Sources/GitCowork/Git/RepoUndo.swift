@@ -9,13 +9,9 @@ extension RepoModel {
     /// Where HEAD is right now, read from git (the cached status may lag a
     /// change made in a terminal a moment ago).
     func currentHead() async -> HeadState {
-        async let sha = git.tryRun(["rev-parse", "-q", "--verify", "HEAD"], in: root)
-        async let branch = git.tryRun(["symbolic-ref", "-q", "--short", "HEAD"], in: root)
-        func clean(_ s: String?) -> String? {
-            let t = s?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return t.isEmpty ? nil : t
-        }
-        return await HeadState(sha: clean(sha), branch: clean(branch))
+        async let sha = git.tryLine(["rev-parse", "-q", "--verify", "HEAD"], in: root)
+        async let branch = git.tryLine(["symbolic-ref", "-q", "--short", "HEAD"], in: root)
+        return await HeadState(sha: sha, branch: branch)
     }
 
     /// Runs `args` like `perform`, and on success remembers how to take it back.

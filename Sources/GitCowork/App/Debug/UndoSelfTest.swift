@@ -27,12 +27,6 @@ enum UndoSelfTest {
         if !cond { failures += 1 }
     }
 
-    @discardableResult
-    private static func sh(_ args: [String], in dir: URL) async -> String {
-        let r = await GitRunner.shared.execute(args, in: dir)
-        if r.exitCode != 0 { print("  git \(args.joined(separator: " ")) -> \(r.stderr)") }
-        return r.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 
     private static func write(_ text: String, _ name: String, in dir: URL) {
         try? text.write(to: dir.appendingPathComponent(name), atomically: true, encoding: .utf8)

@@ -1,3 +1,4 @@
+import CoworkKit
 import Foundation
 import GitCoworkCore
 import Observation
@@ -18,8 +19,8 @@ final class AccountStore {
            let old = accounts.first(where: { $0.host == account.host && $0.username == account.username }) {
             account.sshKey = old.sshKey
         }
-        guard let data = try? JSONEncoder().encode(tokens), Keychain.save(data, host: account.host) else {
-            throw SignInError(message: L("Couldn't save the token in the Keychain."))
+        guard Keychain.saveTokens(tokens, host: account.host) else {
+            throw AccountError(message: L("Couldn't save the token in the Keychain."))
         }
         accounts.removeAll { $0.host == account.host }
         accounts.append(account)
@@ -47,7 +48,7 @@ final class AccountStore {
 }
 
 enum AccountList {
-    private static let key = "accounts"
+    private static let key = Prefs.Key.accounts
 
     static func load() -> [HostAccount] {
         guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
@@ -125,11 +126,6 @@ final class Credentials: @unchecked Sendable {
         return SSHKey.sshCommand(configPath: sshConfigPath)
     }
 
-    /// A current access token for API calls, refreshed if it's about to expire.
-    func accessToken(for account: HostAccount) async -> String? {
-        await refresher.validTokens(for: account)?.access
-    }
-
     /// Extra `-c` options for every git command. Empty when nobody signed in.
     var configArgs: [String] {
         let hosts = current.map(\.host)
@@ -143,11 +139,11 @@ final class Credentials: @unchecked Sendable {
             guard let tokens = await refresher.validTokens(for: account),
                   let input = CredentialConfig.storeInput(host: account.host, username: account.gitUsername, password: tokens.access)
             else { continue }
-            cache(["store"], input: input, gitPath: gitPath, env: env)
+            await cache(["store"], input: input, gitPath: gitPath, env: env)
         }
     }
 
-    /// The account's token for API calls, renewed first if it's about to expire.
+    /// The account's tokens for API calls, renewed first if they're about to expire.
     func tokens(for account: HostAccount) async -> TokenSet? {
         await refresher.validTokens(for: account)
     }
@@ -155,28 +151,26 @@ final class Credentials: @unchecked Sendable {
     /// Drops a host's token from the running daemon.
     func forget(_ account: HostAccount) {
         let input = Data("protocol=https\nhost=\(account.host)\n\n".utf8)
-        cache(["erase"], input: input, gitPath: GitRunner.shared.gitPath, env: ProcessInfo.processInfo.environment)
+        let runner = GitRunner.shared
+        Task { await cache(["erase"], input: input, gitPath: runner.gitPath, env: runner.environment) }
     }
 
-    /// Stops the daemon so no token outlives the app.
+    /// Stops the daemon so no token outlives the app. Called while quitting,
+    /// so it waits (briefly) for git to finish.
     func stop() {
         guard FileManager.default.fileExists(atPath: socketPath) else { return }
-        cache(["exit"], input: Data(), gitPath: GitRunner.shared.gitPath, env: ProcessInfo.processInfo.environment)
+        let runner = GitRunner.shared
+        let done = DispatchSemaphore(value: 0)
+        Task.detached { [self] in
+            await cache(["exit"], input: Data(), gitPath: runner.gitPath, env: runner.environment)
+            done.signal()
+        }
+        _ = done.wait(timeout: .now() + 3)
     }
 
-    private func cache(_ action: [String], input: Data, gitPath: String, env: [String: String]) {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: gitPath)
-        p.arguments = ["credential-cache", "--socket", socketPath, "--timeout", String(Self.cacheTimeout)] + action
-        p.environment = env
-        let inPipe = Pipe()
-        p.standardInput = inPipe
-        p.standardOutput = FileHandle.nullDevice
-        p.standardError = FileHandle.nullDevice
-        guard (try? p.run()) != nil else { return }
-        try? inPipe.fileHandleForWriting.write(contentsOf: input)
-        try? inPipe.fileHandleForWriting.close()
-        p.waitUntilExit()
+    private func cache(_ action: [String], input: Data, gitPath: String, env: [String: String]) async {
+        let args = ["credential-cache", "--socket", socketPath, "--timeout", String(Self.cacheTimeout)] + action
+        _ = await Subprocess.run(gitPath, args, input: input, env: env, timeout: 10)
     }
 }
 
@@ -188,9 +182,7 @@ private actor Refresher {
 
     func validTokens(for account: HostAccount) async -> TokenSet? {
         if let task = running[account.host] { return await task.value }
-        guard let data = Keychain.load(host: account.host),
-              let tokens = try? JSONDecoder().decode(TokenSet.self, from: data)
-        else { return nil }
+        guard let tokens = Keychain.loadTokens(host: account.host) else { return nil }
         guard tokens.expiresSoon(), let refreshToken = tokens.refresh,
               let clientID = OAuthApps.clientID(for: account.host)
         else { return tokens }
@@ -199,7 +191,7 @@ private actor Refresher {
             guard let fresh = await SignIn.refresh(kind: account.kind, host: account.host,
                                                    clientID: clientID, refreshToken: refreshToken)
             else { return tokens }   // let git try; an auth error tells the user to sign in again
-            if let data = try? JSONEncoder().encode(fresh) { Keychain.save(data, host: account.host) }
+            Keychain.saveTokens(fresh, host: account.host)
             return fresh
         }
         running[account.host] = task

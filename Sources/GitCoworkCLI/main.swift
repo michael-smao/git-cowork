@@ -1,5 +1,6 @@
 import CoworkKit
 import Foundation
+import GitCoworkCLIKit
 import GitCoworkCore
 
 // `git cowork`: the team's tasks and review requests from the terminal.
@@ -17,7 +18,7 @@ Tasks
   edit <ID> [--title T] [--body TEXT] [--status S] [--assign WHO]
             [--label L | --label -L]... [--branch NAME|none]
   move <ID> <status>             backlog, todo, doing, review, done
-  assign <ID> <WHO>              WHO: me, none, or an email
+  assign <ID> <WHO>              WHO: me, none, an email, or a teammate's handle
   done <ID>
   comment <ID> <text>            on a task or a review
   start <ID> [--worktree] [--worktree-path PATH]
@@ -28,7 +29,7 @@ Tasks
 Reviews
   reviews [--waiting | --mine | --all]
                                  open reviews (--waiting: asked of you)
-  review <branch> --to EMAIL[,EMAIL] [--base B] [--title T] [--body TEXT] [--task ID]
+  review <branch> --to WHO[,WHO] [--base B] [--title T] [--body TEXT] [--task ID]
   approve <R-ID> [comment]
   changes <R-ID> <what should change>
 
@@ -40,9 +41,11 @@ Options
   --json         machine-readable output (for agents and scripts)
   --sync         fetch teammates' changes before reading
   --no-sync      don't push after a change (it goes out with the next sync)
-  --remote NAME  remote to sync with (default: git config cowork.remote, else origin)
+  --remote NAME  remote to sync with (default: git config cowork.remote, else a
+                 remote that already has tasks, else origin; same as the app)
   -C PATH        run in another repository
 
+Titles and comments don't need quotes: git cowork new Fix login bug.
 Tasks live in the repository on refs/cowork/main and sync through your
 normal remote. Your identity is git config user.email.
 """
@@ -56,10 +59,12 @@ let argv = Array(CommandLine.arguments.dropFirst())
 let args: Args
 do { args = try Args(argv) } catch CLIError.usage(let m) { fail("\(m)\n\n\(usage)", code: 2) }
 
-guard let command = args.positional.first, !args.flag("help"), command != "help" else {
+guard let typed = args.positional.first, !args.flag("help"), typed != "help" else {
     print(usage)
-    exit(args.positional.isEmpty && !args.flag("help") && !argv.contains("help") ? 2 : 0)
+    exit(args.positional.isEmpty && !args.flag("help") ? 2 : 0)
 }
+do { try CommandSpec.check(args) } catch CLIError.usage(let m) { fail("\(m) (see git cowork help)", code: 2) }
+let command = CommandSpec.canonical(typed) ?? typed
 
 let git = ProcessGit()
 let start = URL(fileURLWithPath: args.value("C") ?? FileManager.default.currentDirectoryPath)
@@ -72,22 +77,19 @@ if me.email.isEmpty && ["new", "edit", "move", "assign", "done", "comment", "sta
     fail("set your email first: git config user.email you@example.com", code: 1)
 }
 
-/// Remote for syncing: --remote, then `git config cowork.remote`, then origin, then the only remote.
-let remotes = await git.git(["remote"], in: root).text.split(separator: "\n").map(String.init)
-let configured = await git.git(["config", "cowork.remote"], in: root).line
-let remote: String? = args.value("remote")
-    ?? (remotes.contains(configured) ? configured : nil)
-    ?? (remotes.contains("origin") ? "origin" : remotes.first)
+// Same remote as the app: --remote, else CoworkRemote's choice.
+let remote: String?
+if let r = args.value("remote") { remote = r } else { remote = await CoworkRemote.choose(root: root, git: git).remote }
 
 let commands = Commands(args: args, repo: CoworkRepo(root: root, git: git, me: me), remote: remote)
 do {
     switch command {
-    case "list", "ls", "tasks": try await commands.list()
+    case "list": try await commands.list()
     case "show": try await commands.show()
-    case "new", "add": try await commands.new()
+    case "new": try await commands.new()
     case "edit": try await commands.edit()
-    case "move", "status": try await commands.edit(status: Commands.status(args.arg(2, "status")))
-    case "assign": try await commands.edit(assignee: .some(commands.resolve(args.arg(2, "who (me, none or an email)"))))
+    case "move": try await commands.edit(status: Commands.status(args.arg(2, "status")))
+    case "assign": try await commands.assign(args.arg(2, "who (me, none or an email)"))
     case "done": try await commands.edit(status: .done)
     case "comment": try await commands.comment()
     case "start": try await commands.start()
@@ -97,7 +99,7 @@ do {
     case "changes": try await commands.verdict(.changesRequested)
     case "inbox": try await commands.inbox()
     case "sync": try await commands.sync()
-    default: fail("unknown command \(command)\n\n\(usage)", code: 2)
+    default: fail("unknown command \(typed)\n\n\(usage)", code: 2)
     }
 } catch CLIError.usage(let m) {
     fail("\(m) (see git cowork help)", code: 2)

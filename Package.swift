@@ -26,15 +26,26 @@ let package = Package(
             dependencies: ["GitCoworkCore", "CoworkKit"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
+        // Argument parsing and person lookup for `git cowork`, kept apart so it's testable.
+        .target(
+            name: "GitCoworkCLIKit",
+            dependencies: ["GitCoworkCore"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
         // `git cowork …`: tasks and reviews from the terminal, for people and agents.
         .executableTarget(
             name: "GitCoworkCLI",
-            dependencies: ["GitCoworkCore", "CoworkKit"],
+            dependencies: ["GitCoworkCore", "CoworkKit", "GitCoworkCLIKit"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(
             name: "CoworkKitTests",
             dependencies: ["CoworkKit", "GitCoworkCore"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
+            name: "GitCoworkCLITests",
+            dependencies: ["GitCoworkCLIKit", "GitCoworkCore"],
             swiftSettings: [.swiftLanguageMode(.v5)]
         ),
         .testTarget(

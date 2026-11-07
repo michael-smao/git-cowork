@@ -1,28 +1,5 @@
-import AppKit
 import Foundation
 import GitCoworkCore
-
-enum PullMode: String, CaseIterable {
-    case `default`, ffOnly, rebase, merge
-
-    var title: String {
-        switch self {
-        case .default: L("Pull")
-        case .ffOnly: L("Pull (fast-forward only)")
-        case .rebase: L("Pull (rebase)")
-        case .merge: L("Pull (merge)")
-        }
-    }
-
-    var args: [String] {
-        switch self {
-        case .default: ["pull"]
-        case .ffOnly: ["pull", "--ff-only"]
-        case .rebase: ["pull", "--rebase"]
-        case .merge: ["pull", "--no-rebase"]
-        }
-    }
-}
 
 /// Everything the user can do to a repo. Each action is one or two plain git
 /// commands; they all show up in the command log.
@@ -107,40 +84,45 @@ extension RepoModel {
         worktrees.first { $0.branch == branch && $0.path != root.path }
     }
 
+    /// Alerts and returns true when `branch` is checked out in another worktree
+    /// (git allows a branch in one worktree at a time).
+    func refuseIfCheckedOutElsewhere(_ branch: String) -> Bool {
+        guard let wt = worktree(holding: branch) else { return false }
+        alert = AlertItem(title: String(localized: "\(branch) is checked out in another worktree"),
+                          message: String(localized: "Git allows a branch in one worktree at a time. It's open in \(wt.path). Open that worktree instead, or create a new branch."))
+        return true
+    }
+
     func checkout(_ ref: Ref) async {
-        let local = ref.kind == .remoteBranch ? ref.branchNameWithoutRemote : ref.name
-        if ref.kind != .tag, let wt = worktree(holding: local) {
-            alert = AlertItem(title: String(localized: "\(local) is checked out in another worktree"),
-                              message: String(localized: "Git allows a branch in one worktree at a time. It's open in \(wt.path). Open that worktree instead, or create a new branch."))
-            return
-        }
+        let local = split(ref)?.branch ?? ref.name
+        if ref.kind != .tag, refuseIfCheckedOutElsewhere(local) { return }
         let args: [String]
         switch ref.kind {
         case .localBranch:
-            args = ["switch", ref.name]
+            args = ["switch", "--end-of-options", ref.name]
         case .remoteBranch:
-            if localBranches.contains(where: { $0.name == local }) {
-                args = ["switch", local]
+            if localBranch(named: local) != nil {
+                args = ["switch", "--end-of-options", local]
             } else {
-                args = ["switch", "--track", ref.name]
+                args = ["switch", "--track", "-c", local, "--end-of-options", ref.name]
             }
         case .tag:
-            args = ["switch", "--detach", ref.name]
+            args = ["switch", "--detach", "--end-of-options", ref.name]
         }
         await performUndoable(.checkout, "Checkout", args)
     }
 
     func checkoutCommit(_ sha: String) async {
-        await performUndoable(.checkout, "Checkout", ["switch", "--detach", sha])
+        await performUndoable(.checkout, "Checkout", ["switch", "--detach", "--end-of-options", sha])
     }
 
     /// `--no-track`: a new branch made from e.g. origin/main shouldn't use main as its upstream.
     @discardableResult
     func createBranch(_ name: String, from start: String, checkout: Bool) async -> Bool {
         if checkout {
-            return await perform("Create branch", ["switch", "--no-track", "-c", name, start])
+            return await perform("Create branch", ["switch", "--no-track", "-c", name, "--end-of-options", start])
         } else {
-            return await perform("Create branch", ["branch", "--no-track", name, start])
+            return await perform("Create branch", ["branch", "--no-track", "--end-of-options", name, start])
         }
     }
 
@@ -159,13 +141,14 @@ extension RepoModel {
     }
 
     func deleteBranch(_ ref: Ref) {
-        if ref.kind == .remoteBranch, let remote = ref.remoteName {
+        if let s = split(ref) {
+            let remote = s.remote, branch = s.branch
             confirmation = Confirmation(
                 title: String(localized: "Delete \(ref.name) on \(remote)?"),
                 message: "This deletes the branch on the server for everyone.",
                 confirmTitle: "Delete Remote Branch"
             ) { [weak self] in
-                await self?.perform("Delete remote branch", ["push", remote, "--delete", ref.branchNameWithoutRemote])
+                await self?.perform("Delete remote branch", ["push", remote, "--delete", "refs/heads/\(branch)"])
             }
             return
         }
@@ -352,7 +335,7 @@ extension RepoModel {
     /// Clones `url` into `dest` (a folder that doesn't exist yet). Used before a repo window exists.
     static func clone(_ url: String, into dest: String) async throws {
         let parent = URL(fileURLWithPath: dest).deletingLastPathComponent()
-        try await GitRunner.shared.run(["clone", url, dest], in: parent, logged: true)
+        try await GitRunner.shared.run(["clone", "--end-of-options", url, dest], in: parent, logged: true)
     }
 
     // MARK: Merge / rebase in progress
@@ -411,11 +394,11 @@ extension RepoModel {
             // Like createBranch: a new branch started from a remote branch must
             // not track it (a bare `git push` would go to that branch), unless
             // it's the same branch checked out locally.
-            let sameRemoteBranch = refs.contains { $0.kind == .remoteBranch && $0.name == base && $0.branchNameWithoutRemote == newBranch }
-            return await perform("Add worktree", ["worktree", "add"] + (sameRemoteBranch ? [] : ["--no-track"])
-                                    + ["-b", newBranch, path, base])
+            let sameRemoteBranch = refs.contains { $0.kind == .remoteBranch && $0.name == base && split($0)?.branch == newBranch }
+            return await perform("Add worktree", ["worktree", "add"] + (sameRemoteBranch ? ["--track"] : ["--no-track"])
+                                    + ["-b", newBranch, "--end-of-options", path, base])
         }
-        return await perform("Add worktree", ["worktree", "add", path, base])
+        return await perform("Add worktree", ["worktree", "add", "--end-of-options", path, base])
     }
 
     func removeWorktree(_ wt: Worktree) {
@@ -437,29 +420,6 @@ extension RepoModel {
 
     /// Suggested folder for a new worktree: a sibling of the main checkout, `<repo>-<branch>`.
     func suggestedWorktreePath(branch: String) -> String {
-        let main = URL(fileURLWithPath: mainWorktreePath ?? root.path)
-        let safe = branch.replacingOccurrences(of: "/", with: "-")
-        return main.deletingLastPathComponent().appendingPathComponent("\(main.lastPathComponent)-\(safe)").path
-    }
-}
-
-// MARK: Opening things outside the app
-
-enum External {
-    static func open(app: String, path: String) {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/open")
-        p.arguments = ["-a", app, path]
-        try? p.run()
-    }
-
-    static func openTerminal(_ path: String) { open(app: Prefs.terminalApp, path: path) }
-    static func openEditor(_ path: String) { open(app: Prefs.editorApp, path: path) }
-    static func reveal(_ path: String) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
-    static func browse(_ url: URL?) { if let url { NSWorkspace.shared.open(url) } }
-
-    static func copy(_ s: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(s, forType: .string)
+        WorktreePath.suggest(main: mainWorktreePath ?? root.path, branch: branch)
     }
 }

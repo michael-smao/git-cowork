@@ -1,4 +1,5 @@
 import AppKit
+import CoworkKit
 
 /// git comes with Apple's Command Line Tools. A macOS update sometimes removes
 /// them, and then every git call fails with "xcrun: error: invalid active
@@ -8,26 +9,16 @@ enum DeveloperToolsCheck {
     static func runAtLaunch() {
         // A git from Homebrew doesn't need the tools.
         guard GitRunner.shared.gitPath == "/usr/bin/git" else { return }
-        Task.detached(priority: .utility) {
-            let installed = toolsInstalled()
-            if !installed { await MainActor.run { askToInstall() } }
+        Task {
+            if await !toolsInstalled() { askToInstall() }
         }
     }
 
     /// `xcode-select -p` names the tools folder. Unlike running git, it
     /// doesn't trigger macOS's own install prompt when they're missing.
-    nonisolated static func toolsInstalled() -> Bool {
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/xcode-select")
-        p.arguments = ["-p"]
-        let out = Pipe()
-        p.standardOutput = out
-        p.standardError = FileHandle.nullDevice
-        guard (try? p.run()) != nil else { return false }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        let dir = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        return p.terminationStatus == 0 && FileManager.default.isExecutableFile(atPath: dir + "/usr/bin/git")
+    nonisolated static func toolsInstalled() async -> Bool {
+        let r = await Subprocess.run("/usr/bin/xcode-select", ["-p"], timeout: 10)
+        return r.ok && FileManager.default.isExecutableFile(atPath: r.line + "/usr/bin/git")
     }
 
     private static func askToInstall() {

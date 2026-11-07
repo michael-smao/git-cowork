@@ -1,5 +1,44 @@
 import Foundation
 
+/// What git-cowork asks each kind of server for. One list per kind, used for
+/// browser sign-in, the "create a token" link and the hints in Settings.
+extension HostKind {
+    /// Token scopes. GitHub needs `workflow` to push changes to
+    /// .github/workflows; `read:org` lists org repos; `write:public_key` adds
+    /// an SSH key. GitLab has no scope narrower than `api` that can add an
+    /// SSH key (and creating merge requests needs it too). Gitea and Forgejo
+    /// only take pasted tokens.
+    public var scopes: [String] {
+        switch self {
+        case .github: ["repo", "workflow", "read:org", "write:public_key"]
+        case .gitlab: ["read_user", "api", "write_repository"]
+        case .gitea: ["read:user", "write:repository"]
+        }
+    }
+
+    /// The scope that lets the API add an SSH key; nil where git-cowork can't
+    /// add one (Gitea and Forgejo).
+    public var sshKeyScope: String? {
+        switch self {
+        case .github: "write:public_key"
+        case .gitlab: "api"
+        case .gitea: nil
+        }
+    }
+
+    /// GitHub and GitLab can take an SSH key through their API.
+    public var canAddSSHKey: Bool { sshKeyScope != nil }
+
+    /// The public server of each kind, suggested when signing in.
+    public var defaultHost: String {
+        switch self {
+        case .github: "github.com"
+        case .gitlab: "gitlab.com"
+        case .gitea: "codeberg.org"
+        }
+    }
+}
+
 /// A signed-in account on one host. One account per host, so git knows which
 /// token to use for `https://<host>`. The token itself lives in the Keychain.
 public struct HostAccount: Codable, Hashable, Sendable, Identifiable {
@@ -26,8 +65,7 @@ public struct HostAccount: Codable, Hashable, Sendable, Identifiable {
         self.sshKey = sshKey
     }
 
-    /// GitHub and GitLab can take an SSH key through their API.
-    public var canAddSSHKey: Bool { kind != .gitea }
+    public var canAddSSHKey: Bool { kind.canAddSSHKey }
 
     /// Username git sends over HTTPS. GitLab wants "oauth2" with OAuth tokens;
     /// everywhere else the account name works with the token as password.

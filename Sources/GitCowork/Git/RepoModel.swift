@@ -1,95 +1,8 @@
 import AppKit
+import CoworkKit
 import Foundation
 import GitCoworkCore
 import Observation
-
-enum HistorySelection: Hashable {
-    case workingCopy
-    case commit(String)
-}
-
-struct WorktreeInfo: Hashable {
-    var changes = 0
-    var ahead = 0
-    var behind = 0
-}
-
-struct AlertItem: Identifiable {
-    let id = UUID()
-    let title: String
-    let message: String
-}
-
-struct Confirmation: Identifiable {
-    let id = UUID()
-    let title: String
-    let message: String
-    let confirmTitle: String
-    var destructive = true
-    let action: () async -> Void
-}
-
-enum DiffTarget: Hashable {
-    case working(FileChange)
-    case commit(CommitDetail, FileChange)
-
-    var file: FileChange {
-        switch self {
-        case .working(let f), .commit(_, let f): f
-        }
-    }
-}
-
-/// What the big middle area shows.
-enum CenterMode: String, CaseIterable, Hashable {
-    case history, board, reviews
-
-    var title: String {
-        switch self {
-        case .history: L("History")
-        case .board: L("Board")
-        case .reviews: L("Reviews")
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .history: "point.3.connected.trianglepath.dotted"
-        case .board: "rectangle.split.3x1"
-        case .reviews: "checkmark.bubble"
-        }
-    }
-}
-
-/// Selected task or review (shown in the right panel on Board / Reviews).
-enum CoworkSelection: Hashable {
-    case task(String)
-    case review(String)
-}
-
-enum SheetKind: Identifiable {
-    case newBranch(from: String, label: String)
-    case newTag(sha: String)
-    case renameBranch(String)
-    case addWorktree(base: String?)
-    case stash
-    case newTask(status: TaskStatus)
-    case requestReview(branch: String)
-    case team
-
-    var id: String {
-        switch self {
-        case .newBranch(let f, _): "branch:\(f)"
-        case .newTag(let s): "tag:\(s)"
-        case .renameBranch(let b): "rename:\(b)"
-        case .addWorktree(let b): "wt:\(b ?? "")"
-        case .stash: "stash"
-        case .newTask(let s): "task:\(s.rawValue)"
-        case .requestReview(let b): "review:\(b)"
-        case .team: "team"
-        }
-    }
-}
 
 /// Resolves symlinks like realpath(3). Unlike URL.resolvingSymlinksInPath it keeps
 /// /private, so paths match what git prints.
@@ -100,6 +13,7 @@ func realPath(_ path: String) -> String {
 }
 
 /// State of one open worktree: refs, history, working copy, and the actions on it.
+/// UI state types are in RepoUIState.swift, the background fetch in RepoAutoFetch.swift.
 @MainActor @Observable
 final class RepoModel {
     let root: URL
@@ -152,6 +66,8 @@ final class RepoModel {
     var coworkSelection: CoworkSelection?
     /// Shared tasks, reviews and comments for this repository.
     let cowork: CoworkStore
+    /// Background `git fetch` (see RepoAutoFetch).
+    let autoFetcher = RepoAutoFetch()
     /// Commit message being written. Shared by the commit box and the "// WIP" row.
     var draftSummary = ""
     var draftDetails = ""
@@ -172,6 +88,7 @@ final class RepoModel {
         // Resolve symlinks (/tmp -> /private/tmp) so paths match what git reports.
         self.root = URL(fileURLWithPath: realPath(root.path))
         self.cowork = CoworkStore(root: self.root)
+        autoFetcher.model = self
     }
 
     var name: String { mainWorktreePath.map { ($0 as NSString).lastPathComponent } ?? root.lastPathComponent }
@@ -181,6 +98,7 @@ final class RepoModel {
     var localBranches: [Ref] { refs.filter { $0.kind == .localBranch } }
     var remoteBranches: [Ref] { refs.filter { $0.kind == .remoteBranch } }
     var tags: [Ref] { refs.filter { $0.kind == .tag } }
+    var remoteNames: [String] { remotes.map(\.name) }
 
     // MARK: Loading
 
@@ -211,7 +129,7 @@ final class RepoModel {
         await cowork.load()
         guard !isStopped else { return }
         startCoworkSync()
-        startAutoFetch()
+        autoFetcher.start()
     }
 
     /// Called when the window closes: stops file watching, timers and observers.
@@ -222,15 +140,15 @@ final class RepoModel {
         watcher = nil
         coworkTimer?.cancel()
         coworkTimer = nil
-        fetchTimer?.cancel()
-        fetchTimer = nil
+        autoFetcher.stop()
         debounce?.cancel()
         debounce = nil
         if let activationObserver { NotificationCenter.default.removeObserver(activationObserver) }
         activationObserver = nil
     }
 
-    private var isStopped = false
+    /// True once the window closed (see stopWatching).
+    private(set) var isStopped = false
     private var activationObserver: NSObjectProtocol?
 
     // MARK: Cowork
@@ -257,113 +175,31 @@ final class RepoModel {
         }
     }
 
-    /// Remote for cowork sync, independent of the checked-out branch (so a
-    /// branch tracking a fork's `upstream` never sends the team's tasks there):
-    /// the one chosen in Settings if it exists here, else the one picked
-    /// for this repo before, else a remote that already has cowork data,
-    /// else origin, else the first remote. The pick is remembered per repo.
+    /// Remote for cowork sync: the same rule as `git cowork` (CoworkRemote),
+    /// read from `git config cowork.remote`. A remote picked because it
+    /// already has the team's tasks is written there, so the tool uses it too.
     func resolveCoworkRemote() async -> String? {
-        let names = remotes.map(\.name)
-        if let r = Prefs.coworkRemote, names.contains(r) { return r }
-        let key = "cowork.syncRemote." + (mainWorktreePath ?? root.path)
-        if let r = UserDefaults.standard.string(forKey: key), names.contains(r) { return r }
-        guard !names.isEmpty else { return nil }
-        let out = await git.tryRun(["for-each-ref", "--format=%(refname)", "refs/cowork/remotes/"], in: root) ?? ""
-        let withData = out.split(separator: "\n").compactMap { line -> String? in
-            let parts = line.split(separator: "/")    // refs/cowork/remotes/<r>/main
-            return parts.count >= 5 ? parts[3...].dropLast().joined(separator: "/") : nil
+        let choice = await CoworkRemote.choose(root: root, git: AppGit())
+        if let remote = choice.remote, choice.worthRemembering {
+            _ = try? await git.run(CoworkRemote.rememberArgs(remote), in: root, logged: true)
         }
-        let pick = (names.contains("origin") && withData.contains("origin") ? "origin" : nil)
-            ?? withData.first { names.contains($0) }
-            ?? (names.contains("origin") ? "origin" : names[0])
-        UserDefaults.standard.set(pick, forKey: key)
-        return pick
+        return choice.remote
     }
 
-    // MARK: Background fetch
+    // MARK: Background fetch (RepoAutoFetch)
 
-    /// Set while the background fetch runs. User actions wait for it briefly
-    /// so two fetches don't fight over the same ref locks.
-    private(set) var autoFetching = false
-    /// Why background fetching stopped (a sign-in problem), with git's message.
-    /// Cleared by the next fetch, pull or push that works.
-    private(set) var autoFetchPaused: String?
-    /// Signed-in accounts when the pause started. Signing in under Settings ›
-    /// Accounts changes them and ends the pause.
-    private var accountsAtPause: [HostAccount] = []
-    private var fetchTimer: Task<Void, Never>?
-    private let openedAt = Date()
-
-    /// Last fetch per repository (keyed by the shared .git folder), so two
-    /// windows on worktrees of the same repo don't both fetch.
-    private static var lastFetchByRepo: [String: Date] = [:]
-    private var fetchKey: String { commonDir?.path ?? root.path }
-
-    /// Last fetch from anywhere: this app, or the terminal (FETCH_HEAD's date).
-    private var lastFetch: Date? {
-        let fetchHead = gitDir.flatMap {
-            try? FileManager.default.attributesOfItem(atPath: $0.appendingPathComponent("FETCH_HEAD").path)[.modificationDate] as? Date
-        }
-        return [Self.lastFetchByRepo[fetchKey], fetchHead].compactMap { $0 }.max()
-    }
+    var autoFetching: Bool { autoFetcher.running }
+    var autoFetchPaused: String? { autoFetcher.paused }
 
     /// Records a fetch (or pull/push) the user ran, so the timer starts over
     /// and a sign-in pause ends once it worked.
     func noteRemoteAction(fetched: Bool, succeeded: Bool) {
-        if fetched { Self.lastFetchByRepo[fetchKey] = Date() }
-        if succeeded { autoFetchPaused = nil }
-    }
-
-    /// `git fetch --all --prune` shortly after the window opens, then every
-    /// 5 minutes while the app is in front. Wakes on the same 30 s tick as the
-    /// task sync and does nothing in the background.
-    private func startAutoFetch() {
-        fetchTimer?.cancel()
-        fetchTimer = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(AutoFetch.firstDelay))
-            while !Task.isCancelled {
-                guard let self else { return }
-                if self.autoFetchPaused != nil, AccountStore.shared.accounts != self.accountsAtPause {
-                    self.autoFetchPaused = nil
-                }
-                let conditions = AutoFetch.Conditions(
-                    enabled: Prefs.autoFetch, appActive: NSApp.isActive, hasRemotes: !self.remotes.isEmpty,
-                    actionRunning: self.busy != nil || self.autoFetching, pausedForSignIn: self.autoFetchPaused != nil,
-                    openedAt: self.openedAt, lastFetch: self.lastFetch)
-                if AutoFetch.isDue(conditions, now: Date()) { await self.autoFetch() }
-                try? await Task.sleep(for: .seconds(AutoFetch.tick))
-            }
-        }
-    }
-
-    private func autoFetch() async {
-        autoFetching = true
-        defer { autoFetching = false }
-        Self.lastFetchByRepo[fetchKey] = Date()
-        // Never ask for credentials: no terminal prompt (GitRunner sets it for
-        // every command, repeated here because it matters most), no Git
-        // Credential Manager window, no ssh-askpass dialog.
-        let quiet = ["GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never", "SSH_ASKPASS_REQUIRE": "never"]
-        do {
-            try await git.run(["fetch", "--all", "--prune"], in: root, logged: true, env: quiet)
-            guard !isStopped else { return }
-            await refresh()
-        } catch let error as GitError {
-            if AutoFetch.classify(error.result.stderr) == .signIn {
-                autoFetchPaused = error.localizedDescription
-                accountsAtPause = AccountStore.shared.accounts
-            }
-            // Offline and other errors stay in the command log; the next tick retries.
-        } catch {}
+        autoFetcher.note(fetched: fetched, succeeded: succeeded)
     }
 
     /// Waits up to 15 s for a running background fetch, then goes ahead anyway.
     func waitForAutoFetch() async {
-        var waited = 0
-        while autoFetching && waited < 150 {
-            try? await Task.sleep(for: .milliseconds(100))
-            waited += 1
-        }
+        await autoFetcher.waitUntilIdle()
     }
 
     func syncCowork() async {
@@ -538,6 +374,8 @@ final class RepoModel {
     // MARK: File watching
 
     private func restartWatcher() {
+        // A refresh still running when the window closed must not start watching again.
+        guard !isStopped else { return }
         var paths = [root.path]
         if let c = commonDir?.path { paths.append(c) }
         paths += worktrees.map(\.path).filter { !$0.isEmpty }
@@ -597,16 +435,23 @@ final class RepoModel {
         revealToken += 1
     }
 
+    /// The current branch's upstream remote, else origin, else the first remote.
     var defaultRemote: String? {
-        if let up = status.upstream, let r = up.split(separator: "/").first { return String(r) }
-        if remotes.contains(where: { $0.name == "origin" }) { return "origin" }
-        return remotes.first?.name
+        BranchLookup.defaultRemote(upstream: status.upstream, remotes: remoteNames)
     }
 
+    /// Web links for a remote. The host's kind comes from Settings, else from
+    /// a signed-in account on that host (self-hosted servers), else its name.
     func links(for remoteName: String?) -> RemoteLinks? {
         guard let name = remoteName ?? defaultRemote,
               let remote = remotes.first(where: { $0.name == name }) else { return nil }
-        return RemoteLinks(remoteURL: remote.url, overrides: RemoteLinks.parseOverrides(Prefs.hostOverrides))
+        var kinds: [String: HostKind] = [:]
+        for account in AccountStore.shared.accounts {
+            let host = account.host.split(separator: ":").first.map(String.init) ?? account.host
+            kinds[host] = account.kind
+        }
+        let overrides = kinds.merging(RemoteLinks.parseOverrides(Prefs.hostOverrides)) { _, setting in setting }
+        return RemoteLinks(remoteURL: remote.url, overrides: overrides)
     }
 
     func defaultBranch(remote: String?) -> String? {

@@ -47,7 +47,6 @@ extension CoworkStore {
 /// The app's git runner (login-shell PATH, signed-in accounts) for CoworkRepo.
 struct AppGit: GitExecutor {
     func git(_ args: [String], in dir: URL, input: Data?, env: [String: String]) async -> GitOutput {
-        let r = await GitRunner.shared.executeData(args, in: dir, input: input, env: env)
-        return GitOutput(stdout: r.stdout, stderr: r.stderr, exitCode: r.exitCode)
+        await GitRunner.shared.executeData(args, in: dir, input: input, env: env)
     }
 }

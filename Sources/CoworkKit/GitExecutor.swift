@@ -31,48 +31,14 @@ extension GitExecutor {
     }
 }
 
-/// Plain `git` from PATH, never prompting for a password.
+/// Plain `git` from PATH, never prompting for a password, with the same
+/// environment and `-c` options as the app (see GitEnvironment).
 public struct ProcessGit: GitExecutor {
     public init() {}
 
     public func git(_ args: [String], in dir: URL, input: Data?, env extra: [String: String]) async -> GitOutput {
-        await withCheckedContinuation { cont in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let p = Process()
-                p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-                p.arguments = ["git"] + args
-                p.currentDirectoryURL = dir
-                var env = ProcessInfo.processInfo.environment
-                env["GIT_TERMINAL_PROMPT"] = "0"
-                env["GIT_OPTIONAL_LOCKS"] = "0"
-                p.environment = env.merging(extra) { _, new in new }
-                let out = Pipe(), err = Pipe()
-                p.standardOutput = out
-                p.standardError = err
-                let inPipe = input.map { _ in Pipe() }
-                p.standardInput = inPipe ?? FileHandle.nullDevice
-                do { try p.run() } catch {
-                    cont.resume(returning: GitOutput(stdout: Data(), stderr: Data(error.localizedDescription.utf8), exitCode: -1))
-                    return
-                }
-                if let inPipe, let input {
-                    DispatchQueue.global().async {
-                        try? inPipe.fileHandleForWriting.write(contentsOf: input)
-                        try? inPipe.fileHandleForWriting.close()
-                    }
-                }
-                var errData = Data()
-                let group = DispatchGroup()
-                group.enter()
-                DispatchQueue.global().async {
-                    errData = err.fileHandleForReading.readDataToEndOfFile()
-                    group.leave()
-                }
-                let outData = out.fileHandleForReading.readDataToEndOfFile()
-                group.wait()
-                p.waitUntilExit()
-                cont.resume(returning: GitOutput(stdout: outData, stderr: errData, exitCode: p.terminationStatus))
-            }
-        }
+        let env = GitEnvironment.make(ProcessInfo.processInfo.environment).merging(extra) { _, new in new }
+        return await Subprocess.run("/usr/bin/env", ["git"] + GitEnvironment.configArgs + args,
+                                    input: input, env: env, dir: dir)
     }
 }

@@ -6,6 +6,24 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Changed
+- The app and `git cowork` always sync tasks with the same remote:
+  `git config cowork.remote` in the repository (the app saves its pick there).
+  The app-wide "Sync remote" setting is gone.
+- `git cowork new Fix login bug` works without quotes; unknown options and
+  extra words are errors instead of being ignored; `--to anna` finds a
+  teammate by handle; `approve`/`changes` honor `--json`.
+- Start Task in the app and `git cowork start` pick the same branch and run
+  the same git command (a pushed branch is tracked, a new one tracks nothing).
+
+### Fixed
+- install.sh keeps the old app if anything fails or is interrupted while
+  replacing it, and says what to do when the app folder isn't writable.
+- The in-app updater passes install.sh only the environment it needs, and
+  gives up after 10 minutes.
+- Branch names in shared tasks and reviews are checked before git sees them.
+- Saving a renewed token no longer risks losing the old one.
+
 ## [0.2.0] - 2026-11-07
 
 Coming from 0.1.0? Update once by hand with the one-line install (or

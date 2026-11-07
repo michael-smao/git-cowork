@@ -113,13 +113,9 @@ struct GraphBadge {
         return badges.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
     }
 
-    /// "origin/feature/x" -> "feature/x" when "origin" is a known remote.
+    /// "origin/feature/x" -> "feature/x" (RefName.splitRemote).
     private static func shortRemoteName(_ name: String, remoteNames: [String]) -> String {
-        if let remote = remoteNames.filter({ name.hasPrefix($0 + "/") }).max(by: { $0.count < $1.count }) {
-            return String(name.dropFirst(remote.count + 1))
-        }
-        guard let slash = name.firstIndex(of: "/") else { return name }
-        return String(name[name.index(after: slash)...])
+        RefName.splitRemote(name, remotes: remoteNames)?.branch ?? name
     }
 
     /// Trailing icons: checked out, local, remote. Tags get a leading tag icon instead.

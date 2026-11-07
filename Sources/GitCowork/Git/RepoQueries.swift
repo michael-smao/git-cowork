@@ -12,9 +12,7 @@ extension RepoModel {
 
     /// Remote-tracking ref for a branch name: on the default remote, else on any remote.
     func remoteBranch(named name: String) -> Ref? {
-        let remote = defaultRemote ?? "origin"
-        return remoteBranches.first { $0.name == "\(remote)/\(name)" }
-            ?? remoteBranches.first { $0.branchNameWithoutRemote == name && !$0.name.hasSuffix("/HEAD") }
+        BranchLookup.remote(named: name, in: refs, preferred: defaultRemote ?? "origin", remotes: remoteNames)
     }
 
     /// Local branch if there is one, else the remote-tracking one.
@@ -22,27 +20,28 @@ extension RepoModel {
         localBranch(named: name) ?? remoteBranch(named: name)
     }
 
+    /// Remote and branch name of a remote-tracking ref, by the repo's remote names.
+    func split(_ ref: Ref) -> (remote: String, branch: String)? {
+        ref.split(remotes: remoteNames)
+    }
+
     /// The branch new work starts from and reviews compare against: the
     /// remote's default branch ("origin/main") if fetched, else a local
     /// main/master. `name` is the plain name ("main") for PR links and pickers.
-    func baseBranch() -> (ref: String, name: String)? {
+    func baseBranch() -> BaseBranch? {
         let remote = defaultRemote
-        if let remote, let d = defaultBranch(remote: remote),
-           remoteBranches.contains(where: { $0.name == "\(remote)/\(d)" }) {
-            return ("\(remote)/\(d)", d)
-        }
-        let name = defaultBranch(remote: remote) ?? ["main", "master"].first { localBranch(named: $0) != nil }
-        if let name, localBranch(named: name) != nil { return (name, name) }
-        return nil
+        return BaseBranch.resolve(remote: remote, remoteHEAD: defaultBranch(remote: remote),
+                                  remoteBranches: remoteBranches.map(\.name), localBranches: localBranches.map(\.name))
     }
+
+    /// Plain name of the base branch for review requests: "main" when the repo gives no hint.
+    var baseBranchName: String { baseBranch()?.name ?? BaseBranch.fallbackName }
 
     // MARK: Commits
 
     /// Full sha of a revision, or nil if it doesn't exist.
     func sha(_ rev: String) async -> String? {
-        let out = await git.tryRun(["rev-parse", "--verify", "-q", rev + "^{commit}"], in: root)
-        let s = out?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return s.isEmpty ? nil : s
+        await git.tryLine(["rev-parse", "--verify", "-q", rev + "^{commit}"], in: root)
     }
 
     func isAncestor(_ a: String, of b: String) async -> Bool {
@@ -51,16 +50,20 @@ extension RepoModel {
 
     /// Commits on HEAD that aren't on `base`.
     func commitsAhead(of base: String) async -> Int? {
-        let out = await git.tryRun(["rev-list", "--count", "\(base)..HEAD"], in: root)
-        return Int(out?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+        Int(await git.tryLine(["rev-list", "--count", "\(base)..HEAD"], in: root) ?? "")
     }
 
     // MARK: Review changes
 
     /// Files changed on `branch` since it left `base`, plus a stand-in commit
     /// (the tip, with the merge base as its parent) so the diff viewer can show them.
+    /// Both names come from shared review data, so they're checked first.
     func branchChanges(branch: String, base: String) async -> BranchChanges {
         var result = BranchChanges(loaded: true)
+        for name in [branch, base] where !RefName.isValid(name) {
+            result.error = "\(name) isn't a valid branch name."
+            return result
+        }
         guard let tip = await resolvedTip(branch) else {
             result.error = "Branch \(branch) isn't here yet. Fetch to get it."
             return result
@@ -69,8 +72,7 @@ extension RepoModel {
             result.error = "Base branch \(base) not found."
             return result
         }
-        let mb = (await git.tryRun(["merge-base", baseTip, tip], in: root) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !mb.isEmpty else {
+        guard let mb = await git.tryLine(["merge-base", baseTip, tip], in: root) else {
             result.error = "\(branch) and \(base) have no common history."
             return result
         }
@@ -103,9 +105,7 @@ extension RepoModel {
 enum RepoLocator {
     /// Top-level folder of the worktree containing `path`, or nil if it isn't in a git repo.
     static func resolve(_ path: String) async -> String? {
-        let out = await GitRunner.shared.tryRun(["rev-parse", "--show-toplevel"], in: URL(fileURLWithPath: path))
-        let top = out?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return top.isEmpty ? nil : top
+        await GitRunner.shared.tryLine(["rev-parse", "--show-toplevel"], in: URL(fileURLWithPath: path))
     }
 }
 

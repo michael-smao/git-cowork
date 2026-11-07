@@ -1,10 +1,22 @@
+import CoworkKit
 import Foundation
 import GitCoworkCore
 
+/// GitOutput decoded to text, for the command log and error messages.
 struct GitResult {
     let stdout: String
     let stderr: String
     let exitCode: Int32
+
+    init(stdout: String, stderr: String, exitCode: Int32) {
+        self.stdout = stdout
+        self.stderr = stderr
+        self.exitCode = exitCode
+    }
+
+    init(_ r: GitOutput) {
+        self.init(stdout: r.text, stderr: r.errorText, exitCode: r.exitCode)
+    }
 }
 
 struct GitError: LocalizedError {
@@ -26,7 +38,8 @@ struct GitError: LocalizedError {
 /// so behaviour matches the terminal: same config, SSH keys, credential
 /// helpers and hooks. The one addition: hosts signed in under Settings >
 /// Accounts get their token (and SSH key, if one was made) from the app
-/// (see Credentials).
+/// (see Credentials). Processes run through CoworkKit's Subprocess, with the
+/// same environment as the `git cowork` tool (GitEnvironment).
 final class GitRunner: @unchecked Sendable {
     static let shared = GitRunner()
 
@@ -44,38 +57,22 @@ final class GitRunner: @unchecked Sendable {
         // replace with the login shell's PATH once we know it.
         let base = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
         e["PATH"] = [e["PATH"], base].compactMap { $0 }.joined(separator: ":")
-        e["GIT_TERMINAL_PROMPT"] = "0"     // fail instead of waiting for a password on a missing tty
-        e["GIT_OPTIONAL_LOCKS"] = "0"      // `git status` must not touch the index (would retrigger file watching)
-        e["GIT_EDITOR"] = "true"           // accept default messages (merge, rebase --continue)
-        e["GIT_MERGE_AUTOEDIT"] = "no"
-        e["LC_ALL"] = "en_US.UTF-8"
-        env = e
+        env = GitEnvironment.make(e)
 
-        Task.detached(priority: .utility) { [weak self] in self?.loadLoginShellPath() }
+        Task.detached(priority: .utility) { [weak self] in await self?.loadLoginShellPath() }
     }
 
-    private func loadLoginShellPath() {
+    private func loadLoginShellPath() async {
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: shell)
-        p.arguments = ["-l", "-c", "printf %s \"$PATH\""]
-        let out = Pipe()
-        p.standardOutput = out
-        p.standardError = FileHandle.nullDevice
-        p.standardInput = FileHandle.nullDevice
-        guard (try? p.run()) != nil else { return }
         // Don't let a slow shell profile hang anything.
-        DispatchQueue.global().asyncAfter(deadline: .now() + 5) { if p.isRunning { p.terminate() } }
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        p.waitUntilExit()
-        let path = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard p.terminationStatus == 0, path.contains("/") else { return }
-        lock.lock()
-        env["PATH"] = path + ":" + (env["PATH"] ?? "")
-        lock.unlock()
+        let r = await Subprocess.run(shell, ["-l", "-c", "printf %s \"$PATH\""], timeout: 5)
+        let path = r.line
+        guard r.ok, path.contains("/") else { return }
+        lock.withLock { env["PATH"] = path + ":" + (env["PATH"] ?? "") }
     }
 
-    private var environment: [String: String] {
+    /// The environment git runs with (login-shell PATH plus GitEnvironment).
+    var environment: [String: String] {
         lock.lock(); defer { lock.unlock() }
         return env
     }
@@ -101,25 +98,28 @@ final class GitRunner: @unchecked Sendable {
 
     /// Like `run` but never throws; for best-effort reads.
     func tryRun(_ args: [String], in dir: URL) async -> String? {
-        let r = await execute(args, in: dir)
-        return r.exitCode == 0 ? r.stdout : nil
+        let r = await executeData(args, in: dir)
+        return r.ok ? r.text : nil
+    }
+
+    /// The output's first line without surrounding whitespace, or nil when git
+    /// failed or printed nothing. For reads like `rev-parse`.
+    func tryLine(_ args: [String], in dir: URL) async -> String? {
+        let r = await executeData(args, in: dir)
+        return r.ok && !r.line.isEmpty ? r.line : nil
     }
 
     /// `input` is written to git's stdin; `extra` adds environment variables
     /// (e.g. GIT_INDEX_FILE for writing trees without touching the real index).
     func execute(_ args: [String], in dir: URL, input: Data? = nil, env extra: [String: String] = [:]) async -> GitResult {
-        let r = await executeData(args, in: dir, input: input, env: extra)
-        return GitResult(stdout: String(decoding: r.stdout, as: UTF8.self),
-                         stderr: String(decoding: r.stderr, as: UTF8.self),
-                         exitCode: r.exitCode)
+        GitResult(await executeData(args, in: dir, input: input, env: extra))
     }
 
     /// Like `execute`, but stdout stays raw bytes. Diffs need this: decoding
     /// non-UTF-8 content would corrupt patches built from it.
     func executeData(_ args: [String], in dir: URL, input: Data? = nil,
-                     env extra: [String: String] = [:]) async -> (stdout: Data, stderr: Data, exitCode: Int32) {
+                     env extra: [String: String] = [:]) async -> GitOutput {
         var env = environment.merging(extra) { _, new in new }
-        let gitPath = gitPath
         let credentials = Credentials.shared
         if CredentialConfig.needsCredentials(args) {
             await credentials.prepare(gitPath: gitPath, env: env)
@@ -130,46 +130,7 @@ final class GitRunner: @unchecked Sendable {
                 env["GIT_SSH_COMMAND"] = ssh
             }
         }
-        let processEnv = env
-        let configArgs = GitDefaults.configArgs + credentials.configArgs
-        return await withCheckedContinuation { cont in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let p = Process()
-                p.executableURL = URL(fileURLWithPath: gitPath)
-                p.arguments = configArgs + args
-                p.currentDirectoryURL = dir
-                p.environment = processEnv
-                let out = Pipe(), err = Pipe()
-                p.standardOutput = out
-                p.standardError = err
-                let inPipe = input.map { _ in Pipe() }
-                p.standardInput = inPipe ?? FileHandle.nullDevice
-                do {
-                    try p.run()
-                } catch {
-                    cont.resume(returning: (Data(), Data(error.localizedDescription.utf8), -1))
-                    return
-                }
-                if let inPipe, let input {
-                    // Write on another thread so a large input can't deadlock against git's output.
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        try? inPipe.fileHandleForWriting.write(contentsOf: input)
-                        try? inPipe.fileHandleForWriting.close()
-                    }
-                }
-                // Read both pipes at once so a full stderr buffer can't block git.
-                var errData = Data()
-                let group = DispatchGroup()
-                group.enter()
-                DispatchQueue.global(qos: .userInitiated).async {
-                    errData = err.fileHandleForReading.readDataToEndOfFile()
-                    group.leave()
-                }
-                let outData = out.fileHandleForReading.readDataToEndOfFile()
-                group.wait()
-                p.waitUntilExit()
-                cont.resume(returning: (outData, errData, p.terminationStatus))
-            }
-        }
+        let configArgs = GitEnvironment.configArgs + credentials.configArgs
+        return await Subprocess.run(gitPath, configArgs + args, input: input, env: env, dir: dir)
     }
 }

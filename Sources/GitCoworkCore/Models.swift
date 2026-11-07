@@ -79,16 +79,17 @@ public struct Ref: Identifiable, Hashable, Sendable {
         self.isHead = isHead
     }
 
-    /// "origin" for "origin/feature/x". Nil for non-remote refs.
-    public var remoteName: String? {
-        guard kind == .remoteBranch else { return nil }
-        return name.split(separator: "/", maxSplits: 1).first.map(String.init)
-    }
+    /// "origin" for "origin/feature/x". Nil for non-remote refs. Splits at the
+    /// first "/"; with the repo's remote names at hand, use `split(remotes:)`.
+    public var remoteName: String? { split(remotes: [])?.remote }
 
-    /// "feature/x" for "origin/feature/x".
-    public var branchNameWithoutRemote: String {
-        guard kind == .remoteBranch, let i = name.firstIndex(of: "/") else { return name }
-        return String(name[name.index(after: i)...])
+    /// "feature/x" for "origin/feature/x" (first "/"; see `split(remotes:)`).
+    public var branchNameWithoutRemote: String { split(remotes: [])?.branch ?? name }
+
+    /// Remote and branch of a remote-tracking ref, by the longest known
+    /// remote name (see RefName.splitRemote). Nil for other refs.
+    public func split(remotes: [String]) -> (remote: String, branch: String)? {
+        kind == .remoteBranch ? RefName.splitRemote(name, remotes: remotes) : nil
     }
 }
 

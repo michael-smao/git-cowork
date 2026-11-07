@@ -63,11 +63,10 @@ extension CoworkStore {
 
     @discardableResult
     func setVerdict(_ verdict: ReviewVerdict, on review: ReviewRequest, comment: String) async -> Bool {
-        let myID = me.id, myEmail = me.email
+        let myEmail = me.email
         return await write(CoworkEdit.verdict(verdict, on: review, comment: comment, by: me)) { snap in
             guard let i = snap.reviews.firstIndex(where: { $0.id == review.id }) else { return }
-            let key = snap.reviews[i].reviewers.keys.first { $0.lowercased() == myID } ?? myEmail.lowercased()
-            snap.reviews[i].reviewers[key] = verdict
+            snap.reviews[i].setVerdict(verdict, by: myEmail)
         }
     }
 
