@@ -139,7 +139,7 @@ struct FolderRow: View {
 
     var body: some View {
         HStack(spacing: Theme.Space.s) {
-            DisclosureChevron(expanded: !folder.collapsed).frame(width: 10)
+            DisclosureChevron(expanded: !folder.collapsed).frame(width: Theme.Metrics.chevronWidth)
             Image(systemName: "folder")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)

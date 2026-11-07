@@ -13,6 +13,7 @@ struct CloneRepoList: View {
     @State private var errors: [String: String] = [:]
     @State private var filter = ""
     @State private var selection: HostRepo.ID?
+    @FocusState private var filterFocused: Bool
 
     init(accounts: [HostAccount], url: Binding<String>, onOpen: @escaping (String) -> Void) {
         self.accounts = accounts
@@ -41,9 +42,7 @@ struct CloneRepoList: View {
                 }
             }
             .font(Theme.Font.small)
-            TextField("Filter repositories", text: $filter)
-                .textFieldStyle(.roundedBorder)
-                .onExitCommand { filter = "" }
+            SearchField("Filter repositories", text: $filter, focus: $filterFocused, clearHelp: "Clear filter")
             List(shown, selection: $selection) { repo in
                 CloneRepoRow(repo: repo).listRowSeparator(.hidden)
             }
@@ -73,8 +72,7 @@ struct CloneRepoList: View {
         if let account {
             if let error = errors[account.host] {
                 VStack(spacing: Theme.Space.m) {
-                    Text(error).font(Theme.Font.small).foregroundStyle(.red).multilineTextAlignment(.center)
-                        .textSelection(.enabled)
+                    ErrorText(error).multilineTextAlignment(.center)
                     Button("Try Again") {
                         errors[account.host] = nil
                         Task { await load() }

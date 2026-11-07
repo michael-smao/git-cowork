@@ -290,6 +290,7 @@
 "macOS's ssh-agent isn't available, so the key's passphrase can't be put in the Keychain." = "Der ssh-agent von macOS ist nicht verfügbar, daher kann die Passphrase des Schlüssels nicht im Schlüsselbund abgelegt werden.";
 "Mark All as Read" = "Alle als gelesen markieren";
 "Mark Resolved" = "Als gelöst markieren";
+"Me (%@)" = "Ich (%@)";
 "Merge %@ into %@" = "%1$@ in %2$@ mergen";
 "Merge has conflicts" = "Merge hat Konflikte";
 "Message (optional)" = "Nachricht (optional)";

@@ -58,7 +58,7 @@ private struct UpdatePanel: View {
                     .frame(maxHeight: 180)
                 }
                 if let error = updater.error {
-                    Text(verbatim: error).font(Theme.Font.small).foregroundStyle(.red).textSelection(.enabled)
+                    ErrorText(error)
                 }
                 HStack {
                     if let page = r.page {
@@ -66,8 +66,7 @@ private struct UpdatePanel: View {
                     }
                     Spacer()
                     if updater.installing {
-                        ProgressView().controlSize(.small)
-                        Text("Installing…").foregroundStyle(.secondary)
+                        ProgressLabel("Installing…")
                     } else {
                         Button("Update Now") { Task { await updater.install() } }
                             .buttonStyle(ActionButtonStyle.primary())

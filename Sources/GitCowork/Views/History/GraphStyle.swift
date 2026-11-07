@@ -54,7 +54,7 @@ enum GraphStyle {
 
     enum Text {
         static let padding: CGFloat = 8
-        static let subject = NSFont.systemFont(ofSize: 13)
+        static let subject = Theme.AppKitFont.body
         static let body = NSFont.systemFont(ofSize: 12)
         /// Author and date. 12pt rather than Theme's 11pt small: it sits on
         /// 34pt rows beside 13pt subjects, where 11pt looks too faint.
@@ -68,12 +68,12 @@ enum GraphStyle {
     }
 
     enum Badge {
-        static let height: CGFloat = 20
+        static let height = Theme.Metrics.chipHeight
         static let hPadding: CGFloat = 6
         static let iconSize: CGFloat = 9.5
         static let iconSpacing: CGFloat = 4
         static let gap: CGFloat = 4
-        static let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        static let font = Theme.AppKitFont.caption
         static let moreFont = NSFont.systemFont(ofSize: 10, weight: .semibold)
         static let remoteOnlyAlpha: CGFloat = 0.5
         static let fillDarken: CGFloat = 0.2           // local badges: lane color, slightly darker for text contrast
@@ -81,14 +81,17 @@ enum GraphStyle {
     }
 
     enum WIP {
-        static let boxHeight: CGFloat = 22
+        /// As tall as a text field or action button elsewhere.
+        static let boxHeight = Theme.Metrics.buttonHeight
         static let boxMinWidth: CGFloat = 180
         static let boxMaxFraction: CGFloat = 0.5       // of the message column
         static let countSpacing: CGFloat = 10
     }
 
     enum Cowork {
-        static let chipHeight: CGFloat = 18
+        /// Task-ID chip before the subject. 2pt lower than `Theme.Metrics.chipHeight`
+        /// on purpose: it holds 10pt mono text and sits inline with 13pt text.
+        static let idChipHeight: CGFloat = 18
         static let chipPadding: CGFloat = 4
         static let chipFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .semibold)
         static let iconSize: CGFloat = 11

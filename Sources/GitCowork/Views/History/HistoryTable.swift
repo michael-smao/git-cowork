@@ -131,9 +131,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     var graphUserResized = false
     /// rows.count when "load more" was last requested; asks once per history size.
     private var loadMoreRequestedAt = -1
-    private var badgeCache: [Int: [GraphBadge]] = [:]
-    private var initialsCache: [String: String] = [:]
-    private var authorColorCache: [String: NSColor] = [:]
+    private let drawCache = HistoryDrawCache()
     private var wipCountsCache: [WIPCount]?
     lazy var headerMenuDelegate = HistoryHeaderMenu(coordinator: self)
 
@@ -207,7 +205,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     // MARK: Rows
 
     private func rebuildRows() {
-        badgeCache = [:]
+        drawCache.resetBadges()
         coworkCache = [:]
         commits = model.commits
         graph = model.graph
@@ -300,28 +298,18 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     }
 
     func badges(forCommit i: Int) -> [GraphBadge] {
-        if let hit = badgeCache[i] { return hit }
+        if let hit = drawCache.badges(i) { return hit }
         guard i < commits.count else { return [] }
         let refs = refsByCommit[commits[i].id] ?? []
         let b = refs.isEmpty ? [] : GraphBadge.make(refs, remoteNames: model.remotes.map(\.name))
-        badgeCache[i] = b
+        drawCache.setBadges(b, for: i)
         return b
     }
 
-    func initials(_ name: String) -> String {
-        if let hit = initialsCache[name] { return hit }
-        let s = name.initials
-        initialsCache[name] = s
-        return s
-    }
+    func initials(_ name: String) -> String { drawCache.initials(name) }
 
     /// Same color as the author's Avatar elsewhere in the app.
-    func authorColor(_ email: String) -> NSColor {
-        if let hit = authorColorCache[email] { return hit }
-        let c = Theme.personColor(email)
-        authorColorCache[email] = c
-        return c
-    }
+    func authorColor(_ email: String) -> NSColor { drawCache.authorColor(email) }
 
     func wipCounts() -> [WIPCount] {
         if let hit = wipCountsCache { return hit }

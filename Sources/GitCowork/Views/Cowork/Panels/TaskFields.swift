@@ -15,11 +15,8 @@ struct StatusMenu: View {
                     .disabled(s == status)
             }
         } label: {
-            HStack(spacing: Theme.Space.xs) {
+            DropdownLabel(spacing: Theme.Space.xs, quiet: true) {
                 StatusChip(status: status)
-                Image(systemName: "chevron.down")
-                    .font(Theme.Glyph.dropdown)
-                    .foregroundStyle(.secondary)
             }
             .contentShape(Rectangle())
         }
@@ -44,15 +41,12 @@ struct AssigneeMenu: View {
                     .disabled(assignee?.lowercased() == email?.lowercased())
             }
         } label: {
-            HStack(spacing: Theme.Space.s + 2) {
-                PersonAvatar(person: store.person(assignee), size: 18)
+            DropdownLabel(spacing: Theme.Space.s + 2, quiet: true) {
+                PersonAvatar(person: store.person(assignee), size: Theme.AvatarSize.m)
                 Text(displayName(assignee, in: store))
                     .font(Theme.Font.body)
                     .foregroundStyle(assignee == nil ? .secondary : .primary)
                     .lineLimit(1)
-                Image(systemName: "chevron.down")
-                    .font(Theme.Glyph.dropdown)
-                    .foregroundStyle(.secondary)
             }
             .contentShape(Rectangle())
         }
@@ -70,9 +64,7 @@ struct RemovableLabelChip: View {
     let onRemove: () -> Void
 
     var body: some View {
-        let color = Color(nsColor: Theme.labelColor(label))
-        HStack(spacing: Theme.Space.s) {
-            Text(label).lineLimit(1)
+        Chip(text: label, color: Color(nsColor: Theme.labelColor(label)), trailingPadding: Theme.Space.s) {
             Button(action: onRemove) {
                 Image(systemName: "xmark")
                     .font(.system(size: 7, weight: .semibold))
@@ -82,12 +74,6 @@ struct RemovableLabelChip: View {
             .buttonStyle(.plain)
             .help("Remove label")
         }
-        .font(Theme.Font.small.weight(.medium))
-        .padding(.leading, Theme.Space.m)
-        .padding(.trailing, Theme.Space.s)
-        .frame(height: Theme.Metrics.chipHeight)
-        .foregroundStyle(color)
-        .background(color.opacity(Theme.Tint.chip), in: Capsule())
     }
 }
 

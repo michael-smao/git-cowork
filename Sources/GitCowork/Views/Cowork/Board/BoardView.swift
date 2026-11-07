@@ -7,13 +7,14 @@ struct BoardView: View {
     let model: RepoModel
 
     /// "" = everyone, "me", "unassigned", or an email.
-    @AppStorage("board.assignee") private var assignee = ""
+    @AppStorage(Prefs.Key.boardAssignee) private var assignee = ""
     @State private var labelFilter: String?
     @State private var query = ""
     @State private var showAllDone = false
     @State private var dropSpot: DropSpot?
     @State private var draggingID: String?
     @FocusState private var boardFocused: Bool
+    @FocusState private var searchFocused: Bool
 
     /// Done shows this many until "Show all".
     private static let doneLimit = 20
@@ -62,31 +63,28 @@ struct BoardView: View {
         }
     }
 
-    /// Whose tasks to show: everyone, me, nobody, or one person.
+    /// Whose tasks to show: everyone, or one entry of the shared assignee list.
     private var assigneeMenu: some View {
-        let people = model.cowork.others
+        let store = model.cowork
         let title: String = switch assignee {
         case "": L("Everyone")
         case "me": L("Mine")
         case "unassigned": L("Unassigned")
-        default: model.cowork.person(assignee)?.displayName ?? assignee
+        default: store.person(assignee)?.displayName ?? assignee
         }
         return Menu {
             Picker("Show", selection: $assignee) {
-                Text("Everyone").tag("")
-                Text("Mine").tag("me")
-                Text("Unassigned").tag("unassigned")
-                if !people.isEmpty {
-                    Divider()
-                    ForEach(people) { p in Text(p.displayName).tag(p.email.lowercased()) }
+                Label("Everyone", systemImage: "person.2").tag("")
+                Divider()
+                AssigneeOptions(store: store) { email, title, icon in
+                    Label { Text(title) } icon: { icon }.tag(filterValue(email))
                 }
             }
             .pickerStyle(.inline)
         } label: {
-            HStack(spacing: Theme.Space.s) {
+            DropdownLabel {
                 Image(systemName: assignee.isEmpty ? "person.2" : "person")
                 Text(title).lineLimit(1)
-                Image(systemName: "chevron.down").font(Theme.Glyph.dropdown)
             }
             .actionButtonLabel(tint: assignee.isEmpty ? nil : .accentColor)
         }
@@ -94,6 +92,12 @@ struct BoardView: View {
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Show tasks of one person")
+    }
+
+    /// The stored filter for an assignee choice: "unassigned", "me" or an email.
+    private func filterValue(_ email: String?) -> String {
+        guard let email else { return "unassigned" }
+        return email.lowercased() == model.cowork.me.id ? "me" : email.lowercased()
     }
 
     private func labelMenu(_ labels: [String]) -> some View {
@@ -106,10 +110,9 @@ struct BoardView: View {
                     set: { labelFilter = $0 ? label : nil }))
             }
         } label: {
-            HStack(spacing: Theme.Space.s) {
+            DropdownLabel {
                 Image(systemName: "tag").font(.system(size: 9, weight: .semibold))
                 Text(labelFilter ?? "Labels")
-                Image(systemName: "chevron.down").font(Theme.Glyph.dropdown)
             }
             .actionButtonLabel(tint: labelFilter == nil ? nil : .accentColor)
         }
@@ -122,28 +125,10 @@ struct BoardView: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: Theme.Space.s) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-            TextField("Search tasks", text: $query)
-                .textFieldStyle(.plain)
-                .font(Theme.Font.small)
-                .onExitCommand { query = ""; boardFocused = true }
-            if !query.isEmpty {
-                Button { query = "" } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 11))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.tertiary)
-                .help("Clear search")
-            }
+        SearchField("Search tasks", text: $query, focus: $searchFocused, compact: true) {
+            boardFocused = true
         }
-        .padding(.horizontal, Theme.Space.m)
         .frame(minWidth: 100, idealWidth: 200, maxWidth: 200)
-        .frame(height: Theme.Metrics.buttonHeight)
-        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: Theme.Radius.control))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.control).strokeBorder(Color(nsColor: .separatorColor)))
     }
 
     // MARK: Columns
@@ -258,17 +243,10 @@ struct BoardView: View {
                 .lineLimit(1)
             CountBadge(count: count)
             Spacer(minLength: 0)
-            Button {
+            HeaderAddButton(help: String(localized: "New task in \(status.label)"),
+                            size: Theme.Metrics.chipHeight, weight: .semibold) {
                 model.sheet = .newTask(status: status)
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 11, weight: .semibold))
-                    .frame(width: Theme.Metrics.chipHeight, height: Theme.Metrics.chipHeight)
-                    .contentShape(Rectangle())
             }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help("New task in \(status.label)")
         }
         // Icon lines up with the card titles below. As tall as a PanelBar, but
         // with its own insets and no hairline: it sits inside the column.
@@ -373,23 +351,12 @@ struct BoardView: View {
     // MARK: Empty
 
     private var emptyState: some View {
-        VStack(spacing: Theme.Space.m) {
-            Image(systemName: "rectangle.split.3x1")
-                .font(.system(size: 28, weight: .light))
-                .foregroundStyle(.tertiary)
-            Text("No tasks yet")
-                .font(Theme.Font.body.weight(.medium))
-            Text("Tasks are stored in this repository on refs/cowork/main and sync with your teammates through the remote.")
-                .font(Theme.Font.small)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 320)
+        EmptyState(symbol: "rectangle.split.3x1", title: "No tasks yet",
+                   message: "Tasks are stored in this repository on refs/cowork/main and sync with your teammates through the remote.",
+                   messageWidth: 320) {
             Button("Create First Task") { model.sheet = .newTask(status: .todo) }
                 .buttonStyle(ActionButtonStyle.primary())
-                .padding(.top, Theme.Space.s)
         }
-        .padding(Theme.Space.xxl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture { boardFocused = true }
         .focusable()

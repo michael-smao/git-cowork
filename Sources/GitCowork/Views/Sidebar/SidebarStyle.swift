@@ -6,10 +6,10 @@ enum SidebarStyle {
     /// child's chevron sits exactly under its parent's icon.
     static let indent: CGFloat = chevronWidth + Theme.Space.s
     /// Column for disclosure chevrons, reserved on every row so icons line up.
-    static let chevronWidth: CGFloat = 10
+    static let chevronWidth = Theme.Metrics.chevronWidth
     static let iconSize: CGFloat = 11
     static let currentDot: CGFloat = 6
-    static let avatarSize: CGFloat = 16
+    static let avatarSize = Theme.AvatarSize.s
     /// Width reserved for section counts so they right-align in one column.
     static let countWidth: CGFloat = 18
     /// Leading/trailing inset of row content. Together with the list's own cell
@@ -20,5 +20,5 @@ enum SidebarStyle {
     static let currentBand = Color.accentColor.opacity(Theme.Tint.selection)
     /// The band covers the same area as the list's selection highlight.
     static let bandInset = EdgeInsets(top: 1, leading: -Theme.Space.s, bottom: 1, trailing: -Theme.Space.s)
-    static let bandRadius: CGFloat = 6
+    static let bandRadius = Theme.Radius.control
 }

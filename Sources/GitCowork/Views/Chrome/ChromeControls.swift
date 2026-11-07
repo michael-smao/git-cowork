@@ -2,8 +2,9 @@ import SwiftUI
 
 /// Sizes and fonts for the window chrome: toolbar, status bar, welcome screen.
 enum ChromeStyle {
-    /// Picker captions and toolbar button titles.
-    static let caption = Font.system(size: 10)
+    /// Small titles under toolbar icons and above picker values. Not
+    /// `Theme.Font.caption`, which is the semibold section caption.
+    static let toolbarLabel = Font.system(size: 10)
     static let icon = Font.system(size: 15)
     /// Badge position on a toolbar icon: over its top-right corner, never above the icon.
     static let badgeOffset = CGSize(width: 8, height: -2)
@@ -16,10 +17,10 @@ enum ChromeStyle {
     // Center mode switch (History | Board | Reviews)
     static let segment = Font.system(size: 11, weight: .medium)
     static let segmentSymbol = Font.system(size: 10, weight: .semibold)
-    static let segmentHeight: CGFloat = 22
+    static let segmentHeight = Theme.Metrics.buttonHeight
     static let segmentInset: CGFloat = 2
     static let segmentTrackFill = 0.06
-    static let segmentSelectedFill = 0.18
+    static let segmentSelectedFill = Theme.Tint.selection
 
     static let tileIcon = Font.system(size: 18)
 }
@@ -40,7 +41,7 @@ struct ChromeButtonLabel: View {
                     if badge > 0 { CountBadge(count: badge, style: .toolbar).offset(x: ChromeStyle.badgeOffset.width, y: ChromeStyle.badgeOffset.height) }
                 }
             Text(ui: title)
-                .font(ChromeStyle.caption)
+                .font(ChromeStyle.toolbarLabel)
         }
         .frame(minWidth: minWidth)
     }
@@ -82,8 +83,7 @@ struct ChromeSplitButton<Items: View>: View {
             ChromeButton(title: title, symbol: symbol, badge: badge, help: help, disabled: disabled,
                          minWidth: 0, action: action)
             Menu { items } label: {
-                Image(systemName: "chevron.down")
-                    .font(Theme.Glyph.dropdown)
+                DropdownChevron()
                     .frame(height: ChromeStyle.iconHeight)
             }
             .menuStyle(.button)
@@ -108,16 +108,13 @@ struct StackedPicker<Items: View>: View {
         Menu { items } label: {
             VStack(alignment: .leading, spacing: 0) {
                 Text(ui: caption)
-                    .font(ChromeStyle.caption)
+                    .font(ChromeStyle.toolbarLabel)
                     .foregroundStyle(.secondary)
-                HStack(spacing: Theme.Space.s) {
+                DropdownLabel(quiet: true) {
                     Text(title)
                         .font(Theme.Font.headline)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Image(systemName: "chevron.down")
-                        .font(Theme.Glyph.dropdown)
-                        .foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: 220, alignment: .leading)

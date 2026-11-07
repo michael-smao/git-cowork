@@ -19,7 +19,7 @@ struct ReviewsView: View {
         }
     }
 
-    static let filterKey = "reviews.filter"
+    static let filterKey = Prefs.Key.reviewsFilter
     @AppStorage(ReviewsView.filterKey) private var filterRaw = Filter.waiting.rawValue
 
     private var filter: Filter { Filter(rawValue: filterRaw) ?? .waiting }
@@ -174,7 +174,7 @@ private struct ReviewRow: View {
             HStack(spacing: Theme.Space.m) {
                 Text(review.title).foregroundStyle(.secondary).lineLimit(1)
                 Spacer(minLength: Theme.Space.m)
-                PersonAvatar(person: store.person(review.requester), size: 16)
+                PersonAvatar(person: store.person(review.requester), size: Theme.AvatarSize.s)
                 if !review.reviewers.isEmpty {
                     Image(systemName: "arrow.right").font(.system(size: 8, weight: .semibold)).foregroundStyle(.tertiary)
                     HStack(spacing: Theme.Space.xs) {
@@ -210,7 +210,7 @@ private struct ReviewerAvatar: View {
     let verdict: ReviewVerdict
 
     var body: some View {
-        PersonAvatar(person: person, size: 16)
+        PersonAvatar(person: person, size: Theme.AvatarSize.s)
             .overlay(alignment: .bottomTrailing) {
                 Circle()
                     .fill(verdict.color)

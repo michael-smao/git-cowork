@@ -99,7 +99,7 @@ struct TeamSheet: View {
                 }
                 Spacer()
                 if let problem {
-                    Text(problem).font(Theme.Font.small).foregroundStyle(.red).lineLimit(2)
+                    ErrorText(problem).lineLimit(2)
                 }
             }
         }

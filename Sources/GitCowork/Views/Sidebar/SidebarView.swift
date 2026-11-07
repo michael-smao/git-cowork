@@ -33,14 +33,14 @@ private struct SidebarContent: View, Equatable {
     @State private var filter = ""
     @State private var selection: String?
     @FocusState private var filterFocused: Bool
-    @AppStorage("sidebar.local") private var localOpen = SidebarSection.local.openByDefault
-    @AppStorage("sidebar.remote") private var remoteOpen = SidebarSection.remote.openByDefault
-    @AppStorage("sidebar.worktrees") private var worktreesOpen = SidebarSection.worktrees.openByDefault
-    @AppStorage("sidebar.tasks") private var tasksOpen = SidebarSection.tasks.openByDefault
-    @AppStorage("sidebar.reviews") private var reviewsOpen = SidebarSection.reviews.openByDefault
-    @AppStorage("sidebar.stashes") private var stashesOpen = SidebarSection.stashes.openByDefault
-    @AppStorage("sidebar.tags") private var tagsOpen = SidebarSection.tags.openByDefault
-    @AppStorage("sidebar.team") private var teamOpen = SidebarSection.team.openByDefault
+    @AppStorage(Prefs.Key.sidebarSection(.local)) private var localOpen = SidebarSection.local.openByDefault
+    @AppStorage(Prefs.Key.sidebarSection(.remote)) private var remoteOpen = SidebarSection.remote.openByDefault
+    @AppStorage(Prefs.Key.sidebarSection(.worktrees)) private var worktreesOpen = SidebarSection.worktrees.openByDefault
+    @AppStorage(Prefs.Key.sidebarSection(.tasks)) private var tasksOpen = SidebarSection.tasks.openByDefault
+    @AppStorage(Prefs.Key.sidebarSection(.reviews)) private var reviewsOpen = SidebarSection.reviews.openByDefault
+    @AppStorage(Prefs.Key.sidebarSection(.stashes)) private var stashesOpen = SidebarSection.stashes.openByDefault
+    @AppStorage(Prefs.Key.sidebarSection(.tags)) private var tagsOpen = SidebarSection.tags.openByDefault
+    @AppStorage(Prefs.Key.sidebarSection(.team)) private var teamOpen = SidebarSection.team.openByDefault
     /// Collapsed branch folders and remotes of this repository (all open by default).
     @State private var collapsed: Set<String> = []
 
@@ -49,8 +49,14 @@ private struct SidebarContent: View, Equatable {
         let items = filter.isEmpty ? builder.tree() : builder.filtered(filter)
         VStack(alignment: .leading, spacing: 0) {
             PanelBar {
-                SidebarFilterField(text: $filter, focus: $filterFocused,
-                                   count: filter.isEmpty ? builder.totalCount : items.matchCount)
+                let count = filter.isEmpty ? builder.totalCount : items.matchCount
+                SearchField(prompt: "Filter (⌥⌘F)", text: $filter, focus: $filterFocused,
+                            symbol: "line.3.horizontal.decrease", clearHelp: "Clear filter") {
+                    Text(filter.isEmpty ? "Viewing \(count)" : count == 1 ? "1 match" : "\(count) matches")
+                        .font(Theme.Font.small.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .fixedSize()
+                }
             }
             .background { focusShortcut }
 
@@ -133,11 +139,11 @@ private struct SidebarContent: View, Equatable {
         switch section {
         case .worktrees:
             SidebarSectionHeader(section: section, count: count, expanded: expanded, showsDivider: !first, toggle: toggle) {
-                SidebarHeaderButton(help: "Add worktree") { model.sheet = .addWorktree(base: nil) }
+                HeaderAddButton(help: "Add worktree") { model.sheet = .addWorktree(base: nil) }
             }
         case .tasks:
             SidebarSectionHeader(section: section, count: count, expanded: expanded, showsDivider: !first, toggle: toggle) {
-                SidebarHeaderButton(help: "New task") { model.sheet = .newTask(status: .todo) }
+                HeaderAddButton(help: "New task") { model.sheet = .newTask(status: .todo) }
             }
         default:
             SidebarSectionHeader(section: section, count: count, expanded: expanded, highlight: highlight,
@@ -284,7 +290,7 @@ private struct SidebarSelectionSync: View {
 
 /// Collapsed folder/remote ids per repository, in one UserDefaults dictionary.
 enum SidebarCollapseStore {
-    private static let key = "sidebar.collapsedByRepo"
+    private static let key = Prefs.Key.sidebarCollapsedByRepo
 
     static func load(_ repo: String) -> Set<String> {
         let all = UserDefaults.standard.dictionary(forKey: key) as? [String: [String]] ?? [:]
@@ -296,6 +302,6 @@ enum SidebarCollapseStore {
         all[repo] = ids.isEmpty ? nil : ids.sorted()
         UserDefaults.standard.set(all, forKey: key)
         // The old global key collided across repositories.
-        UserDefaults.standard.removeObject(forKey: "sidebar.collapsedFolders")
+        UserDefaults.standard.removeObject(forKey: Prefs.Key.sidebarCollapsedFoldersOld)
     }
 }
