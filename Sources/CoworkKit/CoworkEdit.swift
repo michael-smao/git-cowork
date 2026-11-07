@@ -112,12 +112,31 @@ public enum CoworkEdit {
         if !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             extra = Self.comment(on: review.commentParent, body: comment, by: me, now: now).1.build([:])
         }
-        let myID = me.id, myEmail = me.email
+        let myEmail = me.email
         return updateReview(review.id, extra: extra, message: "\(verdict.rawValue) \(review.branch)", now: now) { r in
-            // Reuse the key the requester wrote, whatever its case.
-            let key = r.reviewers.keys.first { $0.lowercased() == myID } ?? myEmail.lowercased()
-            r.reviewers[key] = verdict
+            r.setVerdict(verdict, by: myEmail)
         }
+    }
+
+    /// What starting a task changes: links `branch`, moves a backlog or to-do
+    /// task to the top of In Progress, and assigns it to `me` if nobody has it.
+    /// `snapshot` gives the current top of In Progress.
+    public static func startedChange(branch: String, me: String, in snapshot: CoworkSnapshot) -> (inout CoworkTask) -> Void {
+        let top = snapshot.tasks.filter { $0.status == .doing }.compactMap(\.rank).min()
+        return { t in
+            t.branch = branch
+            if t.status == .backlog || t.status == .todo {
+                t.status = .doing
+                t.rank = (top ?? 0) - 1
+            }
+            if t.assignee == nil, !me.isEmpty { t.assignee = me }
+        }
+    }
+
+    /// Starting a task (see `startedChange`), written like any task update.
+    public static func markStarted(id: String, branch: String, me: String, in snapshot: CoworkSnapshot,
+                                   now: Date = Date()) -> CoworkWrite {
+        updateTasks([id: startedChange(branch: branch, me: me, in: snapshot)], message: "Start \(id)", now: now)
     }
 
     /// The team list, merged with whatever is stored at the tip, so members

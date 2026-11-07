@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: macos-15
@@ -16,5 +19,50 @@ jobs:
         run: swift build
       - name: Test
         run: swift test
+      - name: Translations
+        run: python3 -I Scripts/check-translations.py
+      # End-to-end checks with real git through the app's own code (debug
+      # builds only). They run AppKit without opening a window.
+      - name: Cowork sync self-test
+        timeout-minutes: 5
+        run: |
+          out="$(GITCOWORK_SELFTEST="$(mktemp -d)/selftest" .build/debug/GitCowork -ApplePersistenceIgnoreState YES 2>&1)" || { echo "$out"; exit 1; }
+          echo "$out"
+          grep -q "SELFTEST PASS" <<<"$out"
+      - name: Undo self-test
+        timeout-minutes: 5
+        run: |
+          out="$(GITCOWORK_UNDO_SELFTEST="$(mktemp -d)/selftest" .build/debug/GitCowork -ApplePersistenceIgnoreState YES 2>&1)" || { echo "$out"; exit 1; }
+          echo "$out"
+          grep -q "SELFTEST PASS" <<<"$out"
+      - name: Check install.sh
+        run: |
+          bash -n install.sh
+          if command -v shellcheck >/dev/null; then shellcheck -S warning install.sh; else echo "shellcheck not installed; skipped"; fi
       - name: Build app bundle
         run: make app
+      - name: Release build has no debug aids
+        run: test "$(strings dist/git-cowork.app/Contents/MacOS/GitCowork | grep -c GITCOWORK_)" = 0
+      # install.sh against the bundle just built, served from file:// URLs,
+      # into a temporary folder (with a space, like "My Apps").
+      - name: install.sh smoke test
+        run: |
+          set -euo pipefail
+          t="$(mktemp -d)"
+          rel="$t/release/v0.0.0-ci"
+          mkdir -p "$rel"
+          zip=git-cowork-0.0.0-ci-macos-arm64.zip
+          ditto -c -k --keepParent dist/git-cowork.app "$rel/$zip"
+          (cd "$rel" && shasum -a 256 "$zip" > "$zip.sha256")
+          export GIT_COWORK_VERSION=0.0.0-ci GIT_COWORK_DOWNLOAD_BASE="file://$t/release"
+          export GIT_COWORK_PREFIX="$t/My Apps" GIT_COWORK_BINDIR="$t/bin"
+          bash install.sh
+          test -x "$t/My Apps/git-cowork.app/Contents/MacOS/GitCowork"
+          test "$(readlink "$t/bin/git-cowork")" = "$t/My Apps/git-cowork.app/Contents/Helpers/git-cowork"
+          "$t/bin/git-cowork" help >/dev/null
+          # A second run replaces the app; a damaged download leaves it alone.
+          bash install.sh
+          echo "0000000000000000000000000000000000000000000000000000000000000000  $zip" > "$rel/$zip.sha256"
+          if bash install.sh; then echo "install.sh accepted a bad checksum"; exit 1; fi
+          test -x "$t/My Apps/git-cowork.app/Contents/MacOS/GitCowork"
+          test ! -e "$t/My Apps/.git-cowork.app.new" && test ! -e "$t/My Apps/.git-cowork.app.old"

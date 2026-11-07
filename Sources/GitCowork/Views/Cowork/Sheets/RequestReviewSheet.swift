@@ -18,7 +18,7 @@ struct RequestReviewSheet: View {
     init(model: RepoModel, branch: String) {
         self.model = model
         self.branch = branch
-        let defaultBase = model.baseBranch()?.name ?? "main"
+        let defaultBase = model.baseBranchName
         _base = State(initialValue: defaultBase == branch ? "" : defaultBase)
         let tip = model.branch(named: branch)?.target
         _title = State(initialValue: tip.flatMap { model.commit($0)?.subject } ?? branch)

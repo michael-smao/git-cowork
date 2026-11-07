@@ -59,9 +59,7 @@ struct ReviewsView: View {
 
     private static func matches(_ r: ReviewRequest, _ f: Filter, me: String) -> Bool {
         switch f {
-        case .waiting:
-            r.status == .open && r.requester.lowercased() != me
-                && r.reviewers.contains { $0.key.lowercased() == me && ($0.value == .requested || $0.value == .commented) }
+        case .waiting: r.isWaiting(on: me)
         case .mine: r.status == .open && r.requester.lowercased() == me
         case .open: r.status == .open
         case .closed: r.status == .closed

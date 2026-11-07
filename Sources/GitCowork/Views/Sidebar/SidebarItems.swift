@@ -157,7 +157,7 @@ struct SidebarCowork {
                 return oa != ob ? oa < ob : a.updated > b.updated
             }
         let open = store.reviews.filter { $0.status == .open }.sorted { $0.updated > $1.updated }
-        let waiting = open.filter { r in r.reviewers.contains { $0.key.lowercased() == email && $0.value == .requested } }
+        let waiting = open.filter { $0.isWaiting(on: email) }
         let waitingIDs = Set(waiting.map(\.id))
         self.waiting = waiting
         requested = open.filter { $0.requester.lowercased() == email && !waitingIDs.contains($0.id) }

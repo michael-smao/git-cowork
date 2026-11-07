@@ -116,8 +116,8 @@ final class CoworkStore {
     var tasks: [CoworkTask] { snapshot.tasks }
     var reviews: [ReviewRequest] { snapshot.reviews }
 
-    func task(_ id: String) -> CoworkTask? { snapshot.tasks.first { $0.id == id } }
-    func review(_ id: String) -> ReviewRequest? { snapshot.reviews.first { $0.id == id } }
+    func task(_ id: String) -> CoworkTask? { snapshot.task(id: id) }
+    func review(_ id: String) -> ReviewRequest? { snapshot.review(id: id) }
     func comments(on parent: String) -> [CoworkComment] { snapshot.comments[parent] ?? [] }
 
     /// Team members plus everyone seen in commits, one entry per email.

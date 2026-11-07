@@ -4,7 +4,6 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.editorApp) private var editorApp = "Visual Studio Code"
     @AppStorage(Prefs.Key.terminalApp) private var terminalApp = "Terminal"
     @AppStorage(Prefs.Key.hostOverrides) private var hostOverrides = ""
-    @AppStorage(Prefs.Key.coworkRemote) private var coworkRemote = ""
     @AppStorage(Prefs.Key.coworkAutoSync) private var coworkAutoSync = true
     @AppStorage(Prefs.Key.autoFetch) private var autoFetch = true
     @AppStorage(Prefs.Key.checkForUpdates) private var checkForUpdates = true
@@ -26,9 +25,10 @@ struct SettingsView: View {
                     .font(Theme.Font.small).foregroundStyle(.secondary)
             }
             Section("Cowork") {
-                TextField("Sync remote", text: $coworkRemote, prompt: Text("Remote with cowork data, else origin"))
                 Toggle("Sync tasks automatically", isOn: $coworkAutoSync)
                 Text("Tasks, reviews and comments live on the hidden ref refs/cowork/main and are fetched and pushed with plain git, about once a minute while git-cowork is in front. Turn this off to sync only from the status bar or Repository > Sync Tasks Now.")
+                    .font(Theme.Font.small).foregroundStyle(.secondary)
+                Text("Each repository syncs with the remote in git config cowork.remote, the same one git cowork uses. Without it, git-cowork picks a remote that already has tasks, else origin, and saves the choice there. To change it: git config cowork.remote <name>")
                     .font(Theme.Font.small).foregroundStyle(.secondary)
             }
             Section("Git") {

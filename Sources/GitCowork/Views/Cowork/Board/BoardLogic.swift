@@ -4,20 +4,9 @@ import GitCoworkCore
 /// Pure helpers for the board: filtering, column order, and drop ranks.
 /// Kept free of SwiftUI so they're cheap and easy to reason about.
 enum BoardLogic {
-    /// Column order: ranked tasks first (lower rank on top), then unranked
-    /// ones by most recent update. Done is always newest first.
+    /// Column order (TaskOrder, shared with `git cowork list`).
     static func sorted(_ tasks: [CoworkTask], status: TaskStatus) -> [CoworkTask] {
-        if status == .done {
-            return tasks.sorted { $0.updated != $1.updated ? $0.updated > $1.updated : $0.id < $1.id }
-        }
-        return tasks.sorted { a, b in
-            switch (a.rank, b.rank) {
-            case let (x?, y?) where x != y: return x < y
-            case (_?, nil): return true
-            case (nil, _?): return false
-            default: return a.updated != b.updated ? a.updated > b.updated : a.id < b.id
-            }
-        }
+        TaskOrder.sorted(tasks, status: status)
     }
 
     /// True when the task matches the search text (id, title or body).

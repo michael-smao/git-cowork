@@ -165,8 +165,13 @@ git cowork inbox --sync
 ```
 
 `git cowork help` lists everything. Reads use what's already fetched; add
-`--sync` to fetch teammates' changes first. The remote is `origin` unless
-`git config cowork.remote <name>` says otherwise.
+`--sync` to fetch teammates' changes first. Titles and comments need no
+quotes (`git cowork new Fix login bug`), and teammates can be named by
+handle (`--to anna`) once they appear in the tasks.
+
+Tasks sync with the remote in `git config cowork.remote <name>`, the same
+one for the app and the tool. Without it, both pick a remote that already has
+tasks, else `origin`; the app saves that choice in the repository's config.
 
 ## Keyboard shortcuts
 

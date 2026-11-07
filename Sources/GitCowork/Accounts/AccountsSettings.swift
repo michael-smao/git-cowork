@@ -58,14 +58,6 @@ struct AccountsSection: View {
     }
 }
 
-private func defaultHost(_ kind: HostKind) -> String {
-    switch kind {
-    case .github: "github.com"
-    case .gitlab: "gitlab.com"
-    case .gitea: "codeberg.org"
-    }
-}
-
 /// Same frame as SheetScaffold, but stays open while sign-in runs.
 private struct AccountSheetFrame<Content: View, Buttons: View>: View {
     let title: String
@@ -106,7 +98,7 @@ struct BrowserSignInSheet: View {
 
     init(kind: HostKind, host: String? = nil) {
         self.kind = kind
-        _host = State(initialValue: host ?? defaultHost(kind))
+        _host = State(initialValue: host ?? kind.defaultHost)
     }
 
     private var normalizedHost: String? { HostAccount.normalizeHost(host) }
@@ -188,7 +180,7 @@ struct BrowserSignInSheet: View {
 struct TokenSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var kind: HostKind = .github
-    @State private var host = defaultHost(.github)
+    @State private var host = HostKind.github.defaultHost
     @State private var token = ""
     @State private var working = false
     @State private var error: String?
@@ -205,7 +197,7 @@ struct TokenSheet: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .onChange(of: kind) { old, new in
-                if host == defaultHost(old) { host = defaultHost(new) }
+                if host == old.defaultHost { host = new.defaultHost }
             }
             TextField("Server", text: $host).textFieldStyle(.roundedBorder)
             SecureField("Token", text: $token).textFieldStyle(.roundedBorder)
@@ -253,7 +245,7 @@ struct CreateSSHKeySheet: View {
     let signInAgain: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var working = false
-    @State private var error: SSHKeyError?
+    @State private var error: AccountError?
     @State private var task: Task<Void, Never>?
 
     private var shownPath: String {
@@ -299,10 +291,10 @@ struct CreateSSHKeySheet: View {
                 let path = try await SSHKeys.create(for: account)
                 AccountStore.shared.setSSHKey(path, for: account)
                 dismiss()
-            } catch let e as SSHKeyError {
+            } catch let e as AccountError {
                 error = e
             } catch {
-                self.error = SSHKeyError(message: error.localizedDescription)
+                self.error = AccountError(message: error.localizedDescription)
             }
         }
     }

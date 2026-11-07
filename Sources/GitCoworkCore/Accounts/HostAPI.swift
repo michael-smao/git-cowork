@@ -28,11 +28,11 @@ public enum HostAPI {
 
     // MARK: SSH keys
 
-    /// POST /user/keys, on GitHub and GitLab alike. GitHub needs the
-    /// `write:public_key` scope, GitLab `api`. GitLab keys are marked for
-    /// sign-in only (`usage_type`), since the app doesn't sign commits with them.
+    /// POST /user/keys, on GitHub and GitLab alike (needs `kind.sshKeyScope`).
+    /// GitLab keys are marked for sign-in only (`usage_type`), since the app
+    /// doesn't sign commits with them. Nil where keys can't be added.
     public static func addSSHKeyRequest(kind: HostKind, host: String, token: String, title: String, publicKey: String) -> URLRequest? {
-        guard kind != .gitea, let url = URL(string: apiBase(kind: kind, host: host) + "/user/keys") else { return nil }
+        guard kind.canAddSSHKey, let url = URL(string: apiBase(kind: kind, host: host) + "/user/keys") else { return nil }
         var r = authorized(url, kind: kind, token: token)
         var body = ["title": title, "key": publicKey.trimmingCharacters(in: .whitespacesAndNewlines)]
         if kind == .gitlab { body["usage_type"] = "auth" }
@@ -93,15 +93,19 @@ public enum HostAPI {
 
     /// Where to create a personal access token with the scopes git-cowork needs.
     public static func newTokenPage(kind: HostKind, host: String) -> URL? {
+        let scopes = kind.scopes.joined(separator: ",")
         switch kind {
         case .github:
-            URL(string: "https://\(host)/settings/tokens/new?scopes=repo,workflow,read:org,write:public_key&description=git-cowork")
+            return URL(string: "https://\(host)/settings/tokens/new?scopes=\(scopes)&description=git-cowork")
         case .gitlab:
-            URL(string: "https://\(host)/-/user_settings/personal_access_tokens?name=git-cowork&scopes=read_user,api,write_repository")
+            return URL(string: "https://\(host)/-/user_settings/personal_access_tokens?name=git-cowork&scopes=\(scopes)")
         case .gitea:
-            URL(string: "https://\(host)/user/settings/applications")
+            return URL(string: "https://\(host)/user/settings/applications")
         }
     }
+
+    /// The host turned the token down: expired, revoked, or not allowed.
+    public static func rejectsToken(status: Int) -> Bool { status == 401 || status == 403 }
 
     /// Adds the token and Accept header each host wants.
     static func authorized(_ url: URL, kind: HostKind, token: String) -> URLRequest {

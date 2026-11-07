@@ -24,22 +24,10 @@ public enum DeviceFlow {
         case failed(String)
     }
 
-    /// Scopes asked for at sign-in. GitHub needs `workflow` to push changes to
-    /// .github/workflows; `read:org` lists org repos later; `write:public_key`
-    /// adds an SSH key. GitLab has no scope narrower than `api` that can add
-    /// an SSH key (and creating merge requests needs it too).
-    public static func scopes(_ kind: HostKind) -> String {
-        switch kind {
-        case .github: "repo workflow read:org write:public_key"
-        case .gitlab: "read_user api write_repository"
-        case .gitea: ""
-        }
-    }
-
-    /// Device flow is built in on GitHub, and on GitLab since 17.3 (on by
-    /// default; flag removed in 17.9). Older GitLab servers, Gitea and Forgejo
-    /// use a pasted token.
-    public static func isSupported(_ kind: HostKind) -> Bool { kind != .gitea }
+    /// Scopes asked for at sign-in (see HostKind.scopes). Device flow is built
+    /// in on GitHub, and on GitLab since 17.3; older GitLab servers, Gitea and
+    /// Forgejo use a pasted token.
+    public static func scopes(_ kind: HostKind) -> String { kind.scopes.joined(separator: " ") }
 
     private static func endpoints(_ kind: HostKind, host: String) -> (code: String, token: String) {
         switch kind {

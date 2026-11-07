@@ -211,14 +211,7 @@ struct CloneSheet: View {
         return FileManager.default.fileExists(atPath: gh) ? gh : NSHomeDirectory()
     }
 
-    private var folderName: String { Self.folderName(for: url) }
-
-    private static func folderName(for url: String) -> String {
-        var s = url.trimmingCharacters(in: .whitespaces)
-        while s.hasSuffix("/") { s.removeLast() }
-        if s.hasSuffix(".git") { s = String(s.dropLast(4)) }
-        return s.split(whereSeparator: { $0 == "/" || $0 == ":" }).last.map(String.init) ?? ""
-    }
+    private var folderName: String { RemoteLinks.cloneFolderName(url) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.l) {
@@ -265,7 +258,7 @@ struct CloneSheet: View {
     }
 
     private func clone(_ source: String) {
-        let name = Self.folderName(for: source)
+        let name = RemoteLinks.cloneFolderName(source)
         guard !name.isEmpty else { return }
         running = true
         error = nil

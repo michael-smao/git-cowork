@@ -37,6 +37,37 @@ public enum RefName {
         let s = slug(task.title)
         return s.isEmpty ? task.id : "\(task.id)-\(s)"
     }
+
+    /// "origin/feature/x" -> ("origin", "feature/x"). Remote names may contain
+    /// "/", so the longest known remote that matches wins; when none does, the
+    /// part before the first "/" is the remote. Nil without a "/".
+    public static func splitRemote(_ name: String, remotes: [String]) -> (remote: String, branch: String)? {
+        if let remote = remotes.filter({ name.count > $0.count + 1 && name.hasPrefix($0 + "/") })
+            .max(by: { $0.count < $1.count }) {
+            return (remote, String(name.dropFirst(remote.count + 1)))
+        }
+        guard let slash = name.firstIndex(of: "/"), slash != name.startIndex,
+              name.index(after: slash) != name.endIndex else { return nil }
+        return (String(name[..<slash]), String(name[name.index(after: slash)...]))
+    }
+}
+
+extension CoworkTask {
+    /// The linked branch, if it's a valid branch name. Tasks are written by
+    /// teammates, so the field is checked before git ever sees it; anything
+    /// else counts as not linked.
+    public var linkedBranch: String? {
+        guard let b = branch, RefName.isValid(b) else { return nil }
+        return b
+    }
+}
+
+extension ReviewRequest {
+    /// Branch and base, when both are valid branch names (see CoworkTask.linkedBranch).
+    public var validBranches: (branch: String, base: String)? {
+        guard RefName.isValid(branch), RefName.isValid(base) else { return nil }
+        return (branch, base)
+    }
 }
 
 extension String {

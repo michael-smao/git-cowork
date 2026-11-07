@@ -39,8 +39,8 @@ public struct RemoteLinks: Hashable, Sendable {
             return nil   // local path remote
         }
 
-        if path.hasSuffix(".git") { path = String(path.dropLast(4)) }
         while path.hasSuffix("/") { path.removeLast() }
+        if path.hasSuffix(".git") { path = String(path.dropLast(4)) }
         while path.hasPrefix("/") { path.removeFirst() }
         guard !host.isEmpty, !path.isEmpty else { return nil }
 
@@ -112,5 +112,17 @@ public struct RemoteLinks: Hashable, Sendable {
             if let kind { result[parts[0]] = kind }
         }
         return result
+    }
+
+    /// Folder `git clone` makes for a URL: the repo path's last part without
+    /// ".git" ("git@host:org/app.git" -> "app"). Works for local paths too.
+    public static func cloneFolderName(_ url: String) -> String {
+        if let links = RemoteLinks(remoteURL: url), let last = links.path.split(separator: "/").last {
+            return String(last)
+        }
+        var s = url.trimmingCharacters(in: .whitespaces)
+        while s.hasSuffix("/") { s.removeLast() }
+        if s.hasSuffix(".git") { s = String(s.dropLast(4)) }
+        return s.split(whereSeparator: { $0 == "/" || $0 == ":" }).last.map(String.init) ?? ""
     }
 }

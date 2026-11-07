@@ -6,15 +6,15 @@ import Foundation
 /// To fill these in, register an OAuth app on github.com (Settings > Developer
 /// settings > OAuth Apps, tick "Enable Device Flow") and on gitlab.com (User
 /// settings > Applications, untick "Confidential", allow the device code
-/// grant, scopes read_user, read_api, write_repository). Until then, sign-in
-/// asks for a client ID or a token.
+/// grant, scopes read_user, api, write_repository: see HostKind.scopes).
+/// Until then, sign-in asks for a client ID or a token.
 enum OAuthApps {
     static let builtIn: [String: String] = [
         "github.com": "",
         "gitlab.com": "",
     ]
 
-    private static func key(_ host: String) -> String { "oauth.clientID.\(host)" }
+    private static func key(_ host: String) -> String { Prefs.Key.oauthClientID(host) }
 
     /// Client ID for a host: one the user entered (self-hosted servers), else the built-in one.
     static func clientID(for host: String) -> String? {

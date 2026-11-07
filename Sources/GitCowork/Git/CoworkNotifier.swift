@@ -15,7 +15,7 @@ final class CoworkNotifier {
     /// Notifications need an app bundle; `swift run` builds have none.
     private var available: Bool { Bundle.main.bundleIdentifier != nil }
 
-    private func seenKey(_ repo: String) -> String { "cowork.seen." + repo }
+    private func seenKey(_ repo: String) -> String { Prefs.Key.coworkSeen(repo) }
 
     func seen(repo: String) -> Set<String> {
         Set(UserDefaults.standard.stringArray(forKey: seenKey(repo)) ?? [])
@@ -38,7 +38,7 @@ final class CoworkNotifier {
     }
 
     func deliver(_ items: [InboxItem], repo: String, repoName: String) {
-        let key = "cowork.notified." + repo
+        let key = Prefs.Key.coworkNotified(repo)
         let stored = UserDefaults.standard.stringArray(forKey: key)
         // First time we see a repo: remember everything (even nothing), don't flood.
         guard let stored else {

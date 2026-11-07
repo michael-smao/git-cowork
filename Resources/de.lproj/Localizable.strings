@@ -13,6 +13,7 @@
 "%@ didn't return a repository list (HTTP %lld)." = "%@ hat keine Repository-Liste geliefert (HTTP %lld).";
 "%@ doesn't offer browser sign-in for this app. Check the client ID, or add an access token instead." = "%@ bietet für diese App keine Anmeldung im Browser an. Prüfe die Client-ID oder füge stattdessen ein Zugriffstoken hinzu.";
 "%@ failed" = "%@ fehlgeschlagen";
+"%@ has no usable branch name." = "%@ hat keinen brauchbaren Branch-Namen.";
 "%@ in progress" = "%@ läuft";
 "%@ into %@" = "%1$@ in %2$@";
 "%@ is checked out in another worktree" = "%@ ist in einem anderen Worktree ausgecheckt";
@@ -224,6 +225,7 @@
 "Done" = "Erledigt";
 "e.g. claude/fix-login" = "z. B. claude/fix-login";
 "Each email can only be listed once." = "Jede E-Mail-Adresse darf nur einmal vorkommen.";
+"Each repository syncs with the remote in git config cowork.remote, the same one git cowork uses. Without it, git-cowork picks a remote that already has tasks, else origin, and saves the choice there. To change it: git config cowork.remote <name>" = "Jedes Repository synchronisiert mit dem Remote aus git config cowork.remote, demselben, das git cowork nutzt. Ist keins gesetzt, wählt git-cowork ein Remote, das schon Aufgaben hat, sonst origin, und speichert die Wahl dort. Zum Ändern: git config cowork.remote <Name>";
 "Edit files, or let an agent work in this worktree. Changes show up here live." = "Bearbeite Dateien oder lass einen Agent in diesem Worktree arbeiten. Änderungen erscheinen hier sofort.";
 "Edit Team…" = "Team bearbeiten …";
 "Editor" = "Editor";
@@ -404,8 +406,6 @@
 "Push failed" = "Push fehlgeschlagen";
 "Push Tag" = "Tag pushen";
 "Push to %@" = "Nach %@ pushen";
-"read:user and write:repository" = "read:user und write:repository";
-"read_user, api and write_repository" = "read_user, api und write_repository";
 "Rebase %@ onto %@" = "%1$@ auf %2$@ rebasen";
 "Recent" = "Zuletzt geöffnet";
 "Redo" = "Wiederholen";
@@ -413,7 +413,6 @@
 "Register an OAuth app under Settings > Developer settings > OAuth Apps on that server, tick \"Enable Device Flow\", and paste its client ID. Or use Add Token instead." = "Registriere auf dem Server unter „Settings > Developer settings > OAuth Apps“ eine OAuth-App, aktiviere „Enable Device Flow“ und füge ihre Client-ID hier ein. Oder nutze stattdessen „Token hinzufügen“.";
 "Release Notes" = "Versionshinweise";
 "Remote" = "Remote";
-"Remote with cowork data, else origin" = "Remote mit Cowork-Daten, sonst origin";
 "Remove" = "Entfernen";
 "Remove from Recents" = "Aus „Zuletzt geöffnet“ entfernen";
 "Remove label" = "Label entfernen";
@@ -428,7 +427,6 @@
 "renamed from %@" = "umbenannt von %@";
 "Rename…" = "Umbenennen …";
 "Reopen Review" = "Review wieder öffnen";
-"repo, workflow, read:org and write:public_key" = "repo, workflow, read:org und write:public_key";
 "Repositories you open show up here" = "Repositorys, die du öffnest, erscheinen hier";
 "Repository" = "Repository";
 "repository" = "Repository";
@@ -501,6 +499,7 @@
 "Staged files" = "Vorgemerkte Dateien";
 "Start in New Worktree" = "In neuem Worktree starten";
 "Start Task" = "Aufgabe starten";
+"Start task failed" = "Aufgabe starten fehlgeschlagen";
 "Starts from %@" = "Beginnt bei %@";
 "Stash" = "Stash";
 "Stash Changes" = "Änderungen stashen";
@@ -513,7 +512,6 @@
 "Switch branch" = "Branch wechseln";
 "Sync failed" = "Sync fehlgeschlagen";
 "Sync Now" = "Jetzt synchronisieren";
-"Sync remote" = "Sync-Remote";
 "Sync tasks and reviews with %@ now" = "Aufgaben und Reviews jetzt mit %@ synchronisieren";
 "Sync tasks automatically" = "Aufgaben automatisch synchronisieren";
 "Sync Tasks Now" = "Aufgaben jetzt synchronisieren";
@@ -607,7 +605,6 @@
 "⌘↩ to send · @ to mention" = "⌘↩ zum Senden · @ zum Erwähnen";
 " · SSH key" = " · SSH-Schlüssel";
 "%@ didn't add the key: %@" = "%1$@ hat den Schlüssel nicht hinzugefügt: %2$@";
-"%@ no longer accepts your sign-in. Sign in again." = "%@ akzeptiert deine Anmeldung nicht mehr. Melde dich erneut an.";
 "%@ servers can't take an SSH key from git-cowork." = "%@-Server können keinen SSH-Schlüssel von git-cowork annehmen.";
 "Copy" = "Kopieren";
 "Couldn't find a free file name for the key in ~/.ssh." = "In ~/.ssh wurde kein freier Dateiname für den Schlüssel gefunden.";
@@ -619,7 +616,6 @@
 "Create a Token…" = "Token erstellen …";
 "Creating key…" = "Schlüssel wird erstellt …";
 "Make a new token with the scopes %@ and add it with Add Token." = "Erstelle ein neues Token mit den Scopes %@ und füge es mit „Token hinzufügen“ hinzu.";
-"No token for %@ in the Keychain. Sign in again." = "Kein Token für %@ im Schlüsselbund. Melde dich erneut an.";
 "SSH Host Entry" = "SSH-Host-Eintrag";
 "SSH Host Entry…" = "SSH-Host-Eintrag …";
 "Saved as %@, with its passphrase in the Keychain. Your ~/.ssh/config isn't changed." = "Gespeichert als %@, die Passphrase liegt im Schlüsselbund. Deine ~/.ssh/config bleibt unverändert.";
