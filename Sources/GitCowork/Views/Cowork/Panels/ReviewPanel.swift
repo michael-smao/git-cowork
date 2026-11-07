@@ -21,17 +21,6 @@ struct ReviewPanel: View {
     }
 }
 
-/// "Open" / "Closed" capsule.
-struct ReviewStateChip: View {
-    let status: ReviewStatus
-    var body: some View {
-        switch status {
-        case .open: Chip(text: "Open", symbol: "circle", color: .accentColor)
-        case .closed: Chip(text: "Closed", symbol: "lock", color: .secondary)
-        }
-    }
-}
-
 private struct ReviewPanelContent: View {
     let model: RepoModel
     let review: ReviewRequest
@@ -126,7 +115,7 @@ private struct ReviewPanelContent: View {
                 MentionText(text: review.body.trimmingCharacters(in: .whitespacesAndNewlines), handles: store.mentionHandles)
             }
             HStack(spacing: Theme.Space.s) {
-                PersonAvatar(person: store.person(review.requester), size: 14)
+                PersonAvatar(person: store.person(review.requester), size: Theme.AvatarSize.xs)
                 Text("Requested by \(displayName(review.requester, in: store)) · \(Formatters.relative(review.created))")
                     .help(Formatters.full(review.created))
             }
@@ -154,7 +143,7 @@ private struct ReviewPanelContent: View {
             }
             ForEach(sortedReviewers, id: \.email) { r in
                 HStack(spacing: Theme.Space.m) {
-                    PersonAvatar(person: store.person(r.email), size: 20)
+                    PersonAvatar(person: store.person(r.email), size: Theme.AvatarSize.l)
                     Text(displayName(r.email, in: store)).lineLimit(1)
                     Spacer(minLength: Theme.Space.s)
                     VerdictChip(verdict: r.verdict)

@@ -102,7 +102,7 @@ struct RequestReviewSheet: View {
             if let pushProblem {
                 SheetNotice(symbol: "exclamationmark.triangle.fill", color: .orange, text: pushProblem) {
                     if pushing {
-                        ProgressView().controlSize(.small)
+                        ProgressLabel()
                     } else {
                         Button("Push Branch") { push() }
                             .buttonStyle(ActionButtonStyle.secondary(.orange))
@@ -133,7 +133,7 @@ struct RequestReviewSheet: View {
                                 get: { reviewers.contains(p.email) },
                                 set: { if $0 { reviewers.insert(p.email) } else { reviewers.remove(p.email) } })) {
                                 HStack(spacing: Theme.Space.s + 2) {
-                                    PersonAvatar(person: p, size: 16)
+                                    PersonAvatar(person: p, size: Theme.AvatarSize.s)
                                     Text(p.displayName).lineLimit(1)
                                     Text(p.email).foregroundStyle(.secondary).lineLimit(1)
                                 }

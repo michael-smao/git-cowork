@@ -17,6 +17,19 @@ enum Prefs {
         /// Ask GitHub once a day whether a newer release exists.
         static let checkForUpdates = "updates.check"
         static let lastUpdateCheck = "updates.lastCheck"
+
+        // View state: remembered by the views, not shown in Settings.
+        static let sidebarVisible = "layout.sidebarVisible"
+        /// Open or closed sidebar section, e.g. "sidebar.local".
+        static func sidebarSection(_ section: SidebarSection) -> String { "sidebar." + section.rawValue }
+        /// Collapsed branch folders and remotes, per repository.
+        static let sidebarCollapsedByRepo = "sidebar.collapsedByRepo"
+        /// Older global version of `sidebarCollapsedByRepo`; removed when saving.
+        static let sidebarCollapsedFoldersOld = "sidebar.collapsedFolders"
+        static let diffMode = "diff.mode"
+        static let historyHiddenColumns = "history.hiddenColumns"
+        static let boardAssignee = "board.assignee"
+        static let reviewsFilter = "reviews.filter"
     }
 
     static var editorApp: String { UserDefaults.standard.string(forKey: Key.editorApp) ?? "Visual Studio Code" }

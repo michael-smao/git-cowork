@@ -100,7 +100,7 @@ struct AheadBehind: View {
 struct Avatar: View {
     let name: String
     let email: String
-    var size: CGFloat = 28
+    var size = Theme.AvatarSize.l
 
     var body: some View {
         Text(initials)
@@ -146,7 +146,7 @@ struct SectionHeader<Trailing: View>: View {
                     collapsed.wrappedValue.toggle()
                 } label: {
                     HStack(spacing: Theme.Space.s) {
-                        DisclosureChevron(expanded: !collapsed.wrappedValue).frame(width: 10)
+                        DisclosureChevron(expanded: !collapsed.wrappedValue).frame(width: Theme.Metrics.chevronWidth)
                         label
                     }
                     .contentShape(Rectangle())
@@ -228,11 +228,14 @@ struct FlowRow: Layout {
     }
 }
 
-/// Centered placeholder for empty panels.
-struct EmptyState: View {
+/// Centered placeholder for empty panels, with an optional button below.
+struct EmptyState<Actions: View>: View {
     let symbol: String
     let title: String
     var message: String?
+    /// Narrower column for a long message.
+    var messageWidth: CGFloat?
+    @ViewBuilder var actions: Actions
 
     var body: some View {
         VStack(spacing: Theme.Space.m) {
@@ -245,6 +248,10 @@ struct EmptyState: View {
                     .font(Theme.Font.small)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                    .frame(maxWidth: messageWidth)
+            }
+            if Actions.self != EmptyView.self {
+                actions.padding(.top, Theme.Space.s)
             }
         }
         .padding(Theme.Space.xxl)
@@ -252,171 +259,137 @@ struct EmptyState: View {
     }
 }
 
-/// Standard sheet layout: title, content, Cancel + primary button.
-struct SheetScaffold<Content: View>: View {
+extension EmptyState where Actions == EmptyView {
+    init(symbol: String, title: String, message: String? = nil) {
+        self.init(symbol: symbol, title: title, message: message) { EmptyView() }
+    }
+}
+
+/// Standard sheet layout: title, content, an optional error, then the
+/// button row: busy spinner, extra buttons, Cancel, primary button.
+struct SheetScaffold<Content: View, Extra: View>: View {
     let title: String
-    let confirmTitle: String
+    /// Nil leaves out the primary button.
+    let confirmTitle: String?
     var confirmDisabled = false
+    var error: String?
+    /// Monospaced error, for command output.
+    var monoError = false
+    /// Spinner label at the start of the button row ("Cloning…"); also
+    /// disables the primary button.
+    var busy: LocalizedStringKey?
+    var showsCancel = true
+    /// False for sheets that close themselves once the work succeeds.
+    var dismissOnConfirm = true
+    var width: CGFloat = 440
+    var onCancel: () -> Void = {}
     let onConfirm: () -> Void
     @ViewBuilder var content: Content
+    /// Buttons left of Cancel.
+    @ViewBuilder var extraButtons: Extra
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.l) {
             Text(ui: title).font(Theme.Font.title)
             content
+            if let error {
+                ErrorText(error, mono: monoError).fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
+                if let busy { ProgressLabel(busy) }
                 Spacer()
-                Button("Cancel") { dismiss() }
+                extraButtons
+                if showsCancel {
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
                     .keyboardShortcut(.cancelAction)
-                Button(LocalizedStringKey(confirmTitle)) {
-                    onConfirm()
-                    dismiss()
                 }
-                .keyboardShortcut(.defaultAction)
-                .disabled(confirmDisabled)
+                if let confirmTitle {
+                    Button(LocalizedStringKey(confirmTitle)) {
+                        onConfirm()
+                        if dismissOnConfirm { dismiss() }
+                    }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(confirmDisabled || busy != nil)
+                }
             }
         }
         .padding(Theme.Space.xl)
-        .frame(width: 440)
+        .frame(width: width)
     }
 }
 
-// MARK: Buttons
-
-/// The one button family used inside panels (the toolbar and list rows use
-/// the flat `HoverFillStyle`):
-/// - `.primary`: filled with the tint, white text. The main action of a block
-///   (New Task, Commit, Approve). Use at most one or two per block.
-/// - `.secondary`: small bordered button, tinted text on a soft tinted fill.
-///   Without a tint it is neutral (label color, separator border).
-/// - Inline text actions use `.buttonStyle(.link)`.
-struct ActionButtonStyle: ButtonStyle {
-    enum Kind { case primary, secondary }
-    var kind: Kind = .secondary
-    var tint: Color?
-
-    static func primary(_ tint: Color = .accentColor) -> ActionButtonStyle { .init(kind: .primary, tint: tint) }
-    static func secondary(_ tint: Color? = nil) -> ActionButtonStyle { .init(kind: .secondary, tint: tint) }
-
-    func makeBody(configuration: Configuration) -> some View {
-        ActionButtonBody(label: configuration.label, kind: kind, tint: tint, pressed: configuration.isPressed)
+extension SheetScaffold where Extra == EmptyView {
+    init(title: String, confirmTitle: String?, confirmDisabled: Bool = false, error: String? = nil,
+         monoError: Bool = false, busy: LocalizedStringKey? = nil, dismissOnConfirm: Bool = true,
+         width: CGFloat = 440, onCancel: @escaping () -> Void = {},
+         onConfirm: @escaping () -> Void, @ViewBuilder content: () -> Content) {
+        self.init(title: title, confirmTitle: confirmTitle, confirmDisabled: confirmDisabled, error: error,
+                  monoError: monoError, busy: busy, dismissOnConfirm: dismissOnConfirm, width: width,
+                  onCancel: onCancel, onConfirm: onConfirm, content: content, extraButtons: { EmptyView() })
     }
 }
 
-/// Draws the `ActionButtonStyle` look. Also used directly as the label of
-/// menus (`actionButtonLabel`), which can't take a custom button style.
-private struct ActionButtonBody<Label: View>: View {
-    let label: Label
-    let kind: ActionButtonStyle.Kind
-    let tint: Color?
-    var pressed = false
-    @Environment(\.isEnabled) private var enabled
-    @Environment(\.colorScheme) private var scheme
-    @State private var hovering = false
+/// Red message for a failed action or invalid input. Selectable, so it can be copied.
+struct ErrorText: View {
+    let text: String
+    var mono = false
+
+    init(_ text: String, mono: Bool = false) {
+        self.text = text
+        self.mono = mono
+    }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.Radius.control)
-        label
-            .labelStyle(ActionLabelStyle())
-            .font(Theme.Font.small.weight(kind == .primary ? .semibold : .medium))
-            .lineLimit(1)
-            .foregroundStyle(foreground)
-            .padding(.horizontal, Theme.Space.m + Theme.Space.xs)
-            .frame(minHeight: Theme.Metrics.buttonHeight)
-            .background(shape.fill(fill))
-            .overlay(shape.strokeBorder(border, lineWidth: Theme.Metrics.hairline))
-            .overlay(shape.fill(Color.black.opacity(pressed ? 0.12 : 0)))
-            .contentShape(shape)
-            .opacity(enabled ? 1 : 0.45)
-            .fixedSize()
-            .onHover { hovering = $0 }
+        Text(verbatim: text)
+            .font(mono ? Theme.Font.monoSmall : Theme.Font.small)
+            .foregroundStyle(Theme.Status.error)
+            .textSelection(.enabled)
     }
+}
 
-    private var color: Color { tint ?? .primary }
+/// Small spinner with a quiet label: "Cloning…", "Waiting for approval…".
+/// Without a label it is just the spinner.
+struct ProgressLabel: View {
+    var title: LocalizedStringKey?
 
-    private var foreground: Color {
-        switch kind {
-        case .primary: .white
-        case .secondary: tint?.readableTint(scheme) ?? .primary
-        }
-    }
+    init(_ title: LocalizedStringKey? = nil) { self.title = title }
 
-    private var fill: Color {
-        switch kind {
-        case .primary: (tint ?? .accentColor).opacity(hovering && enabled ? 0.88 : 1)
-        case .secondary: tint == nil
-            ? color.opacity(hovering && enabled ? 0.16 : 0.05)
-            : color.opacity(hovering && enabled ? Theme.Tint.chip + 0.07 : Theme.Tint.chip)
-        }
-    }
-
-    private var border: Color {
-        switch kind {
-        case .primary: .clear
-        case .secondary: tint == nil ? Color(nsColor: .separatorColor) : .clear  // tinted: the fill is enough
+    var body: some View {
+        HStack(spacing: Theme.Space.m) {
+            ProgressView().controlSize(.small)
+            if let title {
+                Text(title).font(Theme.Font.small).foregroundStyle(.secondary)
+            }
         }
     }
 }
 
-/// Plain button with a soft fill while hovered or pressed. `.row` for
-/// clickable list rows; `.chrome()` for the flat toolbar buttons, with a
-/// little padding and rounded corners. Dimmed when disabled.
-struct HoverFillStyle: ButtonStyle {
-    var hover = 0.05
-    var pressed = 0.10
-    var radius: CGFloat = 0
-    var padding = EdgeInsets()
-
-    static let row = HoverFillStyle()
-
-    static func chrome(horizontalPadding: CGFloat = Theme.Space.s) -> HoverFillStyle {
-        HoverFillStyle(hover: 0.08, pressed: 0.16, radius: Theme.Radius.control,
-                       padding: EdgeInsets(top: Theme.Space.xs, leading: horizontalPadding,
-                                           bottom: Theme.Space.xs, trailing: horizontalPadding))
-    }
-
-    func makeBody(configuration: Configuration) -> some View {
-        HoverFillBody(configuration: configuration, style: self)
-    }
-
-    private struct HoverFillBody: View {
-        let configuration: Configuration
-        let style: HoverFillStyle
-        @State private var hovering = false
-        @Environment(\.isEnabled) private var enabled
-
-        var body: some View {
-            configuration.label
-                .padding(style.padding)
-                .background(RoundedRectangle(cornerRadius: style.radius).fill(Color.primary.opacity(fill)))
-                .foregroundStyle(enabled ? .primary : .tertiary)
-                .contentShape(Rectangle())
-                .onHover { hovering = $0 }
-        }
-
-        private var fill: Double {
-            guard enabled else { return 0 }
-            if configuration.isPressed { return style.pressed }
-            return hovering ? style.hover : 0
-        }
+/// The ▾ of pop-up menus.
+struct DropdownChevron: View {
+    var body: some View {
+        Image(systemName: "chevron.down").font(Theme.Glyph.dropdown)
     }
 }
 
-/// Icon and title close together, icon a little smaller than the text.
-private struct ActionLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: Theme.Space.s) {
-            configuration.icon.font(.system(size: 9, weight: .semibold))
-            configuration.title
-        }
-    }
-}
+/// Menu label: content followed by a ▾. `quiet` greys the chevron, for
+/// labels whose content carries its own color (chips, avatars).
+struct DropdownLabel<Content: View>: View {
+    var spacing = Theme.Space.s
+    var quiet = false
+    @ViewBuilder var content: Content
 
-extension View {
-    /// The `ActionButtonStyle` look for a menu's label. Use with
-    /// `.menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden)`.
-    func actionButtonLabel(_ kind: ActionButtonStyle.Kind = .secondary, tint: Color? = nil) -> some View {
-        ActionButtonBody(label: self, kind: kind, tint: tint)
+    var body: some View {
+        HStack(spacing: spacing) {
+            content
+            if quiet {
+                DropdownChevron().foregroundStyle(.secondary)
+            } else {
+                DropdownChevron()
+            }
+        }
     }
 }

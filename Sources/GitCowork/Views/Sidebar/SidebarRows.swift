@@ -110,24 +110,6 @@ extension SidebarSectionHeader where Trailing == EmptyView {
     }
 }
 
-/// Small borderless "+" button for section headers.
-struct SidebarHeaderButton: View {
-    let help: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: "plus")
-                .font(.system(size: SidebarStyle.iconSize, weight: .medium))
-                .frame(width: Theme.Metrics.iconWidth, height: Theme.Metrics.iconWidth)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
-        .foregroundStyle(.secondary)
-        .help(Text(ui: help))
-    }
-}
-
 // MARK: - Tree rows
 
 /// Branch folder ("claude", "feature") or remote ("origin"). Click toggles.
@@ -282,89 +264,6 @@ struct SidebarStashRow: View {
     }
 }
 
-// MARK: - Cowork rows
-
-/// One of my tasks: [status icon] CW-a3f9 Title.
-struct SidebarTaskRow: View {
-    let task: CoworkTask
-
-    var body: some View {
-        SidebarRowLayout {
-            SidebarIcon(symbol: task.status.symbol, color: task.status.color)
-            Text(task.id)
-                .font(Theme.Font.monoSmall)
-                .foregroundStyle(.secondary)
-                .fixedSize()
-            Text(task.title).truncationMode(.tail)
-            Spacer(minLength: 0)
-        }
-        .help("\(task.id) · \(task.status.label)\n\(task.title)")
-    }
-}
-
-/// Review request: [overall verdict icon] branch ……… requester / approvals.
-struct SidebarReviewRow: View {
-    let review: ReviewRequest
-    /// I'm asked and haven't answered.
-    let waiting: Bool
-    let requester: TeamMember?
-
-    var body: some View {
-        let overall = review.overall
-        SidebarRowLayout {
-            SidebarIcon(symbol: overall.symbol, color: waiting ? .accentColor : overall.color)
-            Text(review.branch)
-                .fontWeight(waiting ? .semibold : .regular)
-                .truncationMode(.middle)
-            Spacer(minLength: Theme.Space.s)
-            SidebarTrailing {
-                if waiting {
-                    PersonAvatar(person: requester, size: SidebarStyle.avatarSize)
-                } else {
-                    Text(verbatim: "\(approvals)/\(review.reviewers.count)")
-                        .font(Theme.Font.small.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .help("\(approvals) of \(review.reviewers.count) approved")
-                }
-            }
-        }
-        .help(waiting
-              ? "\(requester?.name ?? review.requester) asked you to review \(review.branch)\n\(review.title)"
-              : "\(review.branch): \(overall.title)\n\(review.title)")
-    }
-
-    private var approvals: Int { review.reviewers.values.filter { $0 == .approved }.count }
-}
-
-/// Team member: [avatar] Name @handle.
-struct SidebarPersonRow: View {
-    let person: TeamMember
-    let isMe: Bool
-
-    var body: some View {
-        SidebarRowLayout {
-            Avatar(name: person.displayName, email: person.email,
-                   size: SidebarStyle.avatarSize)
-                .frame(width: Theme.Metrics.iconWidth)
-            Text(person.displayName)
-            if !person.handle.isEmpty {
-                Text(verbatim: "@" + person.handle)
-                    .font(Theme.Font.small)
-                    .foregroundStyle(.secondary)
-                    .truncationMode(.tail)
-            }
-            Spacer(minLength: Theme.Space.s)
-            if isMe {
-                Text("you")
-                    .font(Theme.Font.small)
-                    .foregroundStyle(.tertiary)
-                    .fixedSize()
-            }
-        }
-        .help("\(person.name) <\(person.email)>")
-    }
-}
-
 /// "All Tasks…", "Edit Team…": a quiet clickable row at the end of a section.
 struct SidebarLinkRow: View {
     let link: SidebarLink
@@ -391,44 +290,6 @@ struct SidebarNoteRow: View {
                 .font(Theme.Font.small)
                 .foregroundStyle(.tertiary)
             Spacer(minLength: 0)
-        }
-    }
-}
-
-// MARK: - Filter
-
-/// Rounded filter field with a count ("106" / "3 matches") and a clear button.
-struct SidebarFilterField: View {
-    @Binding var text: String
-    var focus: FocusState<Bool>.Binding
-    let count: Int
-
-    var body: some View {
-        HStack(spacing: Theme.Space.s) {
-            Image(systemName: "line.3.horizontal.decrease")
-                .foregroundStyle(.secondary)
-            TextField("Filter (⌥⌘F)", text: $text)
-                .textFieldStyle(.plain)
-                .focused(focus)
-                .onExitCommand { text = "" }
-            Text(text.isEmpty ? "Viewing \(count)" : count == 1 ? "1 match" : "\(count) matches")
-                .font(Theme.Font.small.monospacedDigit())
-                .foregroundStyle(.tertiary)
-                .fixedSize()
-            if !text.isEmpty {
-                Button { text = "" } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.secondary)
-                    .help("Clear filter")
-            }
-        }
-        .font(Theme.Font.body)
-        .padding(.horizontal, Theme.Space.m)
-        .frame(height: Theme.Metrics.rowHeight)
-        .background(Color(nsColor: .quaternaryLabelColor).opacity(0.5), in: RoundedRectangle(cornerRadius: Theme.Radius.control))
-        .overlay {
-            RoundedRectangle(cornerRadius: Theme.Radius.control)
-                .strokeBorder(focus.wrappedValue ? Color.accentColor.opacity(0.6) : .clear)
         }
     }
 }

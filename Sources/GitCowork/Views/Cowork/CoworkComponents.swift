@@ -7,7 +7,7 @@ import SwiftUI
 /// use lane colors; people use this stable per-email color).
 struct PersonAvatar: View {
     let person: TeamMember?
-    var size: CGFloat = 20
+    var size = Theme.AvatarSize.l
 
     var body: some View {
         if let person {
@@ -24,23 +24,35 @@ struct PersonAvatar: View {
 }
 
 /// Colored capsule with an icon: "In Progress", "Approved", label names.
-struct Chip: View {
+/// `trailing` adds a control after the text (a remove button).
+struct Chip<Trailing: View>: View {
     let text: String
     var symbol: String?
     var color: Color = .secondary
     var filled = false
+    /// Smaller right inset when `trailing` holds a button.
+    var trailingPadding = Theme.Space.m
+    @ViewBuilder var trailing: Trailing
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         HStack(spacing: Theme.Space.s) {
             if let symbol { Image(systemName: symbol).font(.system(size: 9, weight: .semibold)) }
             Text(text).lineLimit(1)
+            trailing
         }
         .font(Theme.Font.small.weight(.medium))
-        .padding(.horizontal, Theme.Space.m)
+        .padding(.leading, Theme.Space.m)
+        .padding(.trailing, trailingPadding)
         .frame(height: Theme.Metrics.chipHeight)
         .foregroundStyle(filled ? Color.white : color.readableTint(scheme))
         .background(filled ? color : color.opacity(Theme.Tint.chip), in: Capsule())
+    }
+}
+
+extension Chip where Trailing == EmptyView {
+    init(text: String, symbol: String? = nil, color: Color = .secondary, filled: Bool = false) {
+        self.init(text: text, symbol: symbol, color: color, filled: filled) { EmptyView() }
     }
 }
 
@@ -52,6 +64,17 @@ struct StatusChip: View {
 struct VerdictChip: View {
     let verdict: ReviewVerdict
     var body: some View { Chip(text: verdict.title, symbol: verdict.symbol, color: verdict.color) }
+}
+
+/// "Open" / "Closed" capsule.
+struct ReviewStateChip: View {
+    let status: ReviewStatus
+    var body: some View {
+        switch status {
+        case .open: Chip(text: "Open", symbol: "circle", color: .accentColor)
+        case .closed: Chip(text: "Closed", symbol: "lock", color: .secondary)
+        }
+    }
 }
 
 /// Labels get a stable color from their name.
@@ -83,9 +106,9 @@ struct AssigneeOptions<Item: View>: View {
     @ViewBuilder let item: (_ email: String?, _ title: String, _ icon: Image) -> Item
 
     var body: some View {
-        item(nil, "Unassigned", Image(systemName: "person.crop.circle.badge.questionmark"))
+        item(nil, L("Unassigned"), Image(systemName: "person.crop.circle.badge.questionmark"))
         if !store.me.email.isEmpty {
-            item(store.me.email, "Me (\(store.me.displayName))", menuPersonIcon(store.me))
+            item(store.me.email, String(localized: "Me (\(store.me.displayName))"), menuPersonIcon(store.me))
         }
         let others = store.others
         if !others.isEmpty {

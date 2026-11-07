@@ -6,7 +6,7 @@ struct DiffPane: View {
     let model: RepoModel
     let target: DiffTarget
 
-    @AppStorage("diff.mode") private var modeRaw = DiffMode.hunk.rawValue
+    @AppStorage(Prefs.Key.diffMode) private var modeRaw = DiffMode.hunk.rawValue
     @State private var document = DiffDocument()
     @State private var version = 0
     @State private var loaded = false

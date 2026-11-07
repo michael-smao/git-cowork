@@ -63,6 +63,7 @@ enum Theme {
         static let caption = NSFont.systemFont(ofSize: 11, weight: .semibold)
         static let mono = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
         static let monoSmall = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        static let body = NSFont.systemFont(ofSize: 13)
     }
 
     /// Layout rules shared by every panel, so edges line up across the window.
@@ -84,8 +85,26 @@ enum Theme {
         static let buttonHeight: CGFloat = 22
         /// Column for a row's leading icon (file status, sidebar icons), so text lines up.
         static let iconWidth: CGFloat = 16
+        /// Column for disclosure chevrons, so the titles after them line up.
+        static let chevronWidth: CGFloat = 10
         /// Borders: use Divider() / separatorColor at 1pt; never stack two.
         static let hairline: CGFloat = 1
+    }
+
+    /// Avatar diameters, smallest to largest. Sizes in between aren't used.
+    enum AvatarSize {
+        /// Inline beside small text ("by Anna").
+        static let xs: CGFloat = 14
+        /// List and sidebar rows.
+        static let s: CGFloat = 16
+        /// Pickers, board cards, co-authors.
+        static let m: CGFloat = 18
+        /// Reviewer rows; the default.
+        static let l: CGFloat = 20
+        /// Comment authors.
+        static let xl: CGFloat = 22
+        /// Inbox entries.
+        static let xxl: CGFloat = 24
     }
 
     /// Sidebar column (filter bar and list alike): a step lighter than the
@@ -140,6 +159,14 @@ enum Theme {
         static let untracked = Color(nsColor: .systemTeal)
         /// Needs attention: conflicts banner, sync errors, uncommitted counts.
         static let warning = Color(nsColor: .systemOrange)
+        /// Failed actions and invalid input (`ErrorText`).
+        static let error = Color(nsColor: .systemRed)
+        /// Done or approved; the Commit button.
+        static let success = Color(nsColor: .systemGreen)
+        /// Neutral news, e.g. a comment.
+        static let info = Color(nsColor: .systemBlue)
+        /// Waiting, nothing decided yet.
+        static let pending = Color(nsColor: .systemGray)
     }
 }
 
@@ -271,10 +298,10 @@ extension TaskStatus {
 extension ReviewVerdict {
     var color: Color {
         switch self {
-        case .requested: Color(nsColor: .systemGray)
-        case .approved: Color(nsColor: .systemGreen)
-        case .changesRequested: Color(nsColor: .systemOrange)
-        case .commented: Color(nsColor: .systemBlue)
+        case .requested: Theme.Status.pending
+        case .approved: Theme.Status.success
+        case .changesRequested: Theme.Status.warning
+        case .commented: Theme.Status.info
         }
     }
 

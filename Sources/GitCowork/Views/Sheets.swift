@@ -172,7 +172,7 @@ struct AddWorktreeSheet: View {
             .formStyle(.columns)
 
             if FileManager.default.fileExists(atPath: path) && !path.isEmpty {
-                Text("That folder already exists").font(Theme.Font.small).foregroundStyle(.red)
+                ErrorText(L("That folder already exists"))
             }
             Toggle("Open in a new tab", isOn: $openAfter).toggleStyle(.checkbox)
         }
@@ -221,8 +221,12 @@ struct CloneSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.l) {
-            Text("Clone Repository").font(Theme.Font.title)
+        // Stays open while cloning; clone() closes it when done.
+        SheetScaffold(title: "Clone Repository", confirmTitle: "Clone", confirmDisabled: folderName.isEmpty,
+                      error: error, monoError: true, busy: running ? "Cloning…" : nil,
+                      dismissOnConfirm: false, width: accounts.isEmpty ? 480 : 540) {
+            clone(url)
+        } content: {
             if !accounts.isEmpty {
                 CloneRepoList(accounts: accounts, url: $url) { picked in
                     guard !running else { return }
@@ -248,20 +252,7 @@ struct CloneSheet: View {
             if !folderName.isEmpty {
                 Text("Clones into \(parent)/\(folderName)").font(Theme.Font.small).foregroundStyle(.secondary)
             }
-            if let error {
-                Text(error).font(Theme.Font.monoSmall).foregroundStyle(.red).textSelection(.enabled)
-            }
-            HStack {
-                if running { ProgressView().controlSize(.small); Text("Cloning…").font(Theme.Font.small) }
-                Spacer()
-                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("Clone") { clone(url) }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(folderName.isEmpty || running)
-            }
         }
-        .padding(Theme.Space.xl)
-        .frame(width: accounts.isEmpty ? 480 : 540)
     }
 
     private func clone(_ source: String) {

@@ -51,7 +51,7 @@ struct BoardCard: View, Equatable {
                     .foregroundStyle(.secondary)
                     .help(comments == 1 ? "1 comment" : "\(comments) comments")
                 }
-                PersonAvatar(person: assignee, size: 18)
+                PersonAvatar(person: assignee, size: Theme.AvatarSize.m)
             }
             .frame(height: 18)
         }

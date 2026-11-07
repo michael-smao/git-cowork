@@ -11,7 +11,7 @@ struct RepoView: View {
     let openHere: (String) -> Void
     let openInNewTab: (String) -> Void
 
-    @AppStorage("layout.sidebarVisible") private var sidebarVisible = true
+    @AppStorage(Prefs.Key.sidebarVisible) private var sidebarVisible = true
 
     var body: some View {
         // A plain split (not NavigationSplitView): the toolbar and the tab bar

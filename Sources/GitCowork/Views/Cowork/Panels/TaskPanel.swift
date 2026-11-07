@@ -216,7 +216,7 @@ private struct TaskPanelContent: View {
     private var meta: some View {
         VStack(alignment: .leading, spacing: Theme.Space.xs) {
             HStack(spacing: Theme.Space.s) {
-                PersonAvatar(person: store.person(task.author), size: 14)
+                PersonAvatar(person: store.person(task.author), size: Theme.AvatarSize.xs)
                 Text("Created by \(displayName(task.author, in: store)) · \(Formatters.full(task.created))")
             }
             Text("Updated \(Formatters.relative(task.updated))")
@@ -315,11 +315,8 @@ private struct TaskBranchRow: View {
                     Button(b.name) { onLink(b.name) }
                 }
             } label: {
-                HStack(spacing: Theme.Space.s) {
-                    Text("Link Branch")
-                    Image(systemName: "chevron.down").font(Theme.Glyph.dropdown)
-                }
-                .actionButtonLabel()
+                DropdownLabel { Text("Link Branch") }
+                    .actionButtonLabel()
             }
             .menuStyle(.button)
             .buttonStyle(.plain)

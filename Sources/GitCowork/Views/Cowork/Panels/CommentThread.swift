@@ -109,7 +109,7 @@ struct MentionSuggestions: View {
             ForEach(people) { p in
                 Button { pick(p) } label: {
                     HStack(spacing: Theme.Space.m) {
-                        PersonAvatar(person: p, size: 16)
+                        PersonAvatar(person: p, size: Theme.AvatarSize.s)
                         Text(p.displayName).lineLimit(1)
                         Text("@" + p.mentionHandle)
                             .foregroundStyle(.secondary)
@@ -159,7 +159,7 @@ private struct CommentRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Theme.Space.m) {
-            PersonAvatar(person: person, size: 22)
+            PersonAvatar(person: person, size: Theme.AvatarSize.xl)
             VStack(alignment: .leading, spacing: Theme.Space.xs) {
                 HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s) {
                     Text(person?.displayName ?? comment.authorName)

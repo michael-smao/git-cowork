@@ -104,7 +104,7 @@ private struct InboxRow: View {
                     .frame(width: 6, height: 6)
                     .padding(.top, 7)
                 ZStack(alignment: .bottomTrailing) {
-                    PersonAvatar(person: actor, size: 24)
+                    PersonAvatar(person: actor, size: Theme.AvatarSize.xxl)
                     Image(systemName: symbol)
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(.white)
@@ -158,7 +158,7 @@ private struct InboxRow: View {
         case .reviewRequested: TaskStatus.review.color
         case .reviewVerdict: item.id.hasSuffix(ReviewVerdict.approved.rawValue) ? ReviewVerdict.approved.color : ReviewVerdict.changesRequested.color
         case .mention: Color.accentColor
-        case .comment: Color(nsColor: .systemGray)
+        case .comment: Theme.Status.pending
         }
     }
 }

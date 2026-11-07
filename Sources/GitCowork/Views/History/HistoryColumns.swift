@@ -37,7 +37,7 @@ enum HistoryColumn: String, CaseIterable {
     /// Columns the user can show or hide from the header menu.
     static let optional: [HistoryColumn] = [.author, .date, .sha]
 
-    private static let hiddenKey = "history.hiddenColumns"
+    private static let hiddenKey = Prefs.Key.historyHiddenColumns
 
     static var hiddenColumns: Set<HistoryColumn> {
         get {

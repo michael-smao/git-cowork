@@ -68,7 +68,7 @@ struct CommitComposer: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(InspectorStyle.commitTint)
+            .tint(Theme.Status.success)
             .controlSize(.large)
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(!canCommit)

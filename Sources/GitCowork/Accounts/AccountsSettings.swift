@@ -66,31 +66,6 @@ private func defaultHost(_ kind: HostKind) -> String {
     }
 }
 
-/// Same frame as SheetScaffold, but stays open while sign-in runs.
-private struct AccountSheetFrame<Content: View, Buttons: View>: View {
-    let title: String
-    let error: String?
-    @ViewBuilder var content: Content
-    @ViewBuilder var buttons: Buttons
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.l) {
-            Text(ui: title).font(Theme.Font.title)
-            content
-            if let error {
-                Text(error).font(Theme.Font.small).foregroundStyle(.red).textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            HStack(spacing: Theme.Space.m) {
-                Spacer()
-                buttons
-            }
-        }
-        .padding(Theme.Space.xl)
-        .frame(width: 440)
-    }
-}
-
 /// Device flow: show a code, the user approves it in the browser, done.
 struct BrowserSignInSheet: View {
     let kind: HostKind
@@ -114,15 +89,17 @@ struct BrowserSignInSheet: View {
     private var trimmedClientID: String { clientID.trimmingCharacters(in: .whitespaces) }
 
     var body: some View {
-        AccountSheetFrame(title: String(localized: "Sign In to \(kind.title)"), error: error) {
+        // Stays open while sign-in runs; start() closes it when done.
+        SheetScaffold(title: String(localized: "Sign In to \(kind.title)"), confirmTitle: code == nil ? "Continue" : nil,
+                      confirmDisabled: working || normalizedHost == nil || (knownClientID == nil && trimmedClientID.isEmpty),
+                      error: error, dismissOnConfirm: false, onCancel: { task?.cancel() }) {
+            start()
+        } content: {
             if let code {
                 Text("Enter this code on \(code.verificationURL.host ?? host) and approve git-cowork:")
                 Text(code.userCode).font(Self.codeFont).textSelection(.enabled)
                 Button("Copy Code and Open Browser") { openBrowser(code) }
-                HStack(spacing: Theme.Space.m) {
-                    ProgressView().controlSize(.small)
-                    Text("Waiting for approval…").font(Theme.Font.small).foregroundStyle(.secondary)
-                }
+                ProgressLabel("Waiting for approval…")
             } else {
                 TextField("Server", text: $host).textFieldStyle(.roundedBorder)
                 if knownClientID == nil {
@@ -132,14 +109,6 @@ struct BrowserSignInSheet: View {
                 }
                 Text("You approve git-cowork in your browser. No password is typed here.")
                     .font(Theme.Font.small).foregroundStyle(.secondary)
-            }
-        } buttons: {
-            Button("Cancel") { task?.cancel(); dismiss() }
-                .keyboardShortcut(.cancelAction)
-            if code == nil {
-                Button("Continue") { start() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(working || normalizedHost == nil || (knownClientID == nil && trimmedClientID.isEmpty))
             }
         }
         .onDisappear { task?.cancel() }
@@ -177,8 +146,7 @@ struct BrowserSignInSheet: View {
     }
 
     private func openBrowser(_ code: DeviceFlow.Code) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(code.userCode, forType: .string)
+        External.copy(code.userCode)
         NSWorkspace.shared.open(code.verificationURLComplete ?? code.verificationURL)
     }
 }
@@ -198,7 +166,11 @@ struct TokenSheet: View {
     private var trimmedToken: String { token.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        AccountSheetFrame(title: "Add Access Token", error: error) {
+        SheetScaffold(title: "Add Access Token", confirmTitle: "Add",
+                      confirmDisabled: working || normalizedHost == nil || trimmedToken.isEmpty,
+                      error: error, dismissOnConfirm: false, onCancel: { task?.cancel() }) {
+            add()
+        } content: {
             Picker("Server type", selection: $kind) {
                 ForEach(HostKind.allCases, id: \.self) { Text($0.title).tag($0) }
             }
@@ -216,12 +188,6 @@ struct TokenSheet: View {
                 }
             }
             .font(Theme.Font.small).foregroundStyle(.secondary)
-        } buttons: {
-            Button("Cancel") { task?.cancel(); dismiss() }
-                .keyboardShortcut(.cancelAction)
-            Button("Add") { add() }
-                .keyboardShortcut(.defaultAction)
-                .disabled(working || normalizedHost == nil || trimmedToken.isEmpty)
         }
         .onDisappear { task?.cancel() }
     }
@@ -262,19 +228,17 @@ struct CreateSSHKeySheet: View {
     }
 
     var body: some View {
-        AccountSheetFrame(title: "Create SSH Key", error: error?.message) {
+        SheetScaffold(title: "Create SSH Key", confirmTitle: "Create Key", confirmDisabled: working,
+                      error: error?.message, dismissOnConfirm: false, onCancel: { task?.cancel() }) {
+            create()
+        } content: {
             Text("git-cowork makes a new key, adds it to \(account.username) on \(account.host), and uses it for SSH remotes on \(SSHKey.sshHost(account.host)).")
                 .fixedSize(horizontal: false, vertical: true)
             Text("Saved as \(shownPath), with its passphrase in the Keychain. Your ~/.ssh/config isn't changed.")
                 .font(Theme.Font.small).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if working {
-                HStack(spacing: Theme.Space.m) {
-                    ProgressView().controlSize(.small)
-                    Text("Creating key…").font(Theme.Font.small).foregroundStyle(.secondary)
-                }
-            }
-        } buttons: {
+            if working { ProgressLabel("Creating key…") }
+        } extraButtons: {
             if error?.needsSignIn == true {
                 if account.method == .oauth {
                     Button("Sign In Again…") { signInAgain() }
@@ -282,11 +246,6 @@ struct CreateSSHKeySheet: View {
                     Link("Create a Token…", destination: page)
                 }
             }
-            Button("Cancel") { task?.cancel(); dismiss() }
-                .keyboardShortcut(.cancelAction)
-            Button("Create Key") { create() }
-                .keyboardShortcut(.defaultAction)
-                .disabled(working)
         }
     }
 
@@ -312,7 +271,6 @@ struct CreateSSHKeySheet: View {
 /// terminal to use the key too. The app never writes that file itself.
 struct SSHHostEntrySheet: View {
     let account: HostAccount
-    @Environment(\.dismiss) private var dismiss
     @State private var copied = false
 
     private var entry: String {
@@ -320,7 +278,8 @@ struct SSHHostEntrySheet: View {
     }
 
     var body: some View {
-        AccountSheetFrame(title: "SSH Host Entry", error: nil) {
+        SheetScaffold(title: "SSH Host Entry", confirmTitle: "Done", showsCancel: false) {
+        } content: {
             Text("git-cowork already uses this key. To use it in the terminal too, add this near the top of ~/.ssh/config:")
                 .fixedSize(horizontal: false, vertical: true)
             Text(entry)
@@ -330,14 +289,11 @@ struct SSHHostEntrySheet: View {
                 .padding(Theme.Metrics.cardPadding)
                 .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card).stroke(Theme.cardBorder))
-        } buttons: {
+        } extraButtons: {
             Button(copied ? L("Copied") : L("Copy")) {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(entry, forType: .string)
+                External.copy(entry)
                 copied = true
             }
-            Button("Done") { dismiss() }
-                .keyboardShortcut(.defaultAction)
         }
     }
 }
