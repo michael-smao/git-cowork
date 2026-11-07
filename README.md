@@ -63,7 +63,8 @@ curl -fsSL https://raw.githubusercontent.com/michael-smao/git-cowork/main/instal
 It downloads the newest release, checks it, installs `git-cowork.app` and
 the `git cowork` command. No Xcode, no Apple Developer account, no Gatekeeper
 warning. **Updates**: the app checks once a day and shows "Update to x.y.z"
-in the status bar; one click installs it. Or run the same line again.
+in the status bar; click it, then Update Now and Restart. Or run the same
+line again.
 
 **From source** (to change the code or follow `main`), with Xcode Command
 Line Tools and Swift 6:
@@ -109,8 +110,8 @@ also drop a folder onto any window.
 | **Hosts** | "Create pull/merge request" and "Open on …" for GitHub, GitLab, Gitea and Forgejo, including self-hosted. |
 | **Clone** | Paste a URL, or, with an account added, pick from a filterable list of your repositories and your organizations' or groups'. |
 | **Undo** | ⌘Z takes back the last commit, amend, reset, checkout or branch delete, with plain git commands. Not offered once you've pushed. |
-| **Accounts** | Optional. Paste an access token for GitHub, GitLab, Gitea or Forgejo, and HTTPS push and pull just work. Browser sign-in (OAuth device flow) works too once you register an OAuth app for it; Settings > Accounts explains how. Settings > Accounts. Tokens stay in the Keychain and only git-cowork uses them. For SSH remotes, Create SSH Key makes a key, adds it to your GitHub or GitLab account and uses it in git-cowork without touching `~/.ssh/config`. |
-| **Board** | Shared tasks in Backlog / To Do / In Progress / In Review / Done, with assignee, labels, linked branch and comments. "Start Task" creates the branch here; "In New Worktree" gives it its own folder and tab (handy for agents). Filter by person or label; ⌘← / ⌘→ move the selected task. |
+| **Accounts** | Optional. Paste an access token for GitHub, GitLab, Gitea or Forgejo, and HTTPS push and pull just work. Browser sign-in (OAuth device flow) needs an OAuth app registered for your host; Settings > Accounts explains how. Tokens stay in the Keychain and only git-cowork uses them. For SSH remotes, Create SSH Key makes a key, adds it to your GitHub or GitLab account and uses it in git-cowork without touching `~/.ssh/config`. |
+| **Board** | Shared tasks in Backlog / To Do / In Progress / In Review / Done, with assignee, labels, linked branch and comments. "Start Task" creates the branch here; the task's "In New Worktree" / "Start in New Worktree" gives it its own folder and tab (handy for agents). Filter by person or label; ⌘← / ⌘→ move the selected task. |
 | **Reviews** | Review requests for a branch: reviewers, verdicts (approved / changes requested), comments, and the branch's changes. |
 | **Inbox** | Tasks assigned to you, review requests, verdicts, @mentions and replies — also as macOS notifications. |
 
@@ -148,10 +149,13 @@ git-cowork and with plain git only.
 
 ### From the terminal: `git cowork`
 
-`make install` also puts a small command-line tool on your PATH (linked into
-`~/.local/bin`; `make install-cli BINDIR=…` for another folder). It works
-on the same tasks as the app, so people and coding agents can use it side by
-side. Changes sync right away; add `--json` for scripts and agents.
+The install (one-line or `make install`) also puts a small command-line tool
+on your PATH, linked into `~/.local/bin` (`make install-cli BINDIR=…` for
+another folder). It works on the same tasks as the app, so people and coding
+agents can use it side by side. Changes sync right away; add `--json` for
+scripts and agents. It runs your own `git`, so pushing needs your usual git
+sign-in (SSH key or credential helper); accounts added in the app's Settings
+are only used by the app.
 
 ```bash
 git cowork list --mine                   # my open tasks
@@ -195,6 +199,8 @@ tasks, else `origin`; the app saves that choice in the repository's config.
 | ⌘Z | Undo the last git action |
 | ⌘← / ⌘→ | Move the selected task to the previous / next column |
 | ⌘J | Command log |
+| ⌃⌘S | Show or hide the sidebar |
+| N / arrow keys | Board: new task / move the selection |
 
 Editor and terminal apps are set in Settings (⌘,).
 
@@ -207,20 +213,24 @@ and macOS 14+.
 
 **Why the Terminal line instead of a download button?** Apps downloaded in a
 browser need Apple's paid notarization to open without a warning. The install
-line downloads with `curl`, which macOS doesn't flag, and checks the file's
-checksum and signature before installing. Building from source works too.
+line downloads with `curl`, which macOS doesn't flag, and checks that the file
+arrived intact (checksum and code signature) before installing. Those prove the
+download isn't damaged, not who made it: the app is signed ad-hoc, without a
+paid Apple certificate. Building from source works too.
 
 **Is it free?** Yes. MIT license, no subscription, no seat limit.
 
 **Is my data sent anywhere?** No telemetry, no server of ours. The app talks
 to your git remotes through your own `git`. If you add an account, it also
 calls that host's API (GitHub, GitLab, Gitea or Forgejo) to check the token,
-list your repositories and upload an SSH key you create. Tokens stay in your
-Keychain.
+list your repositories and upload an SSH key you create. Once a day it asks
+api.github.com for the newest git-cowork release (Settings › Updates turns this
+off); that request carries nothing about you or your repositories. Tokens stay
+in your Keychain.
 
 **Does browser sign-in work out of the box?** Not yet: it needs an OAuth app
-registered on the host, and 0.1.0 doesn't ship one. Use an access token, or
-register your own app as Settings > Accounts describes.
+registered on the host, and git-cowork doesn't ship one yet. Use an access
+token, or register your own app as Settings > Accounts describes.
 
 ## Development
 

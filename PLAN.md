@@ -6,7 +6,7 @@ well, and adds lightweight shared tasks and review requests that sync through
 git itself. No AI features, no server. Accounts are optional: you can sign
 in to GitHub or GitLab (section 10), and the app works the same without it.
 
-Status: phase 1 (git client) and phase 2 (cowork: tasks, board, reviews, comments, mentions, notifications) are built — see README.md. Open source under the MIT license.
+Status: phase 1 (git client), phase 2 (cowork: tasks, board, reviews, comments, mentions, notifications, the `git cowork` tool) and phase 3 (public release, one-line install, in-app updates; latest release 0.2.0) are built — see README.md. Phase 4 (accounts) is partly built, see section 10. Open source under the MIT license.
 
 ---
 
@@ -131,19 +131,20 @@ branch lists.
 refs/cowork/main
 ├── team.md                         # optional: names, handles, emails
 ├── tasks/
-│   ├── CW-a3f.md                   # one file per task
-│   └── CW-a3f/
+│   ├── CW-a3f9.md                  # one file per task
+│   └── CW-a3f9/
 │       └── comments/
-│           └── 2026-11-06T20-41-12Z-anna.md   # one file per comment
+│           └── <stamp>-<rnd>.md    # one file per comment
 └── reviews/
-    └── feat-login-cache.md         # one per review request
+    ├── R-7k2p.md                   # one per review request
+    └── R-7k2p/comments/<stamp>-<rnd>.md
 ```
 
 Task file:
 
 ```markdown
 ---
-id: CW-a3f
+id: CW-a3f9
 title: Cache user sessions
 status: doing          # backlog | todo | doing | review | done
 assignee: anna@example.com
@@ -160,8 +161,10 @@ Sync without conflicts:
   counters. Two people editing different things never touch the same file.
 - If two people edit the same task while offline, the newer `updated:` wins
   for each field. Comments are only ever added, so they never conflict.
-- The app fetches just this ref (one tiny request) every 30–60 s while open,
-  and right after every normal fetch.
+- The app fetches just this ref (one tiny request) every minute while it's in
+  front and every 3 minutes behind, when it comes to the front, and right
+  after every normal fetch. Sync uses the remote in `git config cowork.remote`
+  (shared with `git cowork`).
 
 ### What you get
 
@@ -169,7 +172,7 @@ Sync without conflicts:
   to move. Filter by assignee and label. Keyboard-first: `N` for a new task,
   arrow keys to move.
 - **Task ↔ branch link**: "Start task" creates the branch (and optionally a
-  worktree) named `CW-a3f-cache-sessions`. The graph shows the task id on
+  worktree) named `CW-a3f9-cache-sessions`. The graph shows the task id on
   that branch.
 - **Review requests**: right-click a branch → "Request review" → pick
   teammates. They see it in a **Reviews** inbox with the branch diff against
@@ -179,7 +182,7 @@ Sync without conflicts:
   macOS notification when her app next syncs. Identity is your
   `git config user.email`. Nothing to sign up for.
 - **Chat**: deliberately **not** a live chat room. Comment threads on tasks
-  and reviews arrive within about 30–60 s. Real-time chat needs a server,
+  and reviews arrive within about a minute (3 when the app is behind). Real-time chat needs a server,
   so for that you keep using Slack (or whatever you use).
 
 ## 5. Phase 3: open source release
@@ -201,10 +204,11 @@ Gatekeeper prompt meanwhile), a Homebrew cask, Sparkle.
 
 ## 6. Performance targets
 
-Measured on an M1/M2 MacBook with a repo of ~50k commits:
+Targets for an M1/M2 MacBook with a repo of ~50k commits. Not measured yet:
 - Cold start to usable window: < 300 ms.
-- Idle CPU: 0% (FSEvents, no polling timers except the cowork sync and the
-  5-minute background fetch, which only runs while the app is in front).
+- Idle CPU: ~0% (FSEvents; the only timers are the cowork sync, the 5-minute
+  background fetch, which only runs while the app is in front, and the daily
+  update check).
 - Memory: < 100 MB with 10k commits loaded.
 - Graph scroll: no dropped frames at 120 Hz.
 - First 2,000 commits on screen: < 150 ms; more load on scroll.
@@ -213,16 +217,25 @@ Measured on an M1/M2 MacBook with a repo of ~50k commits:
 
 ```
 Package.swift
-Sources/GitCowork/
-  App/          app entry, windows, menus, settings
-  Git/          GitRunner (process, env, log), parsers, models, RepoModel
-  Graph/        lane layout (pure, unit-tested), NSTableView + drawing
-  Diff/         diff parser, diff view
-  Worktrees/    list, add/remove sheets
-  Cowork/       store on refs/cowork/main, sync, board, reviews, notifications
-  Hosts/        remote URL → web links (GitHub, GitLab, Gitea/Forgejo)
-Tests/          parsers, graph layout, cowork merge rules
-Scripts/        build-app.sh, make-icon
+Sources/
+  GitCoworkCore/    pure logic, no UI, unit-tested: parsers, graph layout,
+                    diff model, names, remote links, cowork models/codec/merge
+                    rules, task start, accounts parsing, release check
+  CoworkKit/        reads, writes and syncs refs/cowork/main (shared by app
+                    and CLI); process runner, git environment, sync remote
+  GitCoworkCLIKit/  argument parsing and people lookup for the CLI
+  GitCoworkCLI/     the `git-cowork` executable
+  GitCowork/        the app
+    App/            entry, windows, menus, settings, updater, Debug/ self-tests
+    Accounts/       sign-in, Keychain, SSH keys, repo lists
+    Git/            GitRunner, RepoModel and its actions, cowork store/sync
+    Views/          Theme, shared components, Chrome/, Sidebar/, History/,
+                    Diff/, Inspector/, Cowork/
+Resources/          icon, en/de translations
+Tests/              GitCoworkCoreTests, CoworkKitTests, GitCoworkCLITests
+Scripts/            build-app.sh, release.sh, update.sh, version.sh,
+                    check-translations.py, make-icon.swift
+install.sh          one-line install and update
 ```
 
 Code style: small files, plain names, no premature abstraction, comments only
@@ -266,7 +279,9 @@ signed-in accounts' repos (`HostAPI` repo listing in core,
 `Accounts/RepoList.swift` and `Views/CloneRepoList.swift` in the app). The
 optional SSH key is built too (Settings > Accounts > Create SSH Key; tested
 against a local sshd, not yet against a real GitHub/GitLab account). Not
-built yet: items 2 and 3 below.
+built yet: items 2 and 3 below, the `Hosts/` protocol, the message for
+GitHub orgs that block OAuth apps, and a "Sign in" button on auth errors
+(a failed push or fetch only says to sign in under Settings > Accounts).
 
 How git gets the token: `git credential-cache` on a private socket, plus
 `-c credential.https://<host>.helper=` (clears the person's helpers for that
@@ -286,8 +301,9 @@ credential helper just fails. That's the gap this fills first.
 
 - **GitHub**: OAuth device flow. The app shows a short code, you approve it on
   github.com. No client secret ships in the app and no redirect URL is needed.
-- **GitLab** (gitlab.com and self-hosted): OAuth with PKCE in the browser
-  (`ASWebAuthenticationSession`). Gitea and Forgejo support the same flow.
+- **GitLab** (gitlab.com and self-hosted, 17.3 or later): the same device
+  flow. (The plan was OAuth with PKCE; the device flow needs no redirect.)
+- **Gitea and Forgejo**: personal access token.
 - Self-hosted servers need their own OAuth app registered on that server. If
   that's not possible, paste a personal access token instead.
 - Tokens go in the macOS Keychain, one per host and account. Sign out in
@@ -300,8 +316,8 @@ credential helper just fails. That's the gap this fills first.
   options like the ones in `GitDefaults`. It never writes to the person's
   global git config, so the terminal is unchanged.
 - If a credential helper or SSH key already works for a remote, the app leaves
-  it alone. Sign-in is offered when a push or fetch fails with an auth error,
-  and in Settings.
+  it alone. Sign-in is in Settings; a push or fetch that fails with an auth
+  error points there.
 
 ### Optional SSH key
 

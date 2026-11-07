@@ -38,7 +38,8 @@ Coming from 0.1.0? Update once by hand with the one-line install (or
   the newest release, checks its checksum and installs the app and
   `git cowork`. Releases now include the app as a zip.
 - Updates from inside the app: a daily check (Settings › Updates) shows
-  "Update to x.y.z" in the status bar; one click installs it and restarts.
+  "Update to x.y.z" in the status bar; click it, then Update Now and
+  Restart.
   Also git-cowork › Check for Updates….
 
 ## [0.1.0] - 2026-11-07

@@ -51,4 +51,6 @@ For example:
   in git-cowork (beyond git's own hooks and config, which git runs anyway).
 - Task, review or comment data on `refs/cowork/main` that can trigger
   unintended actions or show misleading content to teammates.
-- The app sending data anywhere other than your configured git remotes.
+- The app sending data anywhere other than your configured git remotes, the
+  servers of accounts you add, and the daily update check on api.github.com
+  (Settings › Updates).
