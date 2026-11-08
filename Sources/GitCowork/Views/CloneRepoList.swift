@@ -6,24 +6,27 @@ import SwiftUI
 struct CloneRepoList: View {
     let accounts: [HostAccount]
     @Binding var url: String
+    /// The account whose repo is picked; nil when the URL was typed.
+    @Binding var listAccount: HostAccount?
     let onOpen: (String) -> Void
 
-    @State private var host: String
+    @State private var accountID: String
     @State private var loaded: [String: [HostRepo]] = [:]
     @State private var errors: [String: String] = [:]
     @State private var filter = ""
     @State private var selection: HostRepo.ID?
     @FocusState private var filterFocused: Bool
 
-    init(accounts: [HostAccount], url: Binding<String>, onOpen: @escaping (String) -> Void) {
+    init(accounts: [HostAccount], url: Binding<String>, listAccount: Binding<HostAccount?>, onOpen: @escaping (String) -> Void) {
         self.accounts = accounts
         _url = url
+        _listAccount = listAccount
         self.onOpen = onOpen
-        _host = State(initialValue: accounts.first?.host ?? "")
+        _accountID = State(initialValue: accounts.first?.id ?? "")
     }
 
-    private var account: HostAccount? { accounts.first { $0.host == host } ?? accounts.first }
-    private var all: [HostRepo]? { account.flatMap { loaded[$0.host] } }
+    private var account: HostAccount? { accounts.first { $0.id == accountID } ?? accounts.first }
+    private var all: [HostRepo]? { account.flatMap { loaded[$0.id] } }
     private var shown: [HostRepo] { (all ?? []).filter { $0.matches(filter) } }
 
     var body: some View {
@@ -32,8 +35,8 @@ struct CloneRepoList: View {
                 Text("Your Repositories").font(Theme.Font.caption).foregroundStyle(.secondary)
                 Spacer()
                 if accounts.count > 1 {
-                    Picker("Account", selection: $host) {
-                        ForEach(accounts) { Text(label($0)).tag($0.host) }
+                    Picker("Account", selection: $accountID) {
+                        ForEach(accounts) { Text(label($0)).tag($0.id) }
                     }
                     .labelsHidden()
                     .fixedSize()
@@ -49,17 +52,25 @@ struct CloneRepoList: View {
             .listStyle(.plain)
             .environment(\.defaultMinListRowHeight, Theme.Metrics.rowHeight)
             .contextMenu(forSelectionType: HostRepo.ID.self, menu: { _ in }) { ids in
-                if let id = ids.first, let repo = all?.first(where: { $0.id == id }) { onOpen(repo.cloneURL) }
+                if let id = ids.first, let repo = all?.first(where: { $0.id == id }) {
+                    listAccount = account
+                    onOpen(repo.cloneURL)
+                }
             }
             .overlay { status }
             .frame(height: 220)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.control))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.control).strokeBorder(Theme.cardBorder))
         }
-        .task(id: host) { await load() }
-        .onChange(of: host) { selection = nil }
+        .task(id: accountID) { await load() }
+        .onChange(of: accountID) { selection = nil }
         .onChange(of: selection) {
-            if let selection, let repo = all?.first(where: { $0.id == selection }) { url = repo.cloneURL }
+            if let selection, let repo = all?.first(where: { $0.id == selection }) {
+                listAccount = account
+                url = repo.cloneURL
+            } else {
+                listAccount = nil
+            }
         }
         .onChange(of: url) {
             // Typing a different URL drops the highlighted repo.
@@ -70,11 +81,11 @@ struct CloneRepoList: View {
     /// Plain text for loading, errors and empty results, as in the other sheets.
     @ViewBuilder private var status: some View {
         if let account {
-            if let error = errors[account.host] {
+            if let error = errors[account.id] {
                 VStack(spacing: Theme.Space.m) {
                     ErrorText(error).multilineTextAlignment(.center)
                     Button("Try Again") {
-                        errors[account.host] = nil
+                        errors[account.id] = nil
                         Task { await load() }
                     }
                     .controlSize(.small)
@@ -93,13 +104,13 @@ struct CloneRepoList: View {
     private func label(_ account: HostAccount) -> String { String(localized: "\(account.username) on \(account.host)") }
 
     private func load() async {
-        guard let account, loaded[account.host] == nil, errors[account.host] == nil else { return }
+        guard let account, loaded[account.id] == nil, errors[account.id] == nil else { return }
         do {
-            loaded[account.host] = try await RepoList.fetch(for: account)
+            loaded[account.id] = try await RepoList.fetch(for: account)
         } catch is CancellationError {
             // The sheet closed or the account changed; the next .task loads again.
         } catch {
-            errors[account.host] = error.localizedDescription
+            errors[account.id] = error.localizedDescription
         }
     }
 }

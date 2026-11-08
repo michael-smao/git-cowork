@@ -39,8 +39,8 @@ extension HostKind {
     }
 }
 
-/// A signed-in account on one host. One account per host, so git knows which
-/// token to use for `https://<host>`. The token itself lives in the Keychain.
+/// A signed-in account on one host. A host can have several; `RepoAccounts`
+/// says which one a repository uses. The token itself lives in the Keychain.
 public struct HostAccount: Codable, Hashable, Sendable, Identifiable {
     public enum Method: String, Codable, Sendable {
         case oauth   // browser sign-in
@@ -55,7 +55,7 @@ public struct HostAccount: Codable, Hashable, Sendable, Identifiable {
     /// host. Nil when there is none (older saved accounts have no such field).
     public var sshKey: String?
 
-    public var id: String { host }
+    public var id: String { "\(username)@\(host)" }
 
     public init(host: String, kind: HostKind, username: String, method: Method, sshKey: String? = nil) {
         self.host = host.lowercased()
@@ -82,6 +82,21 @@ public struct HostAccount: Codable, Hashable, Sendable, Identifiable {
         let allowed = Set("abcdefghijklmnopqrstuvwxyz0123456789.-:")
         guard !s.isEmpty, s.allSatisfy(allowed.contains), !s.hasPrefix("."), !s.hasPrefix("-"), !s.hasPrefix(":") else { return nil }
         return s
+    }
+}
+
+extension Array where Element == HostAccount {
+    /// The list with `account` added, or updated if it's already there. Hosts
+    /// stay sorted. Within a host the order is the order of adding, so a new
+    /// account never takes over from the one repositories already use.
+    public func adding(_ account: HostAccount) -> [HostAccount] {
+        var list = self
+        if let i = list.firstIndex(where: { $0.id == account.id }) {
+            list[i] = account
+        } else {
+            list.insert(account, at: list.lastIndex { $0.host <= account.host }.map { $0 + 1 } ?? 0)
+        }
+        return list
     }
 }
 

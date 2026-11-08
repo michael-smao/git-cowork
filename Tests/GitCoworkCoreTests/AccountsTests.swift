@@ -28,6 +28,71 @@ import Testing
         #expect(!TokenSet(access: "a", expiresAt: now.addingTimeInterval(3600)).expiresSoon(now: now))
     }
 
+    // MARK: Several accounts on one host
+
+    private func account(_ name: String, host: String = "github.com", key: String? = nil) -> HostAccount {
+        HostAccount(host: host, kind: .github, username: name, method: .token, sshKey: key)
+    }
+
+    @Test func addingKeepsAccountsOfOneHostInOrderAdded() {
+        let list = [HostAccount]().adding(account("zed")).adding(account("anna", host: "codeberg.org")).adding(account("bob"))
+        #expect(list.map(\.id) == ["anna@codeberg.org", "zed@github.com", "bob@github.com"])
+        // Signing in again updates in place and stays the default.
+        let again = list.adding(account("zed", key: "/k"))
+        #expect(again.map(\.id) == list.map(\.id))
+        #expect(again[1].sshKey == "/k")
+    }
+
+    @Test func repoUsesPickThenOwnerThenFirstAccount() {
+        let accounts = [account("Alice"), account("work")]
+        func current(_ config: String) -> String? {
+            RepoAccounts.choices(accounts: accounts, config: config).first?.current.username
+        }
+        #expect(current("") == "Alice")
+        #expect(current("remote.origin.url https://github.com/acme/app.git") == "Alice")
+        #expect(current("remote.origin.url git@github.com:WORK/app.git") == "work")
+        // origin wins over other remotes, whatever the config's order.
+        #expect(current("remote.fork.url https://github.com/alice/app\nremote.origin.url https://github.com/work/app") == "work")
+        // A pick beats the owner; a pick of an account that's gone doesn't count.
+        #expect(current("remote.origin.url https://github.com/work/app\ncowork.github.com.account Alice") == "Alice")
+        #expect(current("remote.origin.url https://github.com/work/app\ncowork.github.com.account gone") == "work")
+        // A remote on another server says nothing about this one.
+        #expect(current("remote.origin.url https://gitlab.com/work/app") == "Alice")
+    }
+
+    @Test func pickerOnlyForServersWithSeveralAccountsAndARemote() {
+        let accounts = [account("a"), account("b"), account("c", host: "gitlab.com"), account("d", host: "git.corp:8443"), account("e", host: "git.corp:8443")]
+        let config = "remote.origin.url https://github.com/x/y\nremote.lab.url https://gitlab.com/x/y"
+        #expect(RepoAccounts.choices(accounts: accounts, config: config).filter(\.showsPicker).map(\.host) == ["github.com"])
+        // Remote URLs carry no port in RemoteLinks; the account's host may.
+        let corp = RepoAccounts.choices(accounts: accounts, config: "remote.origin.url https://git.corp:8443/e/y")
+        #expect(corp.first { $0.host == "git.corp:8443" }?.current.username == "e")
+    }
+
+    @Test func accountForCloneURL() {
+        let accounts = [account("a"), account("b"), account("c", host: "gitlab.com")]
+        #expect(RepoAccounts.account(forURL: "https://github.com/b/app.git", among: accounts)?.username == "b")
+        #expect(RepoAccounts.account(forURL: "https://github.com/org/app.git", among: accounts)?.username == "a")
+        #expect(RepoAccounts.account(forURL: "git@gitlab.com:org/app.git", among: accounts)?.username == "c")
+        #expect(RepoAccounts.account(forURL: "https://example.org/org/app.git", among: accounts) == nil)
+        #expect(RepoAccounts.account(forURL: "/local/path", among: accounts) == nil)
+    }
+
+    @Test func socketPerAccountOnSharedHost() {
+        let accounts = [account("a"), account("b"), account("c", host: "gitlab.com")]
+        #expect(CredentialConfig.socketName(for: accounts[0], among: accounts) == "credentials.sock")
+        #expect(CredentialConfig.socketName(for: accounts[2], among: accounts) == "credentials.sock")
+        let second = CredentialConfig.socketName(for: accounts[1], among: accounts)
+        #expect(second.hasPrefix("credentials-") && second.hasSuffix(".sock") && second.count == "credentials-.sock".count + 12)
+    }
+
+    @Test func configKeyIsReadBackByChoices() throws {
+        let key = RepoAccounts.configKey(host: "git.corp:8443")
+        let accounts = [account("a", host: "git.corp:8443"), account("b", host: "git.corp:8443")]
+        #expect(key.range(of: RepoAccounts.configPattern, options: .regularExpression) != nil)
+        #expect(RepoAccounts.choices(accounts: accounts, config: "\(key) b").first?.current.username == "b")
+    }
+
     // MARK: Host API
 
     @Test func apiBases() {
@@ -180,6 +245,52 @@ import Testing
         // Another host still goes to the user's own helper.
         _ = try git(args + ["credential", "fill"], input: Data("protocol=https\nhost=example.invalid\n\n".utf8))
         #expect(fm.fileExists(atPath: leak.path))
+    }
+
+    /// Two GitLab browser sign-ins both log in as "oauth2". With a socket
+    /// each, the -c options decide which token git gets.
+    @Test func gitGetsTheTokenOfTheSelectedAccountsSocket() throws {
+        let fm = FileManager.default
+        let dir = URL(fileURLWithPath: "/tmp").appendingPathComponent("gc-cred-\(UUID().uuidString.prefix(8))")
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        defer { try? fm.removeItem(at: dir) }
+
+        func git(_ args: [String], input: Data) throws -> String {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+            p.arguments = args
+            p.currentDirectoryURL = dir
+            var env = ProcessInfo.processInfo.environment
+            env["GIT_TERMINAL_PROMPT"] = "0"
+            p.environment = env
+            let inPipe = Pipe(), out = Pipe()
+            p.standardInput = inPipe
+            p.standardOutput = out
+            p.standardError = FileHandle.nullDevice
+            try p.run()
+            inPipe.fileHandleForWriting.write(input)
+            try inPipe.fileHandleForWriting.close()
+            let data = out.fileHandleForReading.readDataToEndOfFile()
+            p.waitUntilExit()
+            return String(decoding: data, as: UTF8.self)
+        }
+
+        var sockets: [String: String] = [:]
+        for token in ["tok-first", "tok-second"] {
+            let socket = dir.appendingPathComponent(token).path
+            sockets[token] = socket
+            let store = try #require(CredentialConfig.storeInput(host: "gitlab.com", username: "oauth2", password: token))
+            _ = try git(["credential-cache", "--socket", socket, "--timeout", "60", "store"], input: store)
+        }
+        defer {
+            for socket in sockets.values { _ = try? git(["credential-cache", "--socket", socket, "exit"], input: Data()) }
+        }
+
+        for (token, socket) in sockets {
+            let args = CredentialConfig.configArgs(hosts: ["gitlab.com"], socketPath: socket)
+            let filled = try git(args + ["credential", "fill"], input: Data("protocol=https\nhost=gitlab.com\n\n".utf8))
+            #expect(filled.contains("password=\(token)"))
+        }
     }
 
     // MARK: SSH key

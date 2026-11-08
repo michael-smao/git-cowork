@@ -57,6 +57,7 @@
 "A repository or worktree folder" = "Ein Repository- oder Worktree-Ordner";
 "Abort" = "Abbrechen";
 "Account" = "Account";
+"Account this repository uses on %@" = "Account, den dieses Repository auf %@ nutzt";
 "Accounts" = "Accounts";
 "Add" = "Hinzufügen";
 "Add a description" = "Beschreibung hinzufügen";
@@ -276,6 +277,7 @@
 "History" = "Verlauf";
 "Hunk" = "Abschnitte";
 "Hunk: one column. Split: old and new side by side." = "Abschnitte: eine Spalte. Nebeneinander: alt und neu nebeneinander.";
+"If another of your accounts has access, pick it for this repository in the status bar." = "Falls ein anderer deiner Accounts Zugriff hat, wähle ihn für dieses Repository in der Statusleiste aus.";
 "In New Worktree" = "In neuem Worktree";
 "In Progress" = "In Arbeit";
 "In Review" = "Im Review";
@@ -523,6 +525,7 @@
 "Stashes all changes, including new files, and leaves a clean working copy." = "Legt alle Änderungen inklusive neuer Dateien in einen Stash und hinterlässt eine saubere Arbeitskopie.";
 "Status" = "Status";
 "Summary" = "Zusammenfassung";
+"Switch account" = "Account wechseln";
 "Switch branch" = "Branch wechseln";
 "Sync failed" = "Sync fehlgeschlagen";
 "Sync Now" = "Jetzt synchronisieren";
@@ -560,6 +563,7 @@
 "This worktree only" = "Nur dieser Worktree";
 "Tip: drop a folder anywhere in this window" = "Tipp: Zieh einen Ordner irgendwohin in dieses Fenster";
 "Title" = "Titel";
+"To add another account on this server, switch to it in your browser first." = "Um einen weiteren Account auf diesem Server hinzuzufügen, wechsle zuerst in deinem Browser zu ihm.";
 "To Do" = "Offen";
 "Token" = "Token";
 "Tree" = "Baum";
@@ -601,6 +605,7 @@
 "Waiting for me" = "Wartet auf mich";
 "What needs doing?" = "Was ist zu tun?";
 "What should reviewers look at? (optional)" = "Worauf sollen die Reviewer achten? (optional)";
+"With several accounts on one server, a repository uses the account you pick in its status bar, else the one named in its URL, else the one added first." = "Bei mehreren Accounts auf einem Server nutzt ein Repository den Account, den du in seiner Statusleiste wählst, sonst den aus seiner URL, sonst den zuerst hinzugefügten.";
 "Working copy is clean" = "Keine Änderungen in der Arbeitskopie";
 "Worktree" = "Worktree";
 "Worktrees" = "Worktrees";

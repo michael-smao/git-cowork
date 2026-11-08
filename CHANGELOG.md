@@ -8,6 +8,14 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ### Added
 - Settings › Language: follow macOS, or always English or German.
+- Several accounts on one server, like personal and work on github.com. A
+  repository uses the account you pick in its status bar (saved as
+  `git config cowork.<host>.account`), else the one named in its URL, else the
+  one added first. Cloning from an account's list keeps using that account.
+
+### Changed
+- Tokens in the Keychain are stored per account instead of per server. Existing
+  ones move over by themselves.
 
 ## [0.3.0] - 2026-11-08
 

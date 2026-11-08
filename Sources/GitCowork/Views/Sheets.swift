@@ -202,6 +202,8 @@ struct CloneSheet: View {
     @State private var url = ""
     @State private var parent = CloneSheet.defaultParent
     @State private var accounts = AccountStore.shared.accounts
+    /// The account whose list the URL came from; nil for a typed URL.
+    @State private var listAccount: HostAccount?
     @State private var running = false
     @State private var error: String?
     @Environment(\.dismiss) private var dismiss
@@ -221,7 +223,7 @@ struct CloneSheet: View {
             clone(url)
         } content: {
             if !accounts.isEmpty {
-                CloneRepoList(accounts: accounts, url: $url) { picked in
+                CloneRepoList(accounts: accounts, url: $url, listAccount: $listAccount) { picked in
                     guard !running else { return }
                     url = picked
                     clone(picked)
@@ -256,7 +258,7 @@ struct CloneSheet: View {
         let dest = parent + "/" + name
         Task {
             do {
-                try await RepoModel.clone(source.trimmingCharacters(in: .whitespaces), into: dest)
+                try await RepoModel.clone(source.trimmingCharacters(in: .whitespaces), into: dest, picked: listAccount)
                 running = false
                 dismiss()
                 onCloned(dest)

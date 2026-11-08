@@ -333,9 +333,31 @@ extension RepoModel {
     }
 
     /// Clones `url` into `dest` (a folder that doesn't exist yet). Used before a repo window exists.
-    static func clone(_ url: String, into dest: String) async throws {
+    /// `picked` is the account whose repository list it came from; the new
+    /// repository keeps using that account.
+    static func clone(_ url: String, into dest: String, picked: HostAccount? = nil) async throws {
         let parent = URL(fileURLWithPath: dest).deletingLastPathComponent()
-        try await GitRunner.shared.run(["clone", "--end-of-options", url, dest], in: parent, logged: true)
+        let all = Credentials.shared.all
+        var args = ["clone"]
+        if let picked, all.filter({ $0.host == picked.host }).count > 1 {
+            args += ["-c", "\(RepoAccounts.configKey(host: picked.host))=\(picked.username)"]
+        }
+        args += ["--end-of-options", url, dest]
+        try await GitRunner.shared.run(args, in: parent, logged: true,
+                                       account: picked ?? RepoAccounts.account(forURL: url, among: all))
+    }
+
+    /// Makes this repository use `account` on its host from now on.
+    func useAccount(_ account: HostAccount) async {
+        let args = ["config", "--local", RepoAccounts.configKey(host: account.host), account.username]
+        do {
+            // Not `perform`: nothing in the repo moves, so Undo stays available.
+            try await git.run(args, in: root, logged: true)
+            autoFetcher.note(fetched: false, succeeded: true)   // a sign-in pause was about the old account
+        } catch {
+            let label = L("Switch account")
+            alert = AlertItem(title: String(localized: "\(label) failed"), message: error.localizedDescription)
+        }
     }
 
     // MARK: Merge / rebase in progress

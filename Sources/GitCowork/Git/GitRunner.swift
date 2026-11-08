@@ -25,9 +25,12 @@ struct GitError: LocalizedError {
 
     var errorDescription: String? {
         let err = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A private repo the account can't see looks like a missing one.
+        let otherAccount = Credentials.shared.hasSeveralOnOneHost ? "\n\n" + L("If another of your accounts has access, pick it for this repository in the status bar.") : ""
         if CredentialConfig.isAuthFailure(err) {
-            return err + "\n\nThe server wants you to sign in. Add your account under git-cowork > Settings > Accounts (for SSH remotes, also Create SSH Key there), or set up an SSH key or credential helper for git."
+            return err + "\n\nThe server wants you to sign in. Add your account under git-cowork > Settings > Accounts (for SSH remotes, also Create SSH Key there), or set up an SSH key or credential helper for git." + otherAccount
         }
+        if err.lowercased().contains("repository not found") { return err + otherAccount }
         if !err.isEmpty { return err }
         let out = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         return out.isEmpty ? "git exited with code \(result.exitCode)" : out
@@ -82,9 +85,9 @@ final class GitRunner: @unchecked Sendable {
     /// changes the repo; reads would only add noise).
     @discardableResult
     func run(_ args: [String], in dir: URL, logged: Bool = false, okCodes: Set<Int32> = [0],
-             input: Data? = nil, env extra: [String: String] = [:]) async throws -> String {
+             input: Data? = nil, env extra: [String: String] = [:], account: HostAccount? = nil) async throws -> String {
         let start = Date()
-        let result = await execute(args, in: dir, input: input, env: extra)
+        let result = await execute(args, in: dir, input: input, env: extra, account: account)
         if logged {
             let entry = CommandLog.Entry(args: args, directory: dir, start: start,
                                          duration: Date().timeIntervalSince(start), result: result)
@@ -111,26 +114,41 @@ final class GitRunner: @unchecked Sendable {
 
     /// `input` is written to git's stdin; `extra` adds environment variables
     /// (e.g. GIT_INDEX_FILE for writing trees without touching the real index).
-    func execute(_ args: [String], in dir: URL, input: Data? = nil, env extra: [String: String] = [:]) async -> GitResult {
-        GitResult(await executeData(args, in: dir, input: input, env: extra))
+    /// `account` overrides the one the folder's repository uses on that host
+    /// (cloning, where the repository doesn't exist yet).
+    func execute(_ args: [String], in dir: URL, input: Data? = nil, env extra: [String: String] = [:],
+                 account: HostAccount? = nil) async -> GitResult {
+        GitResult(await executeData(args, in: dir, input: input, env: extra, account: account))
     }
 
     /// Like `execute`, but stdout stays raw bytes. Diffs need this: decoding
     /// non-UTF-8 content would corrupt patches built from it.
     func executeData(_ args: [String], in dir: URL, input: Data? = nil,
-                     env extra: [String: String] = [:]) async -> GitOutput {
+                     env extra: [String: String] = [:], account: HostAccount? = nil) async -> GitOutput {
         var env = environment.merging(extra) { _, new in new }
         let credentials = Credentials.shared
+        var accounts = credentials.defaults
         if CredentialConfig.needsCredentials(args) {
-            await credentials.prepare(gitPath: gitPath, env: env)
+            accounts = await networkAccounts(in: dir, override: account)
+            await credentials.prepare(accounts, gitPath: gitPath, env: env)
             // An SSH key made under Settings > Accounts, unless the person
             // already picked an ssh command themselves.
-            if let ssh = credentials.sshCommand, env["GIT_SSH_COMMAND"] == nil, env["GIT_SSH"] == nil,
+            if let ssh = credentials.sshCommand(for: accounts), env["GIT_SSH_COMMAND"] == nil, env["GIT_SSH"] == nil,
                await tryRun(["config", "--get", "core.sshCommand"], in: dir) == nil {
                 env["GIT_SSH_COMMAND"] = ssh
             }
         }
-        let configArgs = GitEnvironment.configArgs + credentials.configArgs
+        let configArgs = GitEnvironment.configArgs + credentials.configArgs(for: accounts)
         return await Subprocess.run(gitPath, configArgs + args, input: input, env: env, dir: dir)
+    }
+
+    /// The accounts a command that talks to a server uses, one per host. Only
+    /// reads the repository's config when some host has more than one.
+    private func networkAccounts(in dir: URL, override: HostAccount?) async -> [HostAccount] {
+        let credentials = Credentials.shared
+        if let override { return credentials.defaults.map { $0.host == override.host ? override : $0 } }
+        guard credentials.hasSeveralOnOneHost else { return credentials.defaults }
+        let config = await tryRun(["config", "--get-regexp", RepoAccounts.configPattern], in: dir) ?? ""
+        return RepoAccounts.choices(accounts: credentials.all, config: config).map(\.current)
     }
 }

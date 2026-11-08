@@ -7,8 +7,9 @@ import Foundation
 /// The key is ed25519 with a random passphrase that `ssh-add
 /// --apple-use-keychain` keeps in the login Keychain. Git runs
 /// `/usr/bin/ssh -F <app config>`, where the app config gives each signed-in
-/// host its key with `IdentitiesOnly yes` and then includes the person's own
-/// `~/.ssh/config`, so every other host resolves exactly as in the terminal.
+/// host the key of the account the repository uses there, with
+/// `IdentitiesOnly yes`, and then includes the person's own `~/.ssh/config`,
+/// so every other host resolves exactly as in the terminal.
 public enum SSHKey {
     /// Apple's ssh: it knows `UseKeychain`, which reads the passphrase.
     public static let sshPath = "/usr/bin/ssh"

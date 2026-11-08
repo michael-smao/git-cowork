@@ -11,8 +11,8 @@ struct AccountsSection: View {
             switch self {
             case .browser(let kind, let host): "browser-\(kind.rawValue)-\(host ?? "")"
             case .token: "token"
-            case .createKey(let account): "key-\(account.host)"
-            case .hostEntry(let account): "entry-\(account.host)"
+            case .createKey(let account): "key-\(account.id)"
+            case .hostEntry(let account): "entry-\(account.id)"
             }
         }
     }
@@ -44,6 +44,8 @@ struct AccountsSection: View {
                 Button("Add Token…") { sheet = .token }
             }
             Text("Used for HTTPS remotes on these servers, and for SSH remotes once you create an SSH key, only by git-cowork. Git in the terminal and other servers keep your own setup. Tokens and key passphrases are kept in the Keychain.")
+                .font(Theme.Font.small).foregroundStyle(.secondary)
+            Text("With several accounts on one server, a repository uses the account you pick in its status bar, else the one named in its URL, else the one added first.")
                 .font(Theme.Font.small).foregroundStyle(.secondary)
         }
         .sheet(item: $sheet) { kind in
@@ -101,6 +103,10 @@ struct BrowserSignInSheet: View {
                 }
                 Text("You approve git-cowork in your browser. No password is typed here.")
                     .font(Theme.Font.small).foregroundStyle(.secondary)
+                if AccountStore.shared.accounts.contains(where: { $0.host == normalizedHost }) {
+                    Text("To add another account on this server, switch to it in your browser first.")
+                        .font(Theme.Font.small).foregroundStyle(.secondary)
+                }
             }
         }
         .onDisappear { task?.cancel() }

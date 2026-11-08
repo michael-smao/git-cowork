@@ -1,10 +1,15 @@
+import GitCoworkCore
 import SwiftUI
 
 /// Bottom bar. Left: what's running or what last ran.
-/// Right: paused background fetch, task sync, upstream sync, commit count, worktree path, command log toggle.
+/// Right: paused background fetch, task sync, upstream sync, account picker
+/// (with several accounts on the repo's server), commit count, worktree path,
+/// command log toggle.
 struct StatusBar: View {
     @Bindable var model: RepoModel
     private let log = CommandLog.shared
+    private let accounts = AccountStore.shared
+    @State private var accountConfig = ""
 
     var body: some View {
         HStack(spacing: Theme.Space.l) {
@@ -14,6 +19,7 @@ struct StatusBar: View {
             AutoFetchStatus(model: model)
             CoworkSyncStatus(model: model)
             upstream
+            RepoAccountPicker(model: model, config: accountConfig) { await loadAccountConfig() }
             Text(commitCount)
                 .foregroundStyle(.tertiary)
             Text(abbreviated(model.root.path))
@@ -35,6 +41,17 @@ struct StatusBar: View {
         .padding(.horizontal, Theme.Metrics.panelPadding)
         .frame(height: Theme.Metrics.rowHeight)   // lines up with list rows above
         .background(.bar)
+        // Here and not on the picker, which is empty until this has loaded.
+        .task(id: AccountConfigKey(accounts: accounts.accounts, remotes: model.remotes)) { await loadAccountConfig() }
+    }
+
+    private struct AccountConfigKey: Equatable {
+        let accounts: [HostAccount]
+        let remotes: [Remote]
+    }
+
+    private func loadAccountConfig() async {
+        accountConfig = await model.git.tryRun(["config", "--get-regexp", RepoAccounts.configPattern], in: model.root) ?? ""
     }
 
     @ViewBuilder
@@ -159,6 +176,54 @@ private struct CoworkSyncStatus: View {
             return String(localized: "Sync tasks and reviews with \(remote) now")
         case (nil, nil):
             return L("No remote: tasks stay on this Mac")
+        }
+    }
+}
+
+/// Which account this repository uses. Shown only for servers where you have
+/// more than one, so it takes no room otherwise.
+private struct RepoAccountPicker: View {
+    let model: RepoModel
+    /// What `git config --get-regexp` printed for this repository.
+    let config: String
+    let reload: () async -> Void
+    private let store = AccountStore.shared
+
+    private var choices: [RepoAccounts.Choice] {
+        RepoAccounts.choices(accounts: store.accounts, config: config).filter(\.showsPicker)
+    }
+
+    var body: some View {
+        ForEach(choices, id: \.host) { choice in
+            Menu {
+                ForEach(choice.accounts) { account in
+                    Button {
+                        Task {
+                            await model.useAccount(account)
+                            await reload()
+                        }
+                    } label: {
+                        if account.id == choice.current.id {
+                            Label(account.username, systemImage: "checkmark")
+                        } else {
+                            Text(account.username)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: Theme.Space.s) {
+                    Image(systemName: "person.crop.circle").foregroundStyle(.tertiary)
+                    Text(choice.current.username)
+                }
+                .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .foregroundStyle(.secondary)
+            .disabled(model.busy != nil)
+            .help("Account this repository uses on \(choice.host)")
         }
     }
 }

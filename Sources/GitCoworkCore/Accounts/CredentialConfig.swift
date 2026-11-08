@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// How the app hands tokens to git without touching the user's git config.
@@ -8,7 +9,23 @@ import Foundation
 /// list for that host, so osxkeychain and friends neither answer nor store a
 /// copy of our token) and the cache helper. Other hosts and SSH remotes are
 /// untouched, and so is git in the terminal.
+///
+/// A socket holds one token per host, so git never has to choose. The first
+/// account on each host uses the main socket; further accounts on a host get
+/// their own (two GitLab browser sign-ins even share the git username
+/// "oauth2", so one cache couldn't tell them apart).
 public enum CredentialConfig {
+    /// File name of the socket for `account`, given all signed-in accounts.
+    public static func socketName(for account: HostAccount, among accounts: [HostAccount]) -> String {
+        if accounts.first(where: { $0.host == account.host })?.id == account.id { return "credentials.sock" }
+        return "credentials-\(shortHash(account.id)).sock"
+    }
+
+    /// Twelve hex digits, for file names (socket paths have a tight length limit).
+    public static func shortHash(_ s: String) -> String {
+        SHA256.hash(data: Data(s.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined()
+    }
+
     /// `-c` options for git, one pair per host.
     public static func configArgs(hosts: [String], socketPath: String) -> [String] {
         let helper = "cache --socket " + shellQuote(socketPath)
