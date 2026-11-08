@@ -75,6 +75,7 @@ enum SheetKind: Identifiable {
     case stash
     case newTask(status: TaskStatus)
     case requestReview(branch: String)
+    case createPull(branch: String)
     case team
 
     var id: String {
@@ -86,6 +87,7 @@ enum SheetKind: Identifiable {
         case .stash: "stash"
         case .newTask(let s): "task:\(s.rawValue)"
         case .requestReview(let b): "review:\(b)"
+        case .createPull(let b): "pull:\(b)"
         case .team: "team"
         }
     }

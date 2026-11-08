@@ -40,6 +40,11 @@ struct CommitPanel: View {
             }
         }
         .task(id: sha) { await load() }
+        .task(id: sha) {
+            // Waits a moment, so arrowing through commits doesn't ask about each one.
+            try? await Task.sleep(for: .milliseconds(400))
+            if !Task.isCancelled { await model.hostStatus?.lookUp(sha) }
+        }
     }
 
     /// Loads detail and files, and swaps both in together once they're ready.
@@ -80,6 +85,7 @@ struct CommitPanel: View {
                     }
                 }
                 CoworkLinks(model: model, branches: branches)
+                HostLinks(model: model, sha: d.id, branches: branches)
             }
             .padding(Theme.Metrics.panelPadding)
 

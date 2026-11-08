@@ -28,13 +28,7 @@ struct RequestReviewSheet: View {
     private var store: CoworkStore { model.cowork }
     private var links: RemoteLinks? { model.links(for: nil) }
 
-    /// Local branches plus the remote's default, without the branch under review.
-    private var baseOptions: [String] {
-        var names = model.localBranches.map(\.name)
-        if let d = model.baseBranch()?.name, !names.contains(d) { names.append(d) }
-        if !base.isEmpty, !names.contains(base) { names.append(base) }
-        return names.filter { $0 != branch }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-    }
+    private var baseOptions: [String] { model.baseOptions(for: branch, keeping: base) }
 
     private var candidates: [TeamMember] { store.others }
 
@@ -43,18 +37,7 @@ struct RequestReviewSheet: View {
             .sorted { $0.updated > $1.updated }
     }
 
-    /// Why reviewers can't see the branch yet, if they can't.
-    private var pushProblem: String? {
-        let local = model.localBranches.first { $0.name == branch }
-        let onRemote = local?.upstream != nil
-            || model.remoteBranches.contains { $0.branchNameWithoutRemote == branch }
-        if !onRemote { return String(localized: "\(branch) isn't on the remote yet. Push it so reviewers can fetch it.") }
-        if let local, local.ahead > 0 {
-            return local.ahead == 1 ? String(localized: "1 commit on \(branch) not pushed yet.")
-                                    : String(localized: "\(local.ahead) commits on \(branch) not pushed yet.")
-        }
-        return nil
-    }
+    private var pushProblem: String? { model.pushProblem(for: branch) }
 
     private var valid: Bool {
         !title.trimmingCharacters(in: .whitespaces).isEmpty && !base.isEmpty && !reviewers.isEmpty

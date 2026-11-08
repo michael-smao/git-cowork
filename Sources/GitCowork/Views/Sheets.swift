@@ -17,6 +17,7 @@ struct RepoSheet: View {
         case .stash: StashSheet(model: model)
         case .newTask(let status): NewTaskSheet(model: model, status: status)
         case .requestReview(let branch): RequestReviewSheet(model: model, branch: branch)
+        case .createPull(let branch): CreatePullSheet(model: model, branch: branch)
         case .team: TeamSheet(model: model)
         }
     }

@@ -1,13 +1,14 @@
 import AppKit
 import GitCoworkCore
 
-// Tasks and reviews linked to the branches on each commit.
+// Tasks, reviews, pull requests and CI for the branches on each commit.
 extension HistoryTableCoordinator {
 
     /// Re-arms itself after each change, so this costs nothing while idle.
     func observeCowork() {
         withObservationTracking {
             _ = model.cowork.version
+            _ = model.hostStatus?.version
         } onChange: { [weak self] in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -19,8 +20,11 @@ extension HistoryTableCoordinator {
 
     func refreshCoworkIfNeeded() {
         let v = model.cowork.version
-        guard v != coworkVersion else { return }
+        let h = model.hostStatus?.version ?? -1
+        guard v != coworkVersion || h != hostVersion else { return }
+        let hostChanged = h != hostVersion
         coworkVersion = v
+        hostVersion = h
         var tasks: [String: [CoworkTask]] = [:]
         for t in model.cowork.tasks {
             guard let b = t.branch, !b.isEmpty else { continue }
@@ -35,7 +39,7 @@ extension HistoryTableCoordinator {
         tasksByBranch = tasks
         reviewByBranch = reviews
         coworkCache = [:]
-        guard changed, let table else { return }
+        guard changed || hostChanged, let table else { return }
         table.enumerateAvailableRowViews { view, _ in (view as? HistoryRowView)?.redrawCells() }
     }
 
@@ -53,6 +57,14 @@ extension HistoryTableCoordinator {
                     let v = r.overall
                     info.review = .init(branch: r.branch, symbol: v.symbol, title: v.title, color: NSColor(v.color))
                 }
+            }
+        }
+        if let host = model.hostStatus {
+            if let pull = badges(forCommit: i).lazy.filter({ $0.kind == .branch }).compactMap({ host.pull(forBranch: $0.name) }).first {
+                info.pull = .init(number: pull.number, title: pull.title, color: pull.isDraft ? .secondaryLabelColor : .controlAccentColor)
+            }
+            if i < commits.count, let state = host.ci[commits[i].id]?.state {
+                info.ci = .init(symbol: state.symbol, title: state.title, color: NSColor(state.color))
             }
         }
         coworkCache[i] = info

@@ -3,13 +3,14 @@ import SwiftUI
 
 /// Top-level groups of the sidebar, in display order.
 enum SidebarSection: String, CaseIterable {
-    case local, remote, worktrees, tasks, reviews, stashes, tags, team
+    case local, remote, worktrees, pulls, tasks, reviews, stashes, tags, team
 
     var title: String {
         switch self {
         case .local: L("Local")
         case .remote: L("Remote")
         case .worktrees: L("Worktrees")
+        case .pulls: L("Pull Requests")
         case .tasks: L("Tasks")
         case .reviews: L("Reviews")
         case .stashes: L("Stashes")
@@ -23,6 +24,7 @@ enum SidebarSection: String, CaseIterable {
         case .local: "laptopcomputer"
         case .remote: "cloud"
         case .worktrees: "square.stack.3d.up"
+        case .pulls: "arrow.triangle.pull"
         case .tasks: "checklist"
         case .reviews: "checkmark.bubble"
         case .stashes: "tray"
@@ -34,7 +36,7 @@ enum SidebarSection: String, CaseIterable {
     /// Open state when the user never toggled the section.
     var openByDefault: Bool {
         switch self {
-        case .local, .remote, .worktrees, .tasks, .reviews: true
+        case .local, .remote, .worktrees, .pulls, .tasks, .reviews: true
         case .stashes, .tags, .team: false
         }
     }
@@ -42,13 +44,14 @@ enum SidebarSection: String, CaseIterable {
 
 /// Non-selectable rows that do something when clicked ("All tasks…").
 enum SidebarLink: String {
-    case board, reviews, team
+    case board, reviews, team, signIn
 
     var title: String {
         switch self {
         case .board: L("All Tasks…")
         case .reviews: L("All Reviews…")
         case .team: L("Edit Team…")
+        case .signIn: L("Sign In to See Them…")
         }
     }
 
@@ -57,6 +60,7 @@ enum SidebarLink: String {
         case .board: "rectangle.split.3x1"
         case .reviews: "list.bullet"
         case .team: "pencil"
+        case .signIn: "person.crop.circle"
         }
     }
 }
@@ -75,6 +79,7 @@ struct SidebarItem: Identifiable, Equatable {
         case task(CoworkTask)
         /// `waiting`: I'm a reviewer and haven't answered yet.
         case review(ReviewRequest, waiting: Bool)
+        case pull(HostPull, ci: CIState?)
         case person(TeamMember, isMe: Bool)
         case link(SidebarLink)
         case note(String)
@@ -86,7 +91,7 @@ struct SidebarItem: Identifiable, Equatable {
 
     var isSelectable: Bool {
         switch kind {
-        case .branch, .worktree, .stash, .task, .review: true
+        case .branch, .worktree, .stash, .task, .review, .pull: true
         case .header, .folder, .remote, .person, .link, .note: false
         }
     }
@@ -201,7 +206,7 @@ struct SidebarBuilder {
     func tree() -> [SidebarItem] {
         var items: [SidebarItem] = []
         items.reserveCapacity(model.refs.count + model.worktrees.count + 32)
-        for section in SidebarSection.allCases {
+        for section in SidebarSection.allCases where section != .pulls || model.hostStatus != nil {
             let open = openSections.contains(section)
             items.append(header(section, expanded: open))
             if open { items += rows(for: section) }
@@ -221,6 +226,7 @@ struct SidebarBuilder {
         case .local: localBranches.count
         case .remote: remoteBranches.count
         case .worktrees: model.worktrees.count
+        case .pulls: model.hostStatus?.pulls.count ?? 0
         case .tasks: cowork.myTasks.count
         case .reviews: cowork.waiting.count
         case .stashes: model.stashes.count
@@ -253,6 +259,8 @@ struct SidebarBuilder {
             return items
         case .worktrees:
             return model.worktrees.map { SidebarItem(id: "wt:" + $0.path, kind: .worktree($0)) }
+        case .pulls:
+            return pullRows()
         case .tasks:
             var items = cowork.myTasks.map(taskItem)
             if items.isEmpty { items.append(SidebarItem(id: "note:tasks", kind: .note("Nothing assigned to you"))) }
@@ -271,6 +279,26 @@ struct SidebarBuilder {
         case .team:
             return cowork.people.map(personItem) + [SidebarItem(id: "link:team", kind: .link(.team))]
         }
+    }
+
+    private func pullRows() -> [SidebarItem] {
+        guard let status = model.hostStatus else { return [] }
+        switch status.state {
+        case .signedOut:
+            return [SidebarItem(id: "link:signIn", kind: .link(.signIn))]
+        case .loading:
+            return [SidebarItem(id: "note:pulls", kind: .note("Loading…"))]
+        case .failed(let message):
+            return [SidebarItem(id: "note:pulls", kind: .note(message))]
+        case .ready:
+            let rows = status.pulls.map(pullItem)
+            let none = status.links.kind == .gitlab ? L("No open merge requests") : L("No open pull requests")
+            return rows.isEmpty ? [SidebarItem(id: "note:pulls", kind: .note(none))] : rows
+        }
+    }
+
+    private func pullItem(_ p: HostPull) -> SidebarItem {
+        SidebarItem(id: "pull:\(p.number)", kind: .pull(p, ci: model.ciState(p.headSHA)))
     }
 
     private func taskItem(_ t: CoworkTask) -> SidebarItem {
@@ -332,6 +360,9 @@ struct SidebarBuilder {
         groups.append((.worktrees, model.worktrees
             .filter { match($0.branch ?? "") || $0.sidebarFolderName(repoName: repoName).map(match) == true }
             .map { SidebarItem(id: "wt:" + $0.path, kind: .worktree($0)) }))
+        groups.append((.pulls, (model.hostStatus?.pulls ?? [])
+            .filter { match($0.title) || match($0.branch) || match("#\($0.number)") }
+            .map(pullItem)))
         groups.append((.tasks, cowork.myTasks
             .filter { match($0.title) || match($0.id) || match($0.branch ?? "") }
             .map(taskItem)))

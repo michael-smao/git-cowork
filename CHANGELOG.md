@@ -8,6 +8,12 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ### Added
 - Settings › Language: follow macOS, or always English or German.
+- Pull/merge requests and CI, with an account for the host (GitHub, GitLab,
+  Gitea, Forgejo): open requests in the sidebar, `#12` on their branches in
+  the graph, CI passed/failed/running on branches and commits, the checks
+  that failed in the commit panel with links to their logs, and Create Pull
+  Request from the app. All worktree tabs of a repository share one lookup,
+  and nothing is asked while the app is in the background.
 
 ## [0.3.0] - 2026-11-08
 

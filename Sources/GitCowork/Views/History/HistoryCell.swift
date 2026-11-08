@@ -323,7 +323,7 @@ final class HistoryCell: NSTableCellView {
         drawAttributed(s, inset: inset)
     }
 
-    /// Review verdict icon and task-id chips for branches on this commit.
+    /// CI and review icons, pull request and task-id chips for this commit.
     /// Returns the x after them.
     private func drawCoworkMarks(_ info: HistoryCoworkInfo, x start: CGFloat) -> CGFloat {
         let style = GraphStyle.Cowork.self
@@ -335,20 +335,35 @@ final class HistoryCell: NSTableCellView {
                                    weight: .semibold, alpha: alpha, hierarchical: true)
             x += style.gap - 2
         }
+        if let ci = info.ci {
+            x += GraphSymbols.draw(ci.symbol, x: x, midY: midY, size: style.iconSize, color: onBand ?? ci.color,
+                                   weight: .semibold, alpha: alpha, hierarchical: true)
+            x += style.gap - 2
+        }
+        if let pull = info.pull {
+            x = drawChip("#\(pull.number)", color: pull.color, x: x, alpha: alpha)
+            if !info.tasks.isEmpty { x += 4 }
+        }
         for (n, task) in info.tasks.prefix(2).enumerated() {
             if n > 0 { x += 4 }
-            let fg = (onBand ?? task.color).withAlphaComponent(alpha)
-            let attrs: [NSAttributedString.Key: Any] = [.font: style.chipFont, .foregroundColor: fg]
-            let s = task.id as NSString
-            let size = s.size(withAttributes: attrs)
-            let rect = NSRect(x: x, y: midY - style.idChipHeight / 2, width: size.width + style.chipPadding * 2, height: style.idChipHeight)
-            let path = NSBezierPath(roundedRect: rect, xRadius: Theme.Radius.badge, yRadius: Theme.Radius.badge)
-            (onBand ?? task.color).withAlphaComponent(CGFloat(Theme.Tint.chip) * alpha).setFill()
-            path.fill()
-            s.draw(at: NSPoint(x: rect.minX + style.chipPadding, y: midY - size.height / 2), withAttributes: attrs)
-            x = rect.maxX
+            x = drawChip(task.id, color: task.color, x: x, alpha: alpha)
         }
         return x
+    }
+
+    /// Small tinted chip. Returns the x after it.
+    private func drawChip(_ text: String, color: NSColor, x: CGFloat, alpha: CGFloat) -> CGFloat {
+        let style = GraphStyle.Cowork.self
+        let fg = (onBand ?? color).withAlphaComponent(alpha)
+        let attrs: [NSAttributedString.Key: Any] = [.font: style.chipFont, .foregroundColor: fg]
+        let s = text as NSString
+        let size = s.size(withAttributes: attrs)
+        let rect = NSRect(x: x, y: midY - style.idChipHeight / 2, width: size.width + style.chipPadding * 2, height: style.idChipHeight)
+        let path = NSBezierPath(roundedRect: rect, xRadius: Theme.Radius.badge, yRadius: Theme.Radius.badge)
+        (onBand ?? color).withAlphaComponent(CGFloat(Theme.Tint.chip) * alpha).setFill()
+        path.fill()
+        s.draw(at: NSPoint(x: rect.minX + style.chipPadding, y: midY - size.height / 2), withAttributes: attrs)
+        return rect.maxX
     }
 
     private func drawText(_ text: String, font: NSFont, color: NSColor) {

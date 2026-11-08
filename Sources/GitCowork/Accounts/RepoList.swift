@@ -24,7 +24,7 @@ enum RepoList {
             // Offset pages can shift while we read them; keep the first copy.
             repos += page.filter { seen.insert($0.id).inserted }
             pages += 1
-            request = HostAPI.nextReposRequest(linkHeader: http?.value(forHTTPHeaderField: "Link"),
+            request = HostAPI.nextPageRequest(linkHeader: http?.value(forHTTPHeaderField: "Link"),
                                                kind: account.kind, host: host, token: tokens.access)
         }
         return repos

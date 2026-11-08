@@ -6,6 +6,7 @@ import Observation
 /// Background `git fetch --all --prune` for one repo window: shortly after it
 /// opens, then every 5 minutes while the app is in front (when it's due is
 /// decided in GitCoworkCore's AutoFetch). Does nothing in the background.
+/// The same tick keeps pull requests and CI current (RepoHosting).
 @MainActor @Observable
 final class RepoAutoFetch {
     /// Set while the background fetch runs. User actions wait for it briefly
@@ -78,6 +79,7 @@ final class RepoAutoFetch {
             actionRunning: model.busy != nil || running, pausedForSignIn: paused != nil,
             openedAt: openedAt, lastFetch: lastFetch)
         if AutoFetch.isDue(conditions, now: Date()) { await fetch(model) }
+        if NSApp.isActive { await model.updateHostStatus() }
     }
 
     private func fetch(_ model: RepoModel) async {

@@ -35,7 +35,7 @@ import Testing
 
     @Test func nextPageStaysOnTheHostAPI() throws {
         func next(_ url: String, kind: HostKind = .github, host: String = "github.com") -> URLRequest? {
-            HostAPI.nextReposRequest(linkHeader: "<\(url)>; rel=\"next\"", kind: kind, host: host, token: "t")
+            HostAPI.nextPageRequest(linkHeader: "<\(url)>; rel=\"next\"", kind: kind, host: host, token: "t")
         }
         let ok = try #require(next("https://api.github.com/user/repos?page=2"))
         #expect(ok.value(forHTTPHeaderField: "Authorization") == "Bearer t")
