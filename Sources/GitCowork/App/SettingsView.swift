@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @AppStorage(Prefs.Key.appearance) private var appearance = AppAppearance.system
     @AppStorage(Prefs.Key.editorApp) private var editorApp = "Visual Studio Code"
     @AppStorage(Prefs.Key.terminalApp) private var terminalApp = "Terminal"
     @AppStorage(Prefs.Key.hostOverrides) private var hostOverrides = ""
@@ -10,6 +11,12 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Picker("Appearance", selection: $appearance) {
+                    ForEach(AppAppearance.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
             AccountsSection()
             Section("Apps") {
                 TextField("Editor", text: $editorApp, prompt: Text("Visual Studio Code, Cursor, Zed…"))
@@ -45,6 +52,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onChange(of: appearance) { _, new in new.apply() }
         .frame(width: 520)
         .fixedSize(horizontal: false, vertical: true)
     }

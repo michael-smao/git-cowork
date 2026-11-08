@@ -46,6 +46,13 @@ final class Updater {
 
     var canUpdate: Bool { current != nil && Bundle.main.url(forResource: "install", withExtension: "sh") != nil }
 
+    /// Installed as a Homebrew cask. Homebrew then does the updating: replacing
+    /// the app from here would leave its records out of date.
+    let installedWithHomebrew = ["/opt/homebrew", "/usr/local"].contains {
+        FileManager.default.fileExists(atPath: $0 + "/Caskroom/git-cowork")
+    }
+    static let homebrewUpdateCommand = "brew upgrade --cask git-cowork"
+
     // MARK: Checking
 
     private var loop: Task<Void, Never>?
@@ -108,6 +115,13 @@ final class Updater {
             if let available {
                 let a = NSAlert()
                 a.messageText = String(localized: "git-cowork \(available.version.description) is available")
+                if installedWithHomebrew {
+                    a.informativeText = String(localized: "You have \(current?.description ?? "?"). You installed git-cowork with Homebrew, so update it in Terminal with: \(Self.homebrewUpdateCommand)")
+                    a.addButton(withTitle: L("Copy Command"))
+                    a.addButton(withTitle: L("Later"))
+                    if a.runModal() == .alertFirstButtonReturn { External.copy(Self.homebrewUpdateCommand) }
+                    return
+                }
                 a.informativeText = String(localized: "You have \(current?.description ?? "?"). Update now? git-cowork restarts when it's done.")
                 a.addButton(withTitle: L("Update Now"))
                 a.addButton(withTitle: L("Later"))
@@ -123,7 +137,7 @@ final class Updater {
     /// Runs the bundled install.sh for the available version, into the folder
     /// this app is in. With `restart`, reopens git-cowork afterwards.
     func install(restart: Bool = false) async {
-        guard let available, !installing,
+        guard let available, !installing, !installedWithHomebrew,
               let script = Bundle.main.url(forResource: "install", withExtension: "sh") else { return }
         installing = true
         error = nil

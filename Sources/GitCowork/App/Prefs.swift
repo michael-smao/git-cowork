@@ -3,6 +3,8 @@ import Foundation
 /// User settings, stored in UserDefaults. Views bind to the same keys with @AppStorage.
 enum Prefs {
     enum Key {
+        /// Follow macOS, or always light or dark (AppAppearance).
+        static let appearance = "appearance"
         static let editorApp = "editorApp"
         static let terminalApp = "terminalApp"
         static let hostOverrides = "hostOverrides"

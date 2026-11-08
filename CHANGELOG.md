@@ -6,7 +6,15 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Settings › Appearance: follow macOS, or always light or dark.
+- Homebrew: `brew install --cask michael-smao/tap/git-cowork`, updates with
+  `brew upgrade`. For Homebrew installs the app shows that command instead of
+  updating itself.
+
 ### Changed
+- Release notes, README and INSTALL say clearly not to download the zip in a
+  browser, and how to replace a copy macOS blocked.
 - The app and `git cowork` always sync tasks with the same remote:
   `git config cowork.remote` in the repository (the app saves its pick there).
   The app-wide "Sync remote" setting is gone.

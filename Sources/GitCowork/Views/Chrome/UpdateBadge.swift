@@ -57,6 +57,13 @@ private struct UpdatePanel: View {
                     }
                     .frame(maxHeight: 180)
                 }
+                if updater.installedWithHomebrew {
+                    Text("Installed with Homebrew. Update in Terminal:")
+                        .foregroundStyle(.secondary)
+                    Text(verbatim: Updater.homebrewUpdateCommand)
+                        .font(Theme.Font.mono)
+                        .textSelection(.enabled)
+                }
                 if let error = updater.error {
                     ErrorText(error)
                 }
@@ -65,7 +72,10 @@ private struct UpdatePanel: View {
                         Link("Release Notes", destination: page).font(Theme.Font.small)
                     }
                     Spacer()
-                    if updater.installing {
+                    if updater.installedWithHomebrew {
+                        Button("Copy Command") { External.copy(Updater.homebrewUpdateCommand) }
+                            .buttonStyle(ActionButtonStyle.primary())
+                    } else if updater.installing {
                         ProgressLabel("Installing…")
                     } else {
                         Button("Update Now") { Task { await updater.install() } }

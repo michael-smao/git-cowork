@@ -1,10 +1,10 @@
 # Installing and updating git-cowork
 
-Two ways, both without an Apple Developer account and without Gatekeeper
-warnings:
+Three ways, all without Gatekeeper warnings:
 
 - **[One line](#quick-install)**: downloads the newest release. Easiest; the
   app tells you about updates and installs them for you.
+- **[Homebrew](#homebrew)**: install and update with `brew`.
 - **[From source](#install-from-source)**: builds on your Mac. For changing
   the code or following `main`.
 
@@ -32,10 +32,24 @@ is one, the status bar shows "Update to x.y.z"; click it, then **Update Now**
 and **Restart**. Or use **git-cowork › Check for Updates…**. Turn the daily
 check off in Settings › Updates.
 
-Downloading with `curl` is what keeps Gatekeeper quiet: macOS quarantines
-apps downloaded in a browser, and an app without a paid Apple signature then
-won't open. If you downloaded the zip in a browser anyway, run
-`xattr -dr com.apple.quarantine /Applications/git-cowork.app` once.
+Please don't download the zip from the release page by hand: macOS blocks
+apps downloaded in a browser. `curl` doesn't trigger that block. If you already
+have a blocked copy, run the line above; it replaces it.
+
+## Homebrew
+
+```bash
+brew install --cask michael-smao/tap/git-cowork
+```
+
+This installs `git-cowork.app` to `/Applications` and `git cowork` to
+Homebrew's `bin`. Update with `brew upgrade --cask git-cowork` (a plain
+`brew upgrade` includes it). The app still tells you when there's a new
+version, and shows that command instead of updating itself. After an update
+macOS may ask once more for access to your folders, because each build has
+its own signature.
+
+To remove it: `brew uninstall --cask git-cowork`.
 
 ## Install from source
 
@@ -175,10 +189,11 @@ is 5.x`** — your Command Line Tools are too old. See
 **Build errors after a macOS or Xcode update** — clear the build cache and try
 again: `make clean && make install`.
 
-**"git-cowork can't be opened because Apple cannot check it"** — the app was
-downloaded in a browser or sent to you. Install it with the
-[one-line install](#quick-install) instead, or build it from source; neither
-triggers this warning.
+**"git-cowork can't be opened because Apple cannot check it"** or **"Apple
+could not verify git-cowork"** — the app was downloaded in a browser or sent to
+you, and macOS blocks those. Run the [one-line install](#quick-install) or use
+[Homebrew](#homebrew); the one-line install replaces the blocked copy. Building
+from source works too.
 
 **`make update` says "You have local changes"** — you edited files in the
 source folder. Keep them with `git stash`, or throw them away with

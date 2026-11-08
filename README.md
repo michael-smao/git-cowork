@@ -61,10 +61,21 @@ curl -fsSL https://raw.githubusercontent.com/michael-smao/git-cowork/main/instal
 ```
 
 It downloads the newest release, checks it, installs `git-cowork.app` and
-the `git cowork` command. No Xcode, no Apple Developer account, no Gatekeeper
-warning. **Updates**: the app checks once a day and shows "Update to x.y.z"
-in the status bar; click it, then Update Now and Restart. Or run the same
-line again.
+the `git cowork` command. No Xcode, no Gatekeeper warning. **Updates**: the
+app checks once a day and shows "Update to x.y.z" in the status bar; click it,
+then Update Now and Restart. Or run the same line again.
+
+> **Please don't download the zip from the release page by hand.** macOS blocks
+> apps that were downloaded in a browser. Already got the message that Apple
+> can't check the app? Run the line above; it replaces the blocked copy.
+
+**With Homebrew**:
+
+```bash
+brew install --cask michael-smao/tap/git-cowork
+```
+
+Update with `brew upgrade --cask git-cowork`.
 
 **From source** (to change the code or follow `main`), with Xcode Command
 Line Tools and Swift 6:
@@ -211,14 +222,18 @@ and macOS 14+.
 
 **Does it use AI?** No. It's a plain git client.
 
-**Why the Terminal line instead of a download button?** Apps downloaded in a
-browser need Apple's paid notarization to open without a warning. The install
+**Why the Terminal line instead of a download button?** macOS blocks apps
+downloaded in a browser unless they went through Apple's paid program, and
+git-cowork is free. The install line and Homebrew avoid that block. The install
 line downloads with `curl`, which macOS doesn't flag, and checks that the file
 arrived intact (checksum and code signature) before installing. Those prove the
 download isn't damaged, not who made it: the app is signed ad-hoc, without a
 paid Apple certificate. Building from source works too.
 
 **Is it free?** Yes. MIT license, no subscription, no seat limit.
+
+**Dark mode?** Yes. It follows macOS by default; Settings (⌘,) › Appearance
+sets it to always light or always dark.
 
 **Is my data sent anywhere?** No telemetry, no server of ours. The app talks
 to your git remotes through your own `git`. If you add an account, it also

@@ -55,6 +55,11 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/install.sh | bash
           \`\`\`
 
+          Please don't download the zip below by hand: macOS blocks apps downloaded
+          in a browser. It's there for the install line and the in-app updater.
+
+          With Homebrew: \`brew install --cask michael-smao/tap/git-cowork\`
+
           Or click "Update" when git-cowork tells you about this version. Built from
           source? Run \`make update\` in your git-cowork folder. More in
           [INSTALL.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/INSTALL.md).

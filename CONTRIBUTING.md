@@ -43,6 +43,10 @@ The version lives in `Resources/Info.plist`. To cut a release:
    attaches `git-cowork-x.y.z-macos-arm64.zip` plus its `.sha256`. The
    one-line install and the in-app updater download that zip, so check that
    both files are on the release.
+4. Homebrew: [michael-smao/homebrew-tap](https://github.com/michael-smao/homebrew-tap)
+   checks for a new release every hour and updates its cask. To do it right
+   away, or if GitHub paused the schedule after a long quiet period:
+   `gh workflow run update.yml --repo michael-smao/homebrew-tap`.
 
 Bump PATCH for fixes, MINOR for new features, MAJOR for breaking changes
 (for example to the cowork file format on `refs/cowork/main`).

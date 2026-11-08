@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         NSWindow.allowsAutomaticWindowTabbing = true
+        AppAppearance.saved.apply()
         _ = GitRunner.shared   // start resolving the login shell PATH early
         DeveloperToolsCheck.runAtLaunch()
         #if DEBUG
