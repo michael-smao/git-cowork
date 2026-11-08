@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-09
+
 ### Added
 - Push any local branch from its right-click menu in the sidebar or the graph
   without checking it out, also when another worktree has it open.
