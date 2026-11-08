@@ -42,10 +42,19 @@ final class HostStatus {
         return status
     }
 
-    /// The account signed in on this host, if any.
-    var account: HostAccount? {
-        let host = links.host.lowercased()
-        return AccountStore.shared.accounts.first { ($0.host.split(separator: ":").first.map(String.init) ?? $0.host) == host }
+    /// The account this repository uses on the host, set by RepoModel.
+    private(set) var account: HostAccount?
+
+    /// Another account can see different things, so its results start over.
+    func use(_ newAccount: HostAccount?) {
+        guard newAccount?.id != account?.id else { return }
+        account = newAccount
+        state = .loading
+        pulls = []
+        ci = [:]
+        checkedAt = [:]
+        pullsCheckedAt = nil
+        version += 1
     }
 
     var canCreatePulls: Bool {
@@ -136,9 +145,11 @@ final class HostStatus {
                 request = HostAPI.nextPageRequest(linkHeader: http?.value(forHTTPHeaderField: "Link"), kind: kind, host: host, token: token)
             }
         } catch {
-            fail(error)
+            if self.account?.id == account.id { fail(error) }
             return
         }
+        // The repository switched accounts meanwhile: this answer is for the old one.
+        guard self.account?.id == account.id else { return }
         pullsCheckedAt = Date()
         guard found != pulls || state != .ready else { return }
         pulls = found
@@ -177,6 +188,7 @@ final class HostStatus {
                 for (sha, list) in batch { group.addTask { await Self.ask(sha: sha, requests: list, host: host) } }
                 return await group.reduce(into: []) { $0.append($1) }
             }
+            guard self.account?.id == account.id else { return }
             for answer in answers {
                 if answer.rateLimited { pausedUntil = Date().addingTimeInterval(HostPollRules.rateLimitPause) }
                 guard !answer.rateLimited, !answer.failed else { checkedAt[answer.sha] = nil; continue }

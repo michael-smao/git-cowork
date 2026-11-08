@@ -9,7 +9,13 @@ extension RepoModel {
         guard !isStopped else { return }
         let status = links(for: nil).flatMap(HostStatus.of)
         if status !== hostStatus { hostStatus = status }
-        await status?.refresh(wanted: commitsWithCI, force: force)
+        guard let status else { return }
+        // The same account git uses for this repository (RepoAccounts).
+        let config = await git.tryRun(["config", "--get-regexp", RepoAccounts.configPattern], in: root) ?? ""
+        let host = status.links.host.lowercased()
+        status.use(RepoAccounts.choices(accounts: AccountStore.shared.accounts, config: config)
+            .first { SSHKey.sshHost($0.host) == host }?.current)
+        await status.refresh(wanted: commitsWithCI, force: force)
     }
 
     /// What's pushed of each tracked branch, and the base branch.

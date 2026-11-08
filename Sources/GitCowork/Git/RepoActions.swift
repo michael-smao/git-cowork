@@ -356,6 +356,7 @@ extension RepoModel {
             // Not `perform`: nothing in the repo moves, so Undo stays available.
             try await git.run(args, in: root, logged: true)
             autoFetcher.note(fetched: false, succeeded: true)   // a sign-in pause was about the old account
+            await updateHostStatus(force: true)
         } catch {
             let label = L("Switch account")
             alert = AlertItem(title: String(localized: "\(label) failed"), message: error.localizedDescription)
