@@ -64,8 +64,9 @@ Write whole sentences, not fragments glued together, so they translate.
 make check-translations   # lists text without a German translation
 ```
 
-To add a language, copy `de.lproj`, translate the values, and add the code
-to `CFBundleLocalizations` in `Resources/Info.plist`.
+To add a language, copy `de.lproj`, translate the values, add the code to
+`CFBundleLocalizations` in `Resources/Info.plist`, and add a case to
+`AppLanguage` for the picker in Settings.
 
 ## Debug aids
 

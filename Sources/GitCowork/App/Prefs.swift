@@ -5,6 +5,8 @@ enum Prefs {
     enum Key {
         /// Follow macOS, or always light or dark (AppAppearance).
         static let appearance = "appearance"
+        /// macOS's own key for the per-app language (AppLanguage).
+        static let language = "AppleLanguages"
         static let editorApp = "editorApp"
         static let terminalApp = "terminalApp"
         static let hostOverrides = "hostOverrides"

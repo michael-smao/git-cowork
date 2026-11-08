@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @AppStorage(Prefs.Key.appearance) private var appearance = AppAppearance.system
+    @State private var language = AppLanguage.saved
     @AppStorage(Prefs.Key.editorApp) private var editorApp = "Visual Studio Code"
     @AppStorage(Prefs.Key.terminalApp) private var terminalApp = "Terminal"
     @AppStorage(Prefs.Key.hostOverrides) private var hostOverrides = ""
@@ -16,6 +17,19 @@ struct SettingsView: View {
                     ForEach(AppAppearance.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                Picker("Language", selection: $language) {
+                    ForEach(AppLanguage.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                // Only the built app can reopen itself (and has the translations).
+                if language != AppLanguage.atLaunch, Updater.shared.current != nil {
+                    HStack {
+                        Text("Restart git-cowork to use it. Your open repositories reopen.")
+                            .font(Theme.Font.small).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Restart Now") { Updater.shared.relaunch() }
+                    }
+                }
             }
             AccountsSection()
             Section("Apps") {
@@ -53,6 +67,7 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .onChange(of: appearance) { _, new in new.apply() }
+        .onChange(of: language) { _, new in new.save() }
         .frame(width: 520)
         .fixedSize(horizontal: false, vertical: true)
     }

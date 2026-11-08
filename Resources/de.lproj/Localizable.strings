@@ -289,6 +289,7 @@
 "It may have been removed by a rebase or garbage collection." = "Er wurde vielleicht durch einen Rebase oder eine Garbage Collection entfernt.";
 "Its commits aren't in your current branch or its upstream. Delete it anyway? Edit > Undo brings it back until you run another git command." = "Seine Commits sind weder in deinem aktuellen Branch noch in dessen Upstream. Trotzdem löschen? Bearbeiten > Widerrufen holt ihn zurück, bis du einen anderen git-Befehl ausführst.";
 "Labels" = "Labels";
+"Language" = "Sprache";
 "Later" = "Später";
 "Light" = "Hell";
 "Link an existing local branch" = "Einen vorhandenen lokalen Branch verknüpfen";

@@ -6,6 +6,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Settings › Language: follow macOS, or always English or German.
+
 ## [0.3.0] - 2026-11-08
 
 ### Added
