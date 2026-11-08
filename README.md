@@ -5,7 +5,7 @@
 <h1 align="center">git-cowork</h1>
 
 <p align="center">
-  A small, fast, native Mac git client — with a task board and code reviews that live inside your repo.<br>
+  A small, fast, native Mac git client with a mini Jira built in: a task board and code reviews that live inside your repo.<br>
   No sign-up. No server. No telemetry. Just <code>git</code>.
 </p>
 
@@ -44,13 +44,42 @@ leaving the repo.
   Settings (⌘,) › Git.
 - **Worktrees first.** Every worktree shows in the sidebar and the graph,
   with live uncommitted counts and ahead/behind.
-- **Tasks and reviews in the repo.** A shared board and review requests,
-  stored on a hidden git ref and synced with plain `git push`/`fetch`.
-  Works with GitHub, GitLab, Gitea, Forgejo or any git server.
+- **Tasks and reviews in the repo.** A [built-in board](#a-mini-jira-inside-your-repo)
+  and review requests, stored on a hidden git ref and synced with plain
+  `git push`/`fetch`. Works with GitHub, GitLab, Gitea, Forgejo or any git
+  server.
+
+## A mini Jira inside your repo
+
+Every repository gets its own task board, right next to your commits. There's
+no second tool to switch to, no workspace to set up and no seats to pay for.
+Whoever can push to the repo can use the board.
 
 <p align="center">
-  <img src="docs/images/board.webp" alt="Board view: tasks in Backlog, To Do, In Progress and In Review columns">
+  <img src="docs/images/board.webp" alt="Board view: tasks in Backlog, To Do, In Progress and In Review columns, with one task open beside them">
 </p>
+
+- **A proper board.** Backlog, To Do, In Progress, In Review and Done. Drag
+  cards between columns, filter by person or label, search titles and
+  descriptions.
+- **Tasks with context.** Assignee, labels, description, comments and
+  @mentions.
+- **Tied to your code.** Start Task checks out the task's branch (or gives it
+  its own worktree), assigns it to you if nobody has it, and moves the card to
+  In Progress. Request a review for it and the card moves to In Review, with
+  the verdict right on it.
+- **You hear about it.** An inbox and macOS notifications for assignments,
+  review requests, verdicts, @mentions and comments.
+- **Yours, in git.** Each task is a small Markdown file on a hidden ref, and
+  every change is a commit, so `git log refs/cowork/main` is the full history.
+  It works offline, and two people editing the same task are merged field by
+  field.
+- **In the terminal too.** [`git cowork`](#from-the-terminal-git-cowork) lists,
+  creates, starts and comments on tasks.
+
+It's deliberately small: one board per repository, with no sprints, estimates,
+due dates or attachments. Tasks show up in git-cowork and with plain git, not
+in your host's web UI. [How it works](#how-tasks-and-reviews-work).
 
 ## Install
 
