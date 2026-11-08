@@ -23,6 +23,10 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - Tokens in the Keychain are stored per account instead of per server. Existing
   ones move over by themselves.
 
+### Fixed
+- Two quick edits on the board could leave an older version of a task on screen
+  until the next change. What was saved was always right.
+
 ## [0.3.0] - 2026-11-08
 
 ### Added

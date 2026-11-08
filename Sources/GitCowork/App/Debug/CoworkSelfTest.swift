@@ -1,9 +1,30 @@
 import AppKit
+import CoworkKit
 import Foundation
 import GitCoworkCore
 
 // Debug builds only (see DebugSnapshot.swift).
 #if DEBUG
+
+/// Delays the next tree listing, so the reload that started first finishes last.
+private final class SlowNextListing: GitExecutor, @unchecked Sendable {
+    private let lock = NSLock()
+    private var armed = false
+
+    func arm() { lock.withLock { armed = true } }
+
+    private func takeArmed() -> Bool {
+        lock.withLock {
+            defer { armed = false }
+            return armed
+        }
+    }
+
+    func git(_ args: [String], in dir: URL, input: Data?, env: [String: String]) async -> GitOutput {
+        if args.first == "ls-tree", takeArmed() { try? await Task.sleep(for: .seconds(1)) }
+        return await AppGit().git(args, in: dir, input: input, env: env)
+    }
+}
 
 /// End-to-end check of cowork sync with real git, no UI:
 ///     GITCOWORK_SELFTEST=/tmp/some-empty-dir .build/debug/GitCowork
@@ -148,6 +169,20 @@ enum CoworkSelfTest {
         async let y: Bool = anna.updateTask(lt.id) { $0.labels.removeAll { $0 == "b" } }
         _ = await (x, y)
         check(anna.task(lt.id)?.labels == ["c"], "two quick label removals both stick (\(anna.task(lt.id)?.labels ?? []))")
+        let slowGit = SlowNextListing()
+        let slowStore = CoworkStore(root: a, git: slowGit)
+        await slowStore.load()
+        guard let st = await slowStore.createTask(title: "Slow reload", labels: ["a", "b", "c"]) else {
+            check(false, "create slow reload task"); return false
+        }
+        slowGit.arm()
+        async let p: Bool = slowStore.updateTask(st.id) { $0.labels.removeAll { $0 == "a" } }
+        async let q: Bool = slowStore.updateTask(st.id) { $0.labels.removeAll { $0 == "b" } }
+        _ = await (p, q)
+        let savedLabels = await slowStore.repo.snapshot().task(id: st.id)?.labels ?? []
+        check(savedLabels == ["c"], "both quick edits are saved (\(savedLabels))")
+        check(slowStore.task(st.id)?.labels == ["c"], "a slow older reload can't replace a newer one (\(slowStore.task(st.id)?.labels ?? []))")
+        if let t = slowStore.task(st.id) { await slowStore.deleteTask(t) }
         let window2 = CoworkStore(root: a)
         await window2.load()
         await anna.updateTask(lt.id) { $0.status = .done }

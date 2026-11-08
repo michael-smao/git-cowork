@@ -34,10 +34,11 @@ final class CoworkStore {
     // Used by CoworkSync.swift.
     var pushTask: Task<Void, Never>?
     var syncChain: Task<Void, Never>?
+    private var reloadChain: Task<Void, Never>?
 
-    init(root: URL) {
+    init(root: URL, git: GitExecutor = AppGit()) {
         self.root = root
-        self.repo = CoworkRepo(root: root, git: AppGit())
+        self.repo = CoworkRepo(root: root, git: git)
     }
 
     // MARK: Reading
@@ -53,7 +54,19 @@ final class CoworkStore {
 
     /// Re-reads the local ref if it moved (or always, with `force`). Edits
     /// still being written are applied on top, so the UI never flickers back.
+    /// Reloads run one at a time, in call order, so a slow read of an older
+    /// commit can't replace a newer one.
     func reload(force: Bool = false) async {
+        let previous = reloadChain
+        let task = Task { @MainActor in
+            await previous?.value
+            await reloadNow(force: force)
+        }
+        reloadChain = task
+        await task.value
+    }
+
+    private func reloadNow(force: Bool) async {
         let tip = await repo.tip()
         guard tip != localTip || !loaded || force else { return }
         localTip = tip
