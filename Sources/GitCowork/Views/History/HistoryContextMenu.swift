@@ -40,6 +40,7 @@ extension HistoryTableCoordinator {
                 if !local.isHead {
                     menu.addItem(ActionItem("Checkout \(local.name)") { Task { await model.checkout(local) } })
                 }
+                menu.addItem(ActionItem("Push \(local.name)") { Task { await model.push(branch: local.name) } })
             } else if let remote {
                 // Remote-only here. If a local branch of that name exists elsewhere,
                 // checking out switches to it, so say where it is.

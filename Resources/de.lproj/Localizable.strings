@@ -413,6 +413,7 @@
 "Pull 1 commit from %@" = "1 Commit von %@ holen (Pull)";
 "Pull from %@" = "Pull von %@";
 "Push" = "Push";
+"Push %@" = "%@ pushen";
 "Push %lld commits to %@" = "%1$lld Commits nach %2$@ pushen";
 "Push 1 commit to %@" = "1 Commit nach %@ pushen";
 "Push and set upstream" = "Pushen und Upstream setzen";

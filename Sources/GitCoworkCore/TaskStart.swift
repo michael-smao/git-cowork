@@ -41,6 +41,18 @@ public enum BranchLookup {
         return remotes.first
     }
 
+    /// `git push` arguments for a branch that may not be checked out: to the
+    /// upstream it tracks, else to `fallbackRemote`, which becomes its upstream.
+    /// Full refs, so a tag of the same name can't make the push ambiguous.
+    public static func pushArguments(branch: String, upstream: String?, remotes: [String], fallbackRemote: String?) -> [String]? {
+        let local = "refs/heads/\(branch)"
+        if let upstream, let s = RefName.splitRemote(upstream, remotes: remotes), remotes.contains(s.remote) {
+            return ["push", s.remote, "\(local):refs/heads/\(s.branch)"]
+        }
+        guard let fallbackRemote else { return nil }
+        return ["push", "-u", fallbackRemote, "\(local):\(local)"]
+    }
+
     /// Remote-tracking ref for a branch name: on `preferred`, else on any remote.
     public static func remote(named name: String, in refs: [Ref], preferred: String?, remotes: [String]) -> Ref? {
         let remoteRefs = refs.filter { $0.kind == .remoteBranch }

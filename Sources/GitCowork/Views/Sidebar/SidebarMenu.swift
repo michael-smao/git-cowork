@@ -77,11 +77,13 @@ struct SidebarMenu: View {
             Button("Open Worktree") { openHere(wt.path) }
             Button("Open Worktree in New Tab") { openInNewTab(wt.path) }
             Divider()
+            Button("Push") { Task { await model.push(branch: ref.name) } }
             Button("Merge \(ref.name) into \(current)") { Task { await model.merge(ref.name) } }
             Button("Rebase \(current) onto \(ref.name)") { Task { await model.rebase(onto: ref.name) } }
             Divider()
         } else if !ref.isHead {
             Button("Checkout") { Task { await model.checkout(ref) } }
+            Button("Push") { Task { await model.push(branch: ref.name) } }
             Button("Merge \(ref.name) into \(current)") { Task { await model.merge(ref.name) } }
             Button("Rebase \(current) onto \(ref.name)") { Task { await model.rebase(onto: ref.name) } }
             Divider()

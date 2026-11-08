@@ -105,6 +105,19 @@ private func review(_ reviewers: [String: ReviewVerdict], requester: String = "a
         #expect(BranchLookup.defaultRemote(upstream: nil, remotes: []) == nil)
     }
 
+    @Test func pushArguments() {
+        // No upstream yet: the fallback remote becomes it.
+        #expect(BranchLookup.pushArguments(branch: "a/b", upstream: nil, remotes: ["origin"], fallbackRemote: "origin")
+                == ["push", "-u", "origin", "refs/heads/a/b:refs/heads/a/b"])
+        // Tracked: stays on that remote and that remote branch name.
+        #expect(BranchLookup.pushArguments(branch: "x", upstream: "my/fork/y", remotes: ["origin", "my/fork"], fallbackRemote: "origin")
+                == ["push", "my/fork", "refs/heads/x:refs/heads/y"])
+        // The upstream's remote no longer exists: treated as no upstream.
+        #expect(BranchLookup.pushArguments(branch: "x", upstream: "gone/x", remotes: ["origin"], fallbackRemote: "origin")
+                == ["push", "-u", "origin", "refs/heads/x:refs/heads/x"])
+        #expect(BranchLookup.pushArguments(branch: "x", upstream: nil, remotes: [], fallbackRemote: nil) == nil)
+    }
+
     @Test func remoteLookupPrefersRemote() {
         let refs = [Ref(fullName: "refs/remotes/up/x", name: "up/x", kind: .remoteBranch, target: "1"),
                     Ref(fullName: "refs/remotes/origin/x", name: "origin/x", kind: .remoteBranch, target: "2"),

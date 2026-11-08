@@ -126,14 +126,16 @@ extension RepoModel {
         }
     }
 
-    /// Pushes a branch that may not be checked out, setting its upstream.
+    /// Pushes a branch that may not be checked out here, or is checked out in
+    /// another worktree. A branch without an upstream gets one.
     @discardableResult
     func push(branch: String) async -> Bool {
-        guard let remote = defaultRemote else {
+        guard let args = BranchLookup.pushArguments(branch: branch, upstream: localBranch(named: branch)?.upstream,
+                                                    remotes: remoteNames, fallbackRemote: defaultRemote) else {
             alert = AlertItem(title: "Push failed", message: "This repository has no remote.")
             return false
         }
-        let pushed = await perform("Push", ["push", "-u", remote, branch])
+        let pushed = await perform("Push", args)
         if pushed { noteRemoteAction(fetched: false, succeeded: true) }
         return pushed
     }
