@@ -135,9 +135,10 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     private var wipCountsCache: [WIPCount]?
     lazy var headerMenuDelegate = HistoryHeaderMenu(coordinator: self)
 
-    // Cowork: tasks and reviews linked to branches, rebuilt when the store
-    // changes (HistoryCoworkMarks.swift).
+    // Cowork: tasks and reviews linked to branches, plus pull requests and CI,
+    // rebuilt when their stores change (HistoryCoworkMarks.swift).
     var coworkVersion = -1
+    var hostVersion = -1
     var tasksByBranch: [String: [CoworkTask]] = [:]
     var reviewByBranch: [String: ReviewRequest] = [:]
     var coworkCache: [Int: HistoryCoworkInfo] = [:]

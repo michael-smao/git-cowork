@@ -44,7 +44,7 @@ extension HostAPI {
 
     /// A later page, from the `next` link of the previous response. Nil when
     /// the link points anywhere but this host's API, so the token stays there.
-    public static func nextReposRequest(linkHeader: String?, kind: HostKind, host: String, token: String) -> URLRequest? {
+    public static func nextPageRequest(linkHeader: String?, kind: HostKind, host: String, token: String) -> URLRequest? {
         guard let next = nextPageURL(linkHeader: linkHeader),
               let base = URL(string: apiBase(kind: kind, host: host)),
               next.scheme == "https", next.host?.lowercased() == base.host?.lowercased(), next.port == base.port,

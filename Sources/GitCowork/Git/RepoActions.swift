@@ -133,7 +133,9 @@ extension RepoModel {
             alert = AlertItem(title: "Push failed", message: "This repository has no remote.")
             return false
         }
-        return await perform("Push", ["push", "-u", remote, branch])
+        let pushed = await perform("Push", ["push", "-u", remote, branch])
+        if pushed { noteRemoteAction(fetched: false, succeeded: true) }
+        return pushed
     }
 
     func renameBranch(_ old: String, to new: String) async {

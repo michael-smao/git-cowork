@@ -59,6 +59,13 @@ extension HistoryTableCoordinator {
             }
             let branch = badge.name
             menu.addItem(ActionItem("Request Review of \(branch)…") { model.sheet = .requestReview(branch: branch) })
+            if let links = model.links(for: nil) {
+                if let pull = model.pull(forBranch: branch) {
+                    menu.addItem(ActionItem("Open \(links.pullRequestTerm) #\(pull.number) on \(links.host)") { External.browse(pull.webURL) })
+                } else if branch != model.baseBranch()?.name, model.canCreatePull(remote: nil) {
+                    menu.addItem(ActionItem("Create \(links.pullRequestTerm)…") { model.sheet = .createPull(branch: branch) })
+                }
+            }
             for task in tasksByBranch[branch] ?? [] {
                 let id = task.id
                 menu.addItem(ActionItem("Open Task \(id)") {

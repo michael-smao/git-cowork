@@ -148,6 +148,7 @@ also drop a folder onto any window.
 | **Diff** | Hunk or split view, intra-line highlights, stage / unstage / discard single hunks. |
 | **Merge / rebase** | Banner with Continue / Skip / Abort, conflicted files, "use mine / theirs". |
 | **Hosts** | "Create pull/merge request" and "Open on …" for GitHub, GitLab, Gitea and Forgejo, including self-hosted. |
+| **Pull requests and CI** | With an account for the host: open pull/merge requests in the sidebar, `#12` on their branches in the graph, CI passed/failed/running on branches and commits, which checks failed in the commit panel, and Create Pull Request from the app (pushes the branch first if needed). Requests from forks are listed but aren't matched to your branches; if you work from a fork, requests on the parent repository aren't shown. |
 | **Clone** | Paste a URL, or, with an account added, pick from a filterable list of your repositories and your organizations' or groups'. |
 | **Undo** | ⌘Z takes back the last commit, amend, reset, checkout or branch delete, with plain git commands. Not offered once you've pushed. |
 | **Accounts** | Optional. Paste an access token for GitHub, GitLab, Gitea or Forgejo, and HTTPS push and pull just work. Browser sign-in (OAuth device flow) needs an OAuth app registered for your host; Settings > Accounts explains how. Tokens stay in the Keychain and only git-cowork uses them. For SSH remotes, Create SSH Key makes a key, adds it to your GitHub or GitLab account and uses it in git-cowork without touching `~/.ssh/config`. Several accounts on one server work too: each repository uses the one you pick in its status bar. |
@@ -266,7 +267,9 @@ sets it to always light or always dark.
 **Is my data sent anywhere?** No telemetry, no server of ours. The app talks
 to your git remotes through your own `git`. If you add an account, it also
 calls that host's API (GitHub, GitLab, Gitea or Forgejo) to check the token,
-list your repositories and upload an SSH key you create. Once a day it asks
+list your repositories, read pull requests and CI results while the app is in
+front, create a pull request when you ask, and upload an SSH key you create.
+Once a day it asks
 api.github.com for the newest git-cowork release (Settings › Updates turns this
 off); that request carries nothing about you or your repositories. Tokens stay
 in your Keychain.

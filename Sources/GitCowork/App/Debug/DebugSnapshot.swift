@@ -1,4 +1,5 @@
 import AppKit
+import GitCoworkCore
 import SwiftUI
 
 // Debug builds only: lets developers and agents check the UI from a terminal.
@@ -14,6 +15,7 @@ enum DebugSnapshot {
     @MainActor
     static func applySelection(_ model: RepoModel) async {
         applyMode(model)
+        await applyHostDemo(model)
         // GITCOWORK_DEBUG_LOG = "1": open the command log.
         if ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_LOG"] != nil { model.showCommandLog = true }
         guard let sel = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_SELECT"] else { return }
@@ -30,6 +32,27 @@ enum DebugSnapshot {
             if let f = await model.changedFiles(d).first { model.openDiff = .commit(d, f) }
         default: break
         }
+    }
+
+    /// GITCOWORK_DEBUG_HOST = "1": sample pull requests and CI on the repo's branches.
+    /// "sheet" also opens Create Pull Request. No network, no account needed.
+    @MainActor
+    private static func applyHostDemo(_ model: RepoModel) async {
+        guard let value = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_HOST"] else { return }
+        await model.updateHostStatus()
+        guard let status = model.hostStatus else { debugLog("host demo: no known host on the remote"); return }
+        let branches = model.localBranches.filter { $0.name != model.baseBranchName }
+        let pulls = branches.prefix(3).enumerated().map { n, ref in
+            HostPull(number: 12 + n, title: model.commit(ref.target)?.subject ?? ref.name, author: "anna", branch: ref.name, base: model.baseBranchName,
+                     headSHA: ref.target, webURL: URL(string: "https://example.com/pull/\(12 + n)"), isDraft: n == 2, isFromFork: false)
+        }
+        let check = { (name: String, state: CIState) in CICheck(name: name, state: state, url: URL(string: "https://example.com/run")) }
+        var ci: [String: CIResult] = [:]
+        if let first = branches.first { ci[first.target] = CIResult(checks: [check("build", .success), check("test", .failure), check("lint", .success)]) }
+        if branches.count > 1 { ci[branches[1].target] = CIResult(checks: [check("build", .pending), check("lint", .success)]) }
+        if let base = model.branch(named: model.baseBranchName) { ci[base.target] = CIResult(checks: [check("build", .success)]) }
+        status.showDemo(pulls: Array(pulls), ci: ci)
+        if value == "sheet", let first = branches.last { model.sheet = .createPull(branch: first.name) }
     }
 
     @MainActor

@@ -122,6 +122,7 @@ final class RepoModel {
             Task { @MainActor in
                 await self?.refresh()
                 if let self, Prefs.coworkAutoSync, (self.cowork.lastSync.map { Date().timeIntervalSince($0) > 30 } ?? true) { await self.syncCowork() }
+                await self?.updateHostStatus()
             }
         }
         cowork.remote = await resolveCoworkRemote()
@@ -130,6 +131,7 @@ final class RepoModel {
         guard !isStopped else { return }
         startCoworkSync()
         autoFetcher.start()
+        await updateHostStatus()
     }
 
     /// Called when the window closes: stops file watching, timers and observers.
@@ -146,6 +148,9 @@ final class RepoModel {
         if let activationObserver { NotificationCenter.default.removeObserver(activationObserver) }
         activationObserver = nil
     }
+
+    /// Pull requests and CI on the remote's host. Nil for a host of unknown kind.
+    var hostStatus: HostStatus?
 
     /// True once the window closed (see stopWatching).
     private(set) var isStopped = false
@@ -195,6 +200,7 @@ final class RepoModel {
     /// and a sign-in pause ends once it worked.
     func noteRemoteAction(fetched: Bool, succeeded: Bool) {
         autoFetcher.note(fetched: fetched, succeeded: succeeded)
+        if succeeded { Task { await updateHostStatus(force: true) } }
     }
 
     /// Waits up to 15 s for a running background fetch, then goes ahead anyway.

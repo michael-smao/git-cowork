@@ -19,7 +19,8 @@ No Xcode project and no third-party dependencies.
 - **Keep it light.** The app should stay near 0% CPU when nothing changes.
   It watches files instead of polling them. The only timers are the task sync
   (every minute in front, every 3 minutes behind), the background fetch
-  (every 5 minutes, only in front) and the daily update check; don't add
+  (every 5 minutes, only in front; its tick also reads pull requests and CI)
+  and the daily update check; don't add
   more without a good reason.
 - **Plain git.** Every action runs the `git` CLI through `GitRunner`, so it
   shows up in the command log and respects the user's config. No libgit2.

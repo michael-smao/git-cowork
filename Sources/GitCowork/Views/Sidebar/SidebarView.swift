@@ -33,9 +33,11 @@ private struct SidebarContent: View, Equatable {
     @State private var filter = ""
     @State private var selection: String?
     @FocusState private var filterFocused: Bool
+    @Environment(\.openSettings) private var openSettings
     @AppStorage(Prefs.Key.sidebarSection(.local)) private var localOpen = SidebarSection.local.openByDefault
     @AppStorage(Prefs.Key.sidebarSection(.remote)) private var remoteOpen = SidebarSection.remote.openByDefault
     @AppStorage(Prefs.Key.sidebarSection(.worktrees)) private var worktreesOpen = SidebarSection.worktrees.openByDefault
+    @AppStorage(Prefs.Key.sidebarSection(.pulls)) private var pullsOpen = SidebarSection.pulls.openByDefault
     @AppStorage(Prefs.Key.sidebarSection(.tasks)) private var tasksOpen = SidebarSection.tasks.openByDefault
     @AppStorage(Prefs.Key.sidebarSection(.reviews)) private var reviewsOpen = SidebarSection.reviews.openByDefault
     @AppStorage(Prefs.Key.sidebarSection(.stashes)) private var stashesOpen = SidebarSection.stashes.openByDefault
@@ -110,7 +112,7 @@ private struct SidebarContent: View, Equatable {
         case .remote(let name, let expanded):
             SidebarGroupRow(name: name, symbol: "network", expanded: expanded, depth: item.depth) { toggleFolder(item.id) }
         case .branch(let ref, let label):
-            SidebarRefRow(ref: ref, label: label, depth: item.depth)
+            SidebarRefRow(ref: ref, label: label, depth: item.depth, ci: model.ciState(ref.target))
                 .tag(item.id)
         case .worktree(let wt):
             SidebarWorktreeRow(model: model, wt: wt, isCurrent: wt.path == model.root.path, repoName: model.name)
@@ -123,6 +125,9 @@ private struct SidebarContent: View, Equatable {
                 .tag(item.id)
         case .review(let review, let waiting):
             SidebarReviewRow(review: review, waiting: waiting, requester: waiting ? model.cowork.person(review.requester) : nil)
+                .tag(item.id)
+        case .pull(let pull, let ci):
+            SidebarPullRow(pull: pull, ci: ci)
                 .tag(item.id)
         case .person(let person, let isMe):
             SidebarPersonRow(person: person, isMe: isMe)
@@ -145,6 +150,9 @@ private struct SidebarContent: View, Equatable {
             SidebarSectionHeader(section: section, count: count, expanded: expanded, showsDivider: !first, toggle: toggle) {
                 HeaderAddButton(help: "New task") { model.sheet = .newTask(status: .todo) }
             }
+        case .pulls:
+            SidebarSectionHeader(section: section, count: count, expanded: expanded, showsDivider: !first,
+                                 title: model.hostStatus?.links.kind == .gitlab ? L("Merge Requests") : nil, toggle: toggle)
         default:
             SidebarSectionHeader(section: section, count: count, expanded: expanded, highlight: highlight,
                                  showsDivider: !first, toggle: toggle)
@@ -158,6 +166,7 @@ private struct SidebarContent: View, Equatable {
         if localOpen { s.insert(.local) }
         if remoteOpen { s.insert(.remote) }
         if worktreesOpen { s.insert(.worktrees) }
+        if pullsOpen { s.insert(.pulls) }
         if tasksOpen { s.insert(.tasks) }
         if reviewsOpen { s.insert(.reviews) }
         if stashesOpen { s.insert(.stashes) }
@@ -173,6 +182,7 @@ private struct SidebarContent: View, Equatable {
             case .local: localOpen.toggle()
             case .remote: remoteOpen.toggle()
             case .worktrees: worktreesOpen.toggle()
+            case .pulls: pullsOpen.toggle()
             case .tasks: tasksOpen.toggle()
             case .reviews: reviewsOpen.toggle()
             case .stashes: stashesOpen.toggle()
@@ -213,6 +223,10 @@ private struct SidebarContent: View, Equatable {
                   let head = wt.head, model.commitIndex[head] != nil {
             model.centerMode = .history
             model.reveal(head)
+        } else if id.hasPrefix("pull:"), let pull = model.hostStatus?.pulls.first(where: { "pull:\($0.number)" == id }),
+                  model.commitIndex[pull.headSHA] != nil {
+            model.centerMode = .history
+            model.reveal(pull.headSHA)
         } else if id.hasPrefix("task:") {
             openCoworkTarget("tasks/" + id.dropFirst(5), model: model)
         } else if id.hasPrefix("review:") {
@@ -242,6 +256,8 @@ private struct SidebarContent: View, Equatable {
             }
         } else if id.hasPrefix("wt:"), let wt = model.worktrees.first(where: { "wt:" + $0.path == id }) {
             if !model.sidebarIsCurrent(wt) { openHere(wt.path) }
+        } else if id.hasPrefix("pull:"), let pull = model.hostStatus?.pulls.first(where: { "pull:\($0.number)" == id }) {
+            External.browse(pull.webURL)
         }
     }
 
@@ -250,6 +266,7 @@ private struct SidebarContent: View, Equatable {
         case .board: model.centerMode = .board
         case .reviews: model.centerMode = .reviews
         case .team: model.sheet = .team
+        case .signIn: openSettings()
         }
     }
 }
@@ -277,6 +294,10 @@ private struct SidebarSelectionSync: View {
             guard model.centerMode == .history, case .commit(let sha)? = model.selection else { return false }
             if id.hasPrefix("ref:") { return model.refs.contains { "ref:" + $0.fullName == id && $0.target == sha } }
             return model.worktrees.contains { "wt:" + $0.path == id && $0.head == sha }
+        }
+        if id.hasPrefix("pull:") {
+            guard model.centerMode == .history, case .commit(let sha)? = model.selection else { return false }
+            return model.hostStatus?.pulls.contains { "pull:\($0.number)" == id && $0.headSHA == sha } ?? false
         }
         if id.hasPrefix("task:") {
             return model.centerMode == .board && model.coworkSelection == .task(String(id.dropFirst(5)))

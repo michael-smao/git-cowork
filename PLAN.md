@@ -279,9 +279,10 @@ signed-in accounts' repos (`HostAPI` repo listing in core,
 `Accounts/RepoList.swift` and `Views/CloneRepoList.swift` in the app). The
 optional SSH key is built too (Settings > Accounts > Create SSH Key; tested
 against a local sshd, not yet against a real GitHub/GitLab account). Not
-built yet: items 2 and 3 below, the `Hosts/` protocol, the message for
-GitHub orgs that block OAuth apps, and a "Sign in" button on auth errors
-(a failed push or fetch only says to sign in under Settings > Accounts).
+built yet: merging or reviewing a request from the app, the `Hosts/` protocol,
+a link to the approval page for GitHub orgs that block OAuth apps (the
+host's own message is shown), and a "Sign in" button on auth errors (a failed
+push or fetch only says to sign in under Settings > Accounts).
 
 How git gets the token: `git credential-cache` on a private socket, plus
 `-c credential.https://<host>.helper=` (clears the person's helpers for that
@@ -350,8 +351,14 @@ credential helper just fails. That's the gap this fills first.
 In this order:
 1. Clone from a list of your repos (and your orgs' repos). Built.
 2. PRs/MRs: list open ones, show them on branches in the graph, create one
-   from the app instead of only opening the web page.
-3. CI status on branches and commits.
+   from the app instead of only opening the web page. Built (`HostPulls` in
+   core, `Accounts/HostStatus.swift`, `Views/Hosting`).
+3. CI status on branches and commits. Built (`HostCI`). One `HostStatus` per
+   repository, shared by its worktree tabs. Runs on the auto-fetch tick while
+   the app is in front: the list every minute, a running commit every 30 s, a
+   finished one every 10 minutes, at most 20 commits per tick, and it stops
+   for 10 minutes when the host rate-limits. Not handled: pull requests on
+   the parent repository when you work from a fork.
 
 ### Things to know
 

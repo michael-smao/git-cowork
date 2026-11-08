@@ -75,14 +75,15 @@ public enum HostAPI {
     }
 
     /// The human part of an API error: GitHub's `errors[].message` or
-    /// `message`, GitLab's `message` (a string or `{field: [problems]}`).
-    static func errorMessage(_ data: Data) -> String? {
+    /// `message`, GitLab's `message` (a string, a list or `{field: [problems]}`).
+    public static func errorMessage(_ data: Data) -> String? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         if let errors = obj["errors"] as? [[String: Any]] {
             let messages = errors.compactMap { $0["message"] as? String }
             if !messages.isEmpty { return messages.joined(separator: "; ") }
         }
         if let message = obj["message"] as? String { return message }
+        if let list = obj["message"] as? [String], !list.isEmpty { return list.joined(separator: "; ") }
         if let fields = obj["message"] as? [String: Any] {
             return fields.keys.sorted().compactMap { key in
                 (fields[key] as? [String]).map { "\(key) \($0.joined(separator: ", "))" }

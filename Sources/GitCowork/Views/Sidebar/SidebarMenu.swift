@@ -43,6 +43,27 @@ struct SidebarMenu: View {
             }
             Divider()
             Button("Copy Branch Name") { External.copy(review.branch) }
+        } else if id.hasPrefix("pull:"), let status = model.hostStatus,
+                  let pull = status.pulls.first(where: { "pull:\($0.number)" == id }) {
+            pullMenu(pull, host: status.links.host)
+        }
+    }
+
+    @ViewBuilder
+    private func pullMenu(_ pull: HostPull, host: String) -> some View {
+        Button("Open on \(host)") { External.browse(pull.webURL) }
+        // Only by a ref that exists: the name comes from the host.
+        if !pull.isFromFork {
+            if let wt = model.sidebarOtherWorktree(for: pull.branch) {
+                Button("Open Worktree for \(pull.branch)") { openHere(wt.path) }
+            } else if let ref = model.localBranches.first(where: { $0.name == pull.branch }) ?? model.remoteBranches.first(where: { $0.branchNameWithoutRemote == pull.branch }),
+                      !ref.isHead {
+                Button("Checkout \(pull.branch)") { Task { await model.checkout(ref) } }
+            }
+        }
+        if let url = pull.webURL {
+            Divider()
+            Button("Copy Link") { External.copy(url.absoluteString) }
         }
     }
 
@@ -157,7 +178,11 @@ struct SidebarMenu: View {
     private func hostLinks(branch: String, remote: String?) -> some View {
         if let links = model.links(for: remote) {
             let base = model.baseBranch()?.name
-            if branch != base, let url = links.newPullRequestURL(branch: branch, base: base) {
+            if let pull = model.pull(forBranch: branch), remote == nil || remote == model.defaultRemote {
+                Button("Open \(links.pullRequestTerm) #\(pull.number) on \(links.host)") { External.browse(pull.webURL) }
+            } else if branch != base, model.canCreatePull(remote: remote) {
+                Button("Create \(links.pullRequestTerm)…") { model.sheet = .createPull(branch: branch) }
+            } else if branch != base, let url = links.newPullRequestURL(branch: branch, base: base) {
                 Button("Create \(links.pullRequestTerm) on \(links.host)") { External.browse(url) }
             }
             if let url = links.branchURL(branch) {

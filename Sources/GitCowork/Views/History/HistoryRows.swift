@@ -46,14 +46,28 @@ struct HistoryCoworkInfo {
         let title: String
         let color: NSColor
     }
+    struct PullMark {
+        let number: Int
+        let title: String
+        let color: NSColor
+    }
+    struct CIMark {
+        let symbol: String
+        let title: String
+        let color: NSColor
+    }
     var tasks: [TaskMark] = []
     var review: ReviewMark?
-    var isEmpty: Bool { tasks.isEmpty && review == nil }
+    var pull: PullMark?
+    var ci: CIMark?
+    var isEmpty: Bool { tasks.isEmpty && review == nil && pull == nil && ci == nil }
 
     /// Tooltip for the message cell.
     var tooltip: String {
         var lines = tasks.map { "\($0.id)  \($0.title) (\($0.statusTitle))" }
         if let review { lines.append("Review of \(review.branch): \(review.title)") }
+        if let pull { lines.append("#\(pull.number)  \(pull.title)") }
+        if let ci { lines.append("CI: \(ci.title)") }
         return lines.joined(separator: "\n")
     }
 }

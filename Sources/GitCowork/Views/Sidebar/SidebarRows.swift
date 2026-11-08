@@ -78,6 +78,8 @@ struct SidebarSectionHeader<Trailing: View>: View {
     /// Accent count (reviews waiting for me).
     var highlight = false
     var showsDivider = true
+    /// Replaces the section's own title ("Merge Requests" on GitLab).
+    var title: String?
     var toggle: () -> Void = {}
     @ViewBuilder var trailing: Trailing
 
@@ -86,7 +88,7 @@ struct SidebarSectionHeader<Trailing: View>: View {
             if let expanded { DisclosureChevron(expanded: expanded) }
         } content: {
             SidebarIcon(symbol: section.symbol)
-            Text(section.title)
+            Text(title ?? section.title)
                 .font(Theme.Font.caption)
                 .foregroundStyle(.secondary)
             Spacer(minLength: Theme.Space.s)
@@ -104,9 +106,9 @@ struct SidebarSectionHeader<Trailing: View>: View {
 
 extension SidebarSectionHeader where Trailing == EmptyView {
     init(section: SidebarSection, count: Int, expanded: Bool?, highlight: Bool = false,
-         showsDivider: Bool = true, toggle: @escaping () -> Void = {}) {
+         showsDivider: Bool = true, title: String? = nil, toggle: @escaping () -> Void = {}) {
         self.init(section: section, count: count, expanded: expanded, highlight: highlight,
-                  showsDivider: showsDivider, toggle: toggle) { EmptyView() }
+                  showsDivider: showsDivider, title: title, toggle: toggle) { EmptyView() }
     }
 }
 
@@ -137,6 +139,7 @@ struct SidebarRefRow: View {
     let ref: Ref
     let label: String
     let depth: Int
+    var ci: CIState?
 
     var body: some View {
         SidebarRowLayout(depth: depth) {
@@ -152,6 +155,7 @@ struct SidebarRefRow: View {
                         .foregroundStyle(.tertiary)
                         .help("Upstream branch was deleted")
                 }
+                CIIcon(state: ci)
                 if ref.ahead > 0 || ref.behind > 0 { AheadBehind(ahead: ref.ahead, behind: ref.behind) }
             }
         }
@@ -208,6 +212,7 @@ struct SidebarWorktreeRow: View {
                 if wt.isLocked {
                     Image(systemName: "lock").foregroundStyle(.tertiary).help("Locked")
                 }
+                CIIcon(state: model.ciState(wt.head))
                 // Own view, so `git status` results arriving per worktree only
                 // redraw this badge, not the whole sidebar list.
                 WorktreeInfoBadges(model: model, path: wt.path)
@@ -289,7 +294,9 @@ struct SidebarNoteRow: View {
             Text(ui: text)
                 .font(Theme.Font.small)
                 .foregroundStyle(.tertiary)
+                .truncationMode(.tail)
             Spacer(minLength: 0)
         }
+        .help(Text(ui: text))
     }
 }
