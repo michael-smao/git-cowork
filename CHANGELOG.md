@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-08
+
 ### Added
 - Settings › Appearance: follow macOS, or always light or dark.
 - Homebrew: `brew install --cask michael-smao/tap/git-cowork`, updates with
