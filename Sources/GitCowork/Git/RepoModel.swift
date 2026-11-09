@@ -115,7 +115,9 @@ final class RepoModel {
         }
         await refresh()
         isLoaded = true
-        selection = status.isClean ? commits.first.map { .commit($0.id) } : .workingCopy
+        // Clean: show the checked-out commit (where the history scrolls to),
+        // not the newest commit of some other branch.
+        selection = status.isClean ? (headSHA ?? commits.first?.id).map { .commit($0) } : .workingCopy
         // The window may have closed while loading; don't start anything then.
         guard !isStopped else { return }
         activationObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in

@@ -8,7 +8,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ### Changed
 - The history scrolls to the checked-out branch when it opens and after a
-  checkout, instead of always starting at the newest commit.
+  checkout, instead of always starting at the newest commit. With no changes
+  to commit, the commit panel opens on that branch's commit too.
 
 ## [0.4.0] - 2026-11-09
 
