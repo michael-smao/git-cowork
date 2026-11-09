@@ -86,6 +86,7 @@ extension HistoryTableCoordinator {
     }
 
     func tableViewColumnDidResize(_ notification: Notification) {
+        badgeHover.close()
         guard let table, let column = notification.userInfo?["NSTableColumn"] as? NSTableColumn else { return }
         // A drag in the header (not our own sizing).
         let byUser = table.headerView?.resizedColumn == table.column(withIdentifier: column.identifier)

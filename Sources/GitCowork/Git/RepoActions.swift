@@ -442,16 +442,63 @@ extension RepoModel {
         return await perform("Add worktree", ["worktree", "add", "--end-of-options", path, base])
     }
 
-    func removeWorktree(_ wt: Worktree) {
+    /// Asks, then removes the worktree's folder (the branch stays). The main
+    /// worktree is never removed. For the worktree this window shows, `leave`
+    /// gets the main worktree's path first and must switch the window there.
+    /// Runs in the background: the row shows "Removing…" and the app stays usable.
+    func removeWorktree(_ wt: Worktree, leave: ((String) -> Void)? = nil) {
+        guard !wt.isMain, !WorktreeRemovals.shared.contains(wt.path) else { return }
+        let isCurrent = sidebarIsCurrent(wt)
+        guard !isCurrent || (leave != nil && canLeaveForMainWorktree) else { return }
+        let main = mainWorktreePath
         let dirty = (worktreeInfo[wt.path]?.changes ?? 0) > 0
+        var message = dirty
+            ? String(localized: "It has uncommitted changes. They will be lost. The branch \(wt.branch ?? "") stays.")
+            : String(localized: "Deletes the folder \(wt.path). The branch \(wt.branch ?? "") stays.")
+        if isCurrent { message += "\n\n" + String(localized: "This tab then shows the main worktree.") }
+        let args = ["worktree", "remove"] + (dirty ? ["--force"] : []) + [wt.path]
         confirmation = Confirmation(
             title: String(localized: "Remove worktree \(wt.displayName)?"),
-            message: dirty
-                ? String(localized: "It has uncommitted changes. They will be lost. The branch \(wt.branch ?? "") stays.")
-                : String(localized: "Deletes the folder \(wt.path). The branch \(wt.branch ?? "") stays."),
+            message: message,
             confirmTitle: "Remove"
         ) { [weak self] in
-            await self?.perform("Remove worktree", ["worktree", "remove"] + (dirty ? ["--force"] : []) + [wt.path])
+            guard let self else { return }
+            // Never in the folder being deleted: run it from the main worktree.
+            let dir = main.map { URL(fileURLWithPath: $0) } ?? self.root
+            let leaveFirst = isCurrent ? leave.flatMap { leave in main.map { main in { leave(main) } } } : nil
+            Task { await self.removeInBackground(wt, args: args, in: dir, leaveFirst: leaveFirst) }
+        }
+    }
+
+    /// The window can move to the main worktree when its own one is removed
+    /// (not when the main one is a bare repository, which has no files to show).
+    var canLeaveForMainWorktree: Bool {
+        guard let main = worktrees.first(where: \.isMain) else { return false }
+        return !main.isBare
+    }
+
+    /// Removes the worktree without taking `busy`, so pull, commit and the rest
+    /// keep working meanwhile. `leaveFirst` moves this window off the worktree
+    /// before its folder goes away.
+    private func removeInBackground(_ wt: Worktree, args: [String], in dir: URL, leaveFirst: (() -> Void)?) async {
+        let removals = WorktreeRemovals.shared
+        guard removals.begin(wt.path) else { return }
+        defer { removals.end(wt.path) }
+        if let leaveFirst {
+            lastUndo = nil
+            leaveFirst()
+        }
+        do {
+            try await git.run(args, in: dir, logged: true)
+            if leaveFirst == nil { await refresh() }
+        } catch {
+            let title = String(localized: "Remove worktree failed")
+            if leaveFirst == nil {
+                await refresh()
+                alert = AlertItem(title: title, message: error.localizedDescription)
+            } else {
+                WorktreeRemovals.reportFailure(title, error.localizedDescription)
+            }
         }
     }
 
