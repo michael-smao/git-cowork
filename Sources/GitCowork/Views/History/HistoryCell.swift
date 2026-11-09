@@ -88,7 +88,6 @@ final class HistoryCell: NSTableCellView {
             if let g, !coordinator.isFiltering {
                 drawLines(g.lines)
                 for join in coordinator.wipJoins[i] ?? [] { drawWIPJoin(join, into: cx) }
-                drawClipFade(lanes: g.laneCount)
             }
             drawNode(cx: cx, color: color, author: coordinator.authorColor(commit.authorEmail),
                      initials: coordinator.initials(commit.authorName),
@@ -116,7 +115,7 @@ final class HistoryCell: NSTableCellView {
         for lane in w.passThrough {
             let path = NSBezierPath()
             path.lineWidth = width
-            let x = GraphStyle.x(lane.lane)
+            let x = GraphStyle.nodeX(lane.lane, width: bounds.width)
             if lane.lane == w.lane {
                 path.move(to: NSPoint(x: x, y: 0))
                 path.line(to: NSPoint(x: x, y: midY - r))
@@ -135,7 +134,7 @@ final class HistoryCell: NSTableCellView {
             let path = NSBezierPath()
             path.lineWidth = 2
             path.setLineDash(GraphStyle.wipDash, count: GraphStyle.wipDash.count, phase: 0)
-            let x = GraphStyle.x(other.lane)
+            let x = GraphStyle.nodeX(other.lane, width: bounds.width)
             path.move(to: NSPoint(x: x, y: 0))
             path.line(to: NSPoint(x: x, y: bounds.height))
             Theme.lane(other.color).withAlphaComponent(0.6).setStroke()

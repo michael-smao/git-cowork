@@ -43,6 +43,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - After removing a worktree, its "// WIP" row could stay in the graph.
 - Settings scroll when they are taller than the window, and the window can be
   made taller. Before, the lower sections could not be reached on smaller screens.
+- In a graph with more lanes than fit, a branch's line ran beside its commits:
+  the nodes were moved to the column's edge, their lines weren't. Lines now
+  move with them.
 
 ## [0.4.0] - 2026-11-09
 
