@@ -6,6 +6,7 @@ struct RepoWindow: View {
     @Binding var path: String?
     @State private var showClone = false
     @State private var dropTargeted = false
+    @State private var host = HostWindow()
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
@@ -19,7 +20,7 @@ struct RepoWindow: View {
         }
         .environment(\.windowActions, actions)
         .frame(minWidth: 900, minHeight: 500)
-        .background(WindowAccessor())
+        .background(WindowAccessor(host: host))
         // Only an empty (welcome) window takes `open -a git-cowork <dir>`;
         // windows showing a repo decline, so SwiftUI opens a new tab instead.
         .handlesExternalEvents(preferring: path == nil ? ["*"] : [], allowing: path == nil ? ["*"] : [])
@@ -29,6 +30,10 @@ struct RepoWindow: View {
                 LaunchFolders.pendingClone = false
                 showClone = true
             }
+        }
+        // The first window can appear before the command line is read.
+        .onReceive(NotificationCenter.default.publisher(for: .launchFoldersPending)) { _ in
+            if path == nil { openLaunchFolders() }
         }
         .onOpenURL { url in
             if url.isFileURL { open(url.path) }
@@ -85,8 +90,17 @@ struct RepoWindow: View {
 
     /// Switches this window to another worktree, unless that worktree is
     /// already open in another tab: then that tab comes to the front.
+    /// If the folder this window shows is gone or being removed, the window
+    /// closes once the other tab is in front, rather than staying on a
+    /// deleted folder.
     private func openHere(_ p: String) {
-        if OpenRepos.isOpen(p) { openTab(p) } else { path = p }
+        guard OpenRepos.isOpen(p) else { path = p; return }
+        openTab(p)
+        if let current = path,
+           WorktreeRemovals.shared.contains(current) || !FileManager.default.fileExists(atPath: current) {
+            let window = host.window
+            DispatchQueue.main.async { window?.close() }
+        }
     }
 
     /// New tab next to this window. SwiftUI brings an existing window to the
@@ -160,6 +174,12 @@ private struct RepoContainer: View {
     }
 }
 
+/// The window a RepoWindow is shown in, so it can close itself.
+@MainActor
+final class HostWindow {
+    weak var window: NSWindow?
+}
+
 /// Sets up the window chrome once and makes new windows join the opener's tab group.
 struct WindowAccessor: NSViewRepresentable {
     /// Window the next new window should join as a tab. Weak and one-shot: if
@@ -177,14 +197,27 @@ struct WindowAccessor: NSViewRepresentable {
         }
     }
 
-    func makeNSView(context: Context) -> NSView { TrackingView() }
+    /// Remembers the window this view lives in.
+    let host: HostWindow
+
+    func makeNSView(context: Context) -> NSView { TrackingView(host: host) }
     func updateNSView(_ nsView: NSView, context: Context) {}
 
     private final class TrackingView: NSView {
         private weak var configured: NSWindow?
+        private let host: HostWindow
+
+        init(host: HostWindow) {
+            self.host = host
+            super.init(frame: .zero)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError() }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            if let window { host.window = window }
             guard let window, window !== configured else { return }
             configured = window
             WindowChrome.configure(window)
@@ -194,10 +227,7 @@ struct WindowAccessor: NSViewRepresentable {
                 DispatchQueue.main.async {
                     parent.addTabbedWindow(window, ordered: .above)
                     window.makeKeyAndOrderFront(nil)
-                    WindowChrome.showTabBar(window)
                 }
-            } else {
-                DispatchQueue.main.async { WindowChrome.showTabBar(window) }
             }
         }
     }

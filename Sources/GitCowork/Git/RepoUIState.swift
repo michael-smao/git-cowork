@@ -27,7 +27,7 @@ struct Confirmation: Identifiable {
     let confirmTitle: String
     var destructive = true
     let action: () async -> Void
-    /// A second choice next to the confirm button, already localized.
+    /// A second choice next to the confirm button (e.g. Rebase beside Merge), already localized.
     var alternativeTitle: String?
     var alternative: (() async -> Void)?
 }

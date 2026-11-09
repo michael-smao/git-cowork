@@ -249,7 +249,7 @@ private struct SidebarContent: View, Equatable {
                 if let wt = model.sidebarOtherWorktree(for: ref.branchNameWithoutRemote) {
                     openHere(wt.path)
                 } else {
-                    Task { await model.checkout(ref) }
+                    Task { await model.checkoutAndPull(ref) }
                 }
             case .tag:
                 Task { await model.checkout(ref) }

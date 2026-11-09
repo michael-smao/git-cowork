@@ -84,6 +84,9 @@ final class RepoModel {
     @ObservationIgnored var openWorktree: ((String) -> Void)?
     /// Bump to move keyboard focus to the commit summary field.
     var focusSummaryToken = 0
+    /// Shows another worktree of this repository: focuses its tab, else
+    /// switches this window to it. Set by the window; nil without one.
+    @ObservationIgnored var openWorktree: ((String) -> Void)?
     /// Bumped on every refresh; open working-copy diffs reload on it.
     private(set) var refreshCount = 0
     private var loadingMore = false
@@ -126,7 +129,9 @@ final class RepoModel {
         }
         await refresh()
         isLoaded = true
-        selection = status.isClean ? commits.first.map { .commit($0.id) } : .workingCopy
+        // Clean: show the checked-out commit (where the history scrolls to),
+        // not the newest commit of some other branch.
+        selection = status.isClean ? (headSHA ?? commits.first?.id).map { .commit($0) } : .workingCopy
         // The window may have closed while loading; don't start anything then.
         guard !isStopped else { return }
         activationObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
@@ -282,6 +287,12 @@ final class RepoModel {
         let newWorktrees = Parsers.parseWorktrees(wt)
         if newWorktrees != worktrees {
             worktrees = newWorktrees
+            // Forget removed worktrees, so the graph drops their "// WIP" rows.
+            let kept = worktreeInfo.filter { info in newWorktrees.contains { $0.path == info.key } }
+            if kept.count != worktreeInfo.count {
+                worktreeInfo = kept
+                worktreeInfoVersion += 1
+            }
             restartWatcher()
             await refreshWorktreeInfo(paths: worktrees.map(\.path))
         } else {

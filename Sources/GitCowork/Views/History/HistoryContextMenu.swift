@@ -6,16 +6,37 @@ extension HistoryTableCoordinator {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        guard let table, table.clickedRow >= 0, table.clickedRow < rows.count else { return }
+        guard let table else { return }
+        fill(menu, row: table.clickedRow)
+    }
+
+    /// The row's menu, for the badge list that hovers over the table. With
+    /// `onlyBadge`, the branch items are only those of that badge.
+    func contextMenu(forRow row: Int, onlyBadge: String? = nil) -> NSMenu? {
+        let menu = NSMenu()
+        fill(menu, row: row, onlyBadge: onlyBadge)
+        return menu.items.isEmpty ? nil : menu
+    }
+
+    private func fill(_ menu: NSMenu, row: Int, onlyBadge: String? = nil) {
+        guard row >= 0, row < rows.count else { return }
         let model = self.model
         let i: Int
-        switch rows[table.clickedRow] {
+        switch rows[row] {
         case .wip:
-            let row = table.clickedRow
             menu.addItem(ActionItem("Write Commit Message") { [weak self] in _ = self?.focusSummaryIfWIP(row: row) })
             menu.addItem(ActionItem("Stash Changes…") { model.sheet = .stash })
             return
         case .otherWIP(let path):
+            if let wt = model.worktrees.first(where: { $0.path == path }) {
+                let openHere = self.openHere, openInNewTab = self.openInNewTab
+                menu.addItem(ActionItem("Open Worktree") { openHere(wt.path) })
+                menu.addItem(ActionItem("Open Worktree in New Tab") { openInNewTab(wt.path) })
+                if !wt.isMain {
+                    menu.addItem(ActionItem("Remove Worktree…") { model.removeWorktree(wt) })
+                }
+                menu.addItem(.separator())
+            }
             menu.addItem(ActionItem("Open in Terminal") { External.openTerminal(path) })
             menu.addItem(ActionItem("Open in Editor") { External.openEditor(path) })
             menu.addItem(ActionItem("Reveal in Finder") { External.reveal(path) })
@@ -33,7 +54,7 @@ extension HistoryTableCoordinator {
         let refs = refsByCommit[sha] ?? []
 
         // One group per branch badge: a local branch and its remote share items.
-        for badge in badges(forCommit: i) where badge.kind == .branch {
+        for badge in badges(forCommit: i) where badge.kind == .branch && (onlyBadge == nil || badge.name == onlyBadge) {
             let local = refs.first { $0.kind == .localBranch && badge.refNames.contains($0.name) }
             let remote = refs.first { $0.kind == .remoteBranch && badge.refNames.contains($0.name) }
             if let local {
@@ -41,6 +62,15 @@ extension HistoryTableCoordinator {
                     menu.addItem(ActionItem("Checkout \(local.name)") { Task { await model.checkout(local) } })
                 }
                 menu.addItem(ActionItem("Push \(local.name)") { Task { await model.push(branch: local.name) } })
+                // Checked out in another worktree: open or remove that one.
+                if let wt = model.sidebarOtherWorktree(for: local.name) {
+                    let openHere = self.openHere, openInNewTab = self.openInNewTab
+                    menu.addItem(ActionItem("Open Worktree for \(local.name)") { openHere(wt.path) })
+                    menu.addItem(ActionItem("Open Worktree for \(local.name) in New Tab") { openInNewTab(wt.path) })
+                    if !wt.isMain {
+                        menu.addItem(ActionItem("Remove Worktree for \(local.name)…") { model.removeWorktree(wt) })
+                    }
+                }
             } else if let remote {
                 // Remote-only here. If a local branch of that name exists elsewhere,
                 // checking out switches to it, so say where it is.

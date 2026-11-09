@@ -102,14 +102,14 @@ final class Updater {
 
     /// Help > Check for Updates…: checks now and says what it found.
     func checkFromMenu() {
-        guard canUpdate else {
-            alert(L("Updates aren't available for this build"),
-                  L("Builds made with swift run or make run don't update themselves. Use make update in your git-cowork folder."))
-            return
-        }
         Task {
+            guard canUpdate else {
+                await alert(L("Updates aren't available for this build"),
+                            L("Builds made with swift run or make run don't update themselves. Use make update in your git-cowork folder."))
+                return
+            }
             guard await check() else {
-                alert(L("Couldn't check for updates"), error ?? "")
+                await alert(L("Couldn't check for updates"), error ?? "")
                 return
             }
             if let available {
@@ -119,15 +119,15 @@ final class Updater {
                     a.informativeText = String(localized: "You have \(current?.description ?? "?"). You installed git-cowork with Homebrew, so update it in Terminal with: \(Self.homebrewUpdateCommand)")
                     a.addButton(withTitle: L("Copy Command"))
                     a.addButton(withTitle: L("Later"))
-                    if a.runModal() == .alertFirstButtonReturn { External.copy(Self.homebrewUpdateCommand) }
+                    if await AlertPresenter.show(a) == .alertFirstButtonReturn { External.copy(Self.homebrewUpdateCommand) }
                     return
                 }
                 a.informativeText = String(localized: "You have \(current?.description ?? "?"). Update now? git-cowork restarts when it's done.")
                 a.addButton(withTitle: L("Update Now"))
                 a.addButton(withTitle: L("Later"))
-                if a.runModal() == .alertFirstButtonReturn { await install(restart: true) }
+                if await AlertPresenter.show(a) == .alertFirstButtonReturn { await install(restart: true) }
             } else {
-                alert(L("You're up to date"), String(localized: "git-cowork \(current?.description ?? "") is the newest version."))
+                await alert(L("You're up to date"), String(localized: "git-cowork \(current?.description ?? "") is the newest version."))
             }
         }
     }
@@ -198,10 +198,10 @@ final class Updater {
         NSApp.terminate(nil)
     }
 
-    private func alert(_ title: String, _ text: String) {
+    private func alert(_ title: String, _ text: String) async {
         let a = NSAlert()
         a.messageText = title
         a.informativeText = text
-        a.runModal()
+        await AlertPresenter.show(a)
     }
 }

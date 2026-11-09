@@ -76,9 +76,78 @@ extension RepoModel {
         await syncCowork()
     }
 
+    /// Pull ▾ variants run as chosen. The plain Pull fast-forwards when it can
+    /// and asks merge or rebase when both sides have new commits, instead of
+    /// git's "divergent branches" error. If the user set pull.rebase or pull.ff
+    /// in git config, plain `git pull` already follows that choice.
     func pull(_ mode: PullMode = .default) async {
-        let ok = await perform("Pull", mode.args)
-        noteRemoteAction(fetched: true, succeeded: ok)
+        guard mode == .default, status.upstream != nil, await !hasPullPreference() else {
+            let ok = await perform("Pull", mode.args)
+            noteRemoteAction(fetched: true, succeeded: ok)
+            return
+        }
+        let fetched = await perform("Pull", ["fetch"])
+        noteRemoteAction(fetched: true, succeeded: fetched)
+        guard fetched else { return }
+        await catchUp(with: "@{upstream}", named: status.upstream ?? "upstream")
+    }
+
+    private func hasPullPreference() async -> Bool {
+        for key in CatchUp.pullPreferenceKeys {
+            if let value = await git.tryRun(["config", "--get", key], in: root),
+               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        }
+        return false
+    }
+
+    /// Brings the checked-out branch up to `target` (a remote branch):
+    /// fast-forward when only `target` moved, nothing when it has no new
+    /// commits, and a question when both moved. Uncommitted changes are
+    /// stashed around it and put back (`--autostash`).
+    func catchUp(with target: String, named name: String) async {
+        guard let out = await git.tryRun(["rev-list", "--left-right", "--count", "HEAD...\(target)"], in: root),
+              let plan = CatchUp(revListCounts: out) else {
+            // Typically the upstream branch was deleted on the server (its pull request merged).
+            alert = AlertItem(title: String(localized: "\(name) doesn't exist anymore"),
+                              message: String(localized: "It was probably deleted on the server, for example after its pull request was merged. Nothing was pulled. Push to create it again, or switch to another branch."))
+            return
+        }
+        let branch = currentBranch ?? "HEAD"
+        switch plan {
+        case .upToDate, .aheadOnly:
+            return
+        case .fastForward:
+            await perform("Pull", ["merge", "--ff-only", "--autostash", target])
+        case .diverged(let ahead, let behind):
+            confirmation = Confirmation(
+                title: String(localized: "\(branch) and \(name) both have new commits"),
+                message: String(localized: "\(branch) has \(ahead) commits that \(name) doesn't, and \(name) has \(behind) new ones. Merge joins them with a merge commit. Rebase puts your \(ahead) commits on top of \(name). Nothing is lost either way."),
+                confirmTitle: "Merge",
+                destructive: false,
+                action: { [weak self] in await self?.perform("Pull", ["merge", "--no-edit", "--autostash", target]) },
+                alternativeTitle: L("Rebase"),
+                alternative: { [weak self] in await self?.perform("Pull", ["rebase", "--autostash", target]) }
+            )
+        }
+    }
+
+    /// Double-click on a remote branch: check out its local branch (a new
+    /// tracking one if there is none) and bring it up to date with the remote,
+    /// asking first when both have new commits.
+    func checkoutAndPull(_ remote: Ref) async {
+        guard remote.kind == .remoteBranch, let (remoteName, branch) = split(remote),
+              localBranch(named: branch) != nil else {
+            await checkout(remote)
+            return
+        }
+        if currentBranch != branch {
+            await checkout(remote)
+            guard currentBranch == branch else { return }   // refused or failed: it said why
+        }
+        // Fresh remote state first; offline, the last fetch still works.
+        _ = await git.tryRun(["fetch", "--end-of-options", remoteName, branch], in: root)
+        await refresh()
+        await catchUp(with: remote.name, named: remote.name)
     }
 
     /// A branch without an upstream asks where to push first (like
@@ -140,9 +209,23 @@ extension RepoModel {
         return true
     }
 
+    /// When `branch` is checked out in another worktree, goes there instead:
+    /// focuses its tab, else switches this window to it. Changes here stay in
+    /// this worktree. Without a window to switch (`openWorktree` is nil), it
+    /// alerts like `refuseIfCheckedOutElsewhere`. Returns true when the branch
+    /// is elsewhere, so the caller stops.
+    func openWorktreeIfCheckedOutElsewhere(_ branch: String) -> Bool {
+        guard let wt = worktree(holding: branch) else { return false }
+        guard let openWorktree else { return refuseIfCheckedOutElsewhere(branch) }
+        openWorktree(wt.path)
+        return true
+    }
+
+    /// Checks out a branch or tag. A branch another worktree has checked out
+    /// (also as the local branch of a remote one) opens that worktree instead.
     func checkout(_ ref: Ref) async {
         let local = split(ref)?.branch ?? ref.name
-        if ref.kind != .tag, refuseIfCheckedOutElsewhere(local) { return }
+        if ref.kind != .tag, openWorktreeIfCheckedOutElsewhere(local) { return }
         let args: [String]
         switch ref.kind {
         case .localBranch:
@@ -556,16 +639,63 @@ extension RepoModel {
         return await perform("Add worktree", ["worktree", "add", "--end-of-options", path, base])
     }
 
-    func removeWorktree(_ wt: Worktree) {
+    /// Asks, then removes the worktree's folder (the branch stays). The main
+    /// worktree is never removed. For the worktree this window shows, `leave`
+    /// gets the main worktree's path first and must switch the window there.
+    /// Runs in the background: the row shows "Removing…" and the app stays usable.
+    func removeWorktree(_ wt: Worktree, leave: ((String) -> Void)? = nil) {
+        guard !wt.isMain, !WorktreeRemovals.shared.contains(wt.path) else { return }
+        let isCurrent = sidebarIsCurrent(wt)
+        guard !isCurrent || (leave != nil && canLeaveForMainWorktree) else { return }
+        let main = mainWorktreePath
         let dirty = (worktreeInfo[wt.path]?.changes ?? 0) > 0
+        var message = dirty
+            ? String(localized: "It has uncommitted changes. They will be lost. The branch \(wt.branch ?? "") stays.")
+            : String(localized: "Deletes the folder \(wt.path). The branch \(wt.branch ?? "") stays.")
+        if isCurrent { message += "\n\n" + String(localized: "This tab then shows the main worktree.") }
+        let args = ["worktree", "remove"] + (dirty ? ["--force"] : []) + [wt.path]
         confirmation = Confirmation(
             title: String(localized: "Remove worktree \(wt.displayName)?"),
-            message: dirty
-                ? String(localized: "It has uncommitted changes. They will be lost. The branch \(wt.branch ?? "") stays.")
-                : String(localized: "Deletes the folder \(wt.path). The branch \(wt.branch ?? "") stays."),
+            message: message,
             confirmTitle: "Remove"
         ) { [weak self] in
-            await self?.perform("Remove worktree", ["worktree", "remove"] + (dirty ? ["--force"] : []) + [wt.path])
+            guard let self else { return }
+            // Never in the folder being deleted: run it from the main worktree.
+            let dir = main.map { URL(fileURLWithPath: $0) } ?? self.root
+            let leaveFirst = isCurrent ? leave.flatMap { leave in main.map { main in { leave(main) } } } : nil
+            Task { await self.removeInBackground(wt, args: args, in: dir, leaveFirst: leaveFirst) }
+        }
+    }
+
+    /// The window can move to the main worktree when its own one is removed
+    /// (not when the main one is a bare repository, which has no files to show).
+    var canLeaveForMainWorktree: Bool {
+        guard let main = worktrees.first(where: \.isMain) else { return false }
+        return !main.isBare
+    }
+
+    /// Removes the worktree without taking `busy`, so pull, commit and the rest
+    /// keep working meanwhile. `leaveFirst` moves this window off the worktree
+    /// before its folder goes away.
+    private func removeInBackground(_ wt: Worktree, args: [String], in dir: URL, leaveFirst: (() -> Void)?) async {
+        let removals = WorktreeRemovals.shared
+        guard removals.begin(wt.path) else { return }
+        defer { removals.end(wt.path) }
+        if let leaveFirst {
+            lastUndo = nil
+            leaveFirst()
+        }
+        do {
+            try await git.run(args, in: dir, logged: true)
+            if leaveFirst == nil { await refresh() }
+        } catch {
+            let title = String(localized: "Remove worktree failed")
+            if leaveFirst == nil {
+                await refresh()
+                alert = AlertItem(title: title, message: error.localizedDescription)
+            } else {
+                WorktreeRemovals.reportFailure(title, error.localizedDescription)
+            }
         }
     }
 
