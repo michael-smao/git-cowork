@@ -49,6 +49,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - In a graph with more lanes than fit, a branch's line ran beside its commits:
   the nodes were moved to the column's edge, their lines weren't. Lines now
   move with them.
+- Check for Updates could freeze the app: its message could open off screen
+  while still blocking every window, so nothing could be clicked and the app
+  could not even be quit. Its messages now open as a sheet on the front window.
 
 ## [0.4.0] - 2026-11-09
 
