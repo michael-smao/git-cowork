@@ -139,8 +139,8 @@ also drop a folder onto any window.
 
 | Area | |
 |---|---|
-| **Tabs** | Every repo or worktree is a tab; ⌘T opens a new one. |
-| **Toolbar** | Repository and branch pickers (switch worktrees, recent repos, checkout), History / Board / Reviews, Fetch (all remotes), Pull ▾ (fetch all, ff-only, rebase, merge), Push ▾ (sets upstream; force-with-lease asks first), Branch, Worktree, Stash, Pop, Terminal, Editor, Inbox. |
+| **Tabs** | Every repo or worktree is a tab in the row beside the traffic lights, always shown, like GitKraken. Click to switch, × or middle-click to close, + or ⌘T for a new one. |
+| **Toolbar** | Repository, worktree and branch pickers (recent repos; switch or add worktrees, shown with more than one; checkout), History / Board / Reviews, Fetch (all remotes), Pull ▾ (fetch all, ff-only, rebase, merge), Push ▾ (sets upstream; force-with-lease asks first), Branch, Worktree, Stash, Pop, Terminal, Editor, Inbox. |
 | **Sidebar** | Local, remote, worktrees, tasks, reviews, stashes, tags and team, with counts. Branch folders (`claude/…`, `codex/…`) open by default. Filter with ⌥⌘F. |
 | **Graph** | Lane-colored rows, author initials in nodes, branch badges connected to their commit, commits outside the current branch dimmed. A `// WIP` row above HEAD, plus one for every other worktree with uncommitted changes. |
 | **Commit panel** | Message, author and co-authors, parents, refs, file list as path or tree. |

@@ -1,7 +1,7 @@
 import GitCoworkCore
 import SwiftUI
 
-/// repository ▾ > branch ▾  History|Board|Reviews  ·  Fetch Pull ▾ Push ▾ Branch Worktree Stash Pop | Terminal Editor  ·  inbox, filter
+/// repository ▾ > worktree ▾ > branch ▾  History|Board|Reviews  ·  Fetch Pull ▾ Push ▾ Branch Worktree Stash Pop | Terminal Editor  ·  inbox, filter
 ///
 /// Every item is its own small view, so each one only re-renders when the
 /// model values it reads change (not on every keystroke elsewhere).
@@ -26,10 +26,12 @@ struct RepoToolbar: ToolbarContent {
                 .help("Show or hide the sidebar (⌃⌘S)")
                 .keyboardShortcut("s", modifiers: [.command, .control])
                 .padding(.trailing, Theme.Space.m)
-                RepositoryPicker(model: model, openHere: openHere, openInNewTab: openInNewTab)
-                Image(systemName: "chevron.right")
-                    .font(Theme.Glyph.dropdown)
-                    .foregroundStyle(.tertiary)
+                RepositoryPicker(model: model, openInNewTab: openInNewTab)
+                CrumbSeparator()
+                if model.worktrees.count > 1 {
+                    WorktreePicker(model: model, openHere: openHere, openInNewTab: openInNewTab)
+                    CrumbSeparator()
+                }
                 BranchPicker(model: model, openHere: openHere)
                 CenterModeSwitch(model: model)
                     .padding(.leading, Theme.Space.l)
@@ -43,6 +45,15 @@ struct RepoToolbar: ToolbarContent {
         ToolbarItem(placement: .primaryAction) {
             InboxButton(model: model)
         }
+    }
+}
+
+/// The "›" between repository, worktree and branch.
+private struct CrumbSeparator: View {
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .font(Theme.Glyph.dropdown)
+            .foregroundStyle(.tertiary)
     }
 }
 
@@ -154,25 +165,16 @@ private struct ActionButtons: View {
     }
 }
 
-/// "repository ▾": this repo's worktrees, recent repositories, open and clone.
+/// "repository ▾": this repository, recent repositories, open and clone.
+/// Worktrees have their own picker.
 private struct RepositoryPicker: View {
     let model: RepoModel
-    let openHere: (String) -> Void
     let openInNewTab: (String) -> Void
     @Environment(\.windowActions) private var window
 
     var body: some View {
-        StackedPicker(caption: "repository", title: title, help: model.root.path) {
-            if model.worktrees.count > 1 {
-                Section("Worktrees") {
-                    ForEach(model.worktrees) { wt in
-                        Toggle(isOn: Binding(get: { wt.path == model.root.path },
-                                             set: { _ in if wt.path != model.root.path { openHere(wt.path) } })) {
-                            Text(worktreeLabel(wt))
-                        }
-                    }
-                }
-            }
+        StackedPicker(caption: "repository", title: model.name, help: model.mainWorktreePath ?? model.root.path) {
+            Toggle(isOn: .constant(true)) { Text(model.name) }
             if !recents.isEmpty {
                 Section("Recent") {
                     ForEach(recents, id: \.self) { path in
@@ -190,23 +192,60 @@ private struct RepositoryPicker: View {
         }
     }
 
-    private var title: String {
-        let isMain = model.mainWorktreePath == nil || model.mainWorktreePath == model.root.path
-        return isMain ? model.name : "\(model.name) · \(model.root.lastPathComponent)"
-    }
-
-    private func worktreeLabel(_ wt: Worktree) -> String {
-        let branch = wt.branch ?? L("detached")
-        return wt.displayName == branch ? branch : "\(branch) — \(wt.displayName)"
-    }
-
     /// Recent repositories other than this one, newest first.
     private var recents: [String] {
-        let current = model.mainWorktreePath ?? model.root.path
+        let own = Set(model.worktrees.map(\.path) + [model.mainWorktreePath ?? model.root.path, model.root.path])
         return Prefs.recentRepos
-            .filter { $0 != current && $0 != model.root.path }
+            .filter { !own.contains($0) }
             .prefix(10)
             .filter { FileManager.default.fileExists(atPath: $0) }
+    }
+}
+
+/// "worktree ▾": switch to another worktree of this repository or add one.
+/// Only shown when the repository has more than one worktree.
+private struct WorktreePicker: View {
+    let model: RepoModel
+    let openHere: (String) -> Void
+    let openInNewTab: (String) -> Void
+
+    var body: some View {
+        StackedPicker(caption: "worktree", title: title, help: model.root.path) {
+            ForEach(model.worktrees) { wt in
+                Toggle(isOn: Binding(get: { wt.path == model.root.path },
+                                     set: { _ in if wt.path != model.root.path { openHere(wt.path) } })) {
+                    Text(label(wt))
+                }
+                .help(wt.path)
+            }
+            if !others.isEmpty {
+                Menu("Open in New Tab") {
+                    ForEach(others) { wt in
+                        Button(label(wt)) { openInNewTab(wt.path) }
+                    }
+                }
+            }
+            Divider()
+            Button("Add Worktree…") { model.sheet = .addWorktree(base: model.currentBranch) }
+        }
+    }
+
+    private var title: String {
+        model.worktrees.first(where: { $0.path == model.root.path }).map(name) ?? model.root.lastPathComponent
+    }
+
+    private var others: [Worktree] { model.worktrees.filter { $0.path != model.root.path } }
+
+    /// The main worktree is called that; linked ones go by their folder.
+    private func name(_ wt: Worktree) -> String {
+        wt.isMain ? L("main worktree") : wt.displayName
+    }
+
+    /// "folder — branch", or just the folder when it is named like its branch.
+    private func label(_ wt: Worktree) -> String {
+        let branch = wt.branch ?? L("detached")
+        let name = name(wt)
+        return name == branch ? name : "\(name) — \(branch)"
     }
 }
 

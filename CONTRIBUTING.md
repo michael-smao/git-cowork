@@ -90,6 +90,7 @@ GITCOWORK_SNAPSHOT=/tmp/shot.png GITCOWORK_SNAPSHOT_QUIT=1 .build/debug/GitCowor
   didn't work (run it from inside an app bundle). Release builds ignore both
   variables and pass install.sh only what it needs.
 - `GITCOWORK_DEBUG_LOG=1` (open the command log, e.g. to see the background fetch)
+- `GITCOWORK_DEBUG_HOVER=<row>` (expand that history row's branch badges as if hovered)
 
 End-to-end cowork sync test against a local bare remote with two clones:
 
