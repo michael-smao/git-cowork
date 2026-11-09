@@ -129,7 +129,8 @@ final class HistoryBadgeHover: NSResponder {
 
         let view = list ?? HistoryBadgeListView()
         view.onClick = { [weak coordinator] event in coordinator?.badgeListClicked(row: row, event: event) }
-        view.onMenu = { [weak coordinator] in coordinator?.contextMenu(forRow: row) }
+        // Right-click on one badge: only that branch's items, plus the commit's.
+        view.onMenu = { [weak coordinator] badge in coordinator?.contextMenu(forRow: row, onlyBadge: badge?.name) }
         view.onExit = { [weak self] in self?.update() }
         view.set(badges: badges, layout: layout, lane: lane)
         view.frame = scroll.convert(layout.frame, from: table)
@@ -143,7 +144,7 @@ final class HistoryBadgeHover: NSResponder {
 /// drawn with the same code as the column.
 final class HistoryBadgeListView: NSView {
     var onClick: ((NSEvent) -> Void)?
-    var onMenu: (() -> NSMenu?)?
+    var onMenu: ((GraphBadge?) -> NSMenu?)?
     var onExit: (() -> Void)?
     private var badges: [GraphBadge] = []
     private var layout: BadgeListLayout?
@@ -206,5 +207,16 @@ final class HistoryBadgeListView: NSView {
         onClick?(event)
     }
 
-    override func menu(for event: NSEvent) -> NSMenu? { onMenu?() }
+    override func menu(for event: NSEvent) -> NSMenu? { onMenu?(badge(at: convert(event.locationInWindow, from: nil))) }
+
+    /// The badge on the line under `p` (view coordinates), if any.
+    private func badge(at p: CGPoint) -> GraphBadge? {
+        guard let layout else { return nil }
+        let height = GraphStyle.Badge.height
+        let spacing = GraphStyle.Badge.listSpacing
+        for (n, top) in layout.tops.enumerated() where n < badges.count {
+            if p.y >= top - spacing / 2, p.y < top + height + spacing / 2 { return badges[n] }
+        }
+        return nil
+    }
 }
