@@ -6,10 +6,49 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Hovering a commit's branch and tag badges in the graph, when names are cut
+  or some are behind "+N", shows all of them at full length in a list over the
+  rows below. Click it to select the commit; right-click for the commit's menu.
+- Remove a worktree from the graph: a branch checked out in another worktree,
+  and another worktree's "// WIP" row, offer Open Worktree, Open Worktree in
+  New Tab and Remove Worktree… in their right-click menu.
+- Remove Worktree… in the sidebar also works for the worktree the tab shows:
+  the tab then switches to the main worktree (or closes, when the main
+  worktree is already open in another tab). The main worktree is never removed.
+- Removing a worktree runs in the background: its row shows "Removing…" right
+  away in every tab of the repository, and the rest of the app stays usable
+  while git deletes the folder.
+- A Fetch button in the toolbar, next to Pull: fetches all remotes
+  (`git fetch --all --prune`) without merging anything.
+
 ### Changed
+- Repository tabs sit in their own row at the top of the window, next to the
+  traffic lights, like GitKraken's, and are always shown, even with one
+  repository open. Each tab shows the repository (and the folder of a linked
+  worktree); click to switch, × or middle-click to close, + for a new tab.
+  Before, the tabs could be missing altogether.
+- The repository menu in the toolbar lists only repositories (this one and
+  recent ones), like GitKraken. Worktrees get their own picker between
+  repository and branch, shown when a repository has more than one: switch,
+  open one in a new tab, or add one.
+- Checking out a branch that another worktree has checked out (double-click
+  or Checkout in the graph, a task's or review's Checkout, Start Task) opens
+  that worktree instead of showing an alert: its tab comes to the front, or
+  this window switches to it. Changes in this worktree stay where they are.
 - The history scrolls to the checked-out branch when it opens and after a
   checkout, instead of always starting at the newest commit. With no changes
   to commit, the commit panel opens on that branch's commit too.
+
+### Fixed
+- A short tag or branch name like `v1` in a narrow Branch / Tag column no
+  longer folds into "+1" when it fits.
+- After removing a worktree, its "// WIP" row could stay in the graph.
+- Settings scroll when they are taller than the window, and the window can be
+  made taller. Before, the lower sections could not be reached on smaller screens.
+- In a graph with more lanes than fit, a branch's line ran beside its commits:
+  the nodes were moved to the column's edge, their lines weren't. Lines now
+  move with them.
 
 ## [0.4.0] - 2026-11-09
 

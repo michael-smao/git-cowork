@@ -16,6 +16,9 @@ struct HistoryTable: NSViewRepresentable {
     let worktreeInfoVersion: Int
     /// Shown inside the "// WIP" row, like GitKraken's inline commit summary.
     let draftSummary: String
+    /// Switch this window to a worktree, or open it in a new tab (right-click menu).
+    let openHere: (String) -> Void
+    let openInNewTab: (String) -> Void
 
     func makeCoordinator() -> HistoryTableCoordinator { HistoryTableCoordinator(model: model) }
 
@@ -69,6 +72,7 @@ struct HistoryTable: NSViewRepresentable {
         scroll.contentView.postsFrameChangedNotifications = true
         NotificationCenter.default.addObserver(coordinator, selector: #selector(HistoryTableCoordinator.fitMessageColumn),
                                                name: NSView.frameDidChangeNotification, object: scroll.contentView)
+        coordinator.badgeHover.attach(to: table, in: scroll)
         sync(context.coordinator)
         return scroll
     }
@@ -78,6 +82,8 @@ struct HistoryTable: NSViewRepresentable {
     }
 
     private func sync(_ coordinator: HistoryTableCoordinator) {
+        coordinator.openHere = openHere
+        coordinator.openInNewTab = openInNewTab
         coordinator.sync(version: version, filter: filter, wipCount: wipCount, selection: selection,
                          revealToken: revealToken, worktreeInfoVersion: worktreeInfoVersion, draftSummary: draftSummary)
     }
@@ -134,8 +140,12 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     /// rows.count when "load more" was last requested; asks once per history size.
     private var loadMoreRequestedAt = -1
     private let drawCache = HistoryDrawCache()
+    lazy var badgeHover = HistoryBadgeHover(coordinator: self)
     private var wipCountsCache: [WIPCount]?
     lazy var headerMenuDelegate = HistoryHeaderMenu(coordinator: self)
+    /// From the window, for "Open Worktree" in the right-click menu.
+    var openHere: (String) -> Void = { _ in }
+    var openInNewTab: (String) -> Void = { _ in }
 
     // Cowork: tasks and reviews linked to branches, plus pull requests and CI,
     // rebuilt when their stores change (HistoryCoworkMarks.swift).
@@ -167,6 +177,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
             self.wipCount = wipCount
             self.worktreeInfoVersion = worktreeInfoVersion
             wipCountsCache = nil
+            badgeHover.close()
             rebuildRows()
             table.reloadData()
             sizeGraphColumn()
@@ -437,9 +448,23 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     }
 
     @objc func doubleClicked() {
-        guard let table, table.clickedRow >= 0, table.clickedRow < rows.count else { return }
-        if focusSummaryIfWIP(row: table.clickedRow) { return }
-        guard let commit = commit(atRow: table.clickedRow) else { return }
+        guard let table else { return }
+        doubleClick(row: table.clickedRow)
+    }
+
+    /// A click on the badge list hovering over the table: selects its row, and
+    /// a double-click does what double-clicking the row does.
+    func badgeListClicked(row: Int, event: NSEvent) {
+        guard let table, row >= 0, row < rows.count else { return }
+        table.window?.makeFirstResponder(table)
+        if table.selectedRow != row { table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
+        if event.clickCount == 2 { doubleClick(row: row) }
+    }
+
+    private func doubleClick(row: Int) {
+        guard row >= 0, row < rows.count else { return }
+        if focusSummaryIfWIP(row: row) { return }
+        guard let commit = commit(atRow: row) else { return }
         // Double-click a branch tip: check out that branch (a remote-only tip
         // gets a tracking branch). Otherwise do nothing.
         let refs = refsByCommit[commit.id] ?? []

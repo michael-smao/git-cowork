@@ -58,7 +58,7 @@ extension HistoryTableCoordinator {
     /// Fits the graph column to the widest row of the whole loaded history
     /// (re-run after every reload) until the user resizes it by hand.
     /// It never pushes the message column below its minimum (lanes past the
-    /// edge are clipped with a fade, and nodes stay pinned inside).
+    /// edge share the last visible slot, nodes and lines alike).
     func sizeGraphColumn() {
         fitMessageColumn()
     }
@@ -86,6 +86,7 @@ extension HistoryTableCoordinator {
     }
 
     func tableViewColumnDidResize(_ notification: Notification) {
+        badgeHover.close()
         guard let table, let column = notification.userInfo?["NSTableColumn"] as? NSTableColumn else { return }
         // A drag in the header (not our own sizing).
         let byUser = table.headerView?.resizedColumn == table.column(withIdentifier: column.identifier)
