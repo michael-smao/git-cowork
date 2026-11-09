@@ -6,6 +6,12 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Changed
+- The repository menu in the toolbar lists only repositories (this one and
+  recent ones), like GitKraken. Worktrees get their own picker between
+  repository and branch, shown when a repository has more than one: switch,
+  open one in a new tab, or add one.
+
 ## [0.4.0] - 2026-11-09
 
 ### Added

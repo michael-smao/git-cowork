@@ -300,6 +300,7 @@
 "Local" = "Lokal";
 "Locked" = "Gesperrt";
 "macOS's ssh-agent isn't available, so the key's passphrase can't be put in the Keychain." = "Der ssh-agent von macOS ist nicht verfügbar, daher kann die Passphrase des Schlüssels nicht im Schlüsselbund gespeichert werden.";
+"main worktree" = "Haupt-Worktree";
 "Make a new token with the scopes %@ and add it with Add Token." = "Erstelle ein neues Token mit den Scopes %@ und füge es mit „Token hinzufügen“ hinzu.";
 "Mark All as Read" = "Alle als gelesen markieren";
 "Mark Resolved" = "Als gelöst markieren";
@@ -610,6 +611,7 @@
 "Working copy is clean" = "Keine Änderungen in der Arbeitskopie";
 "Worktree" = "Worktree";
 "Worktrees" = "Worktrees";
+"worktree" = "Worktree";
 "Write a comment" = "Kommentar schreiben";
 "Write Commit Message" = "Commit-Nachricht schreiben";
 "you" = "du";
