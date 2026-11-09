@@ -86,13 +86,14 @@ struct RepoWindow: View {
 
     /// Switches this window to another worktree, unless that worktree is
     /// already open in another tab: then that tab comes to the front.
-    /// If the folder this window shows is gone (its worktree was just removed),
-    /// the window closes once the other tab is in front, rather than staying
-    /// on a deleted folder.
+    /// If the folder this window shows is gone or being removed, the window
+    /// closes once the other tab is in front, rather than staying on a
+    /// deleted folder.
     private func openHere(_ p: String) {
         guard OpenRepos.isOpen(p) else { path = p; return }
         openTab(p)
-        if let current = path, !FileManager.default.fileExists(atPath: current) {
+        if let current = path,
+           WorktreeRemovals.shared.contains(current) || !FileManager.default.fileExists(atPath: current) {
             let window = host.window
             DispatchQueue.main.async { window?.close() }
         }

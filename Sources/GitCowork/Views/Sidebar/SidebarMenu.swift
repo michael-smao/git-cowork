@@ -155,6 +155,16 @@ struct SidebarMenu: View {
 
     @ViewBuilder
     private func worktree(_ wt: Worktree) -> some View {
+        if WorktreeRemovals.shared.contains(wt.path) {
+            Button("Removing…") {}.disabled(true)
+            Button("Copy Path") { External.copy(wt.path) }
+        } else {
+            worktreeActions(wt)
+        }
+    }
+
+    @ViewBuilder
+    private func worktreeActions(_ wt: Worktree) -> some View {
         if !model.sidebarIsCurrent(wt) {
             Button("Open Here") { openHere(wt.path) }
             Button("Open in New Tab") { openInNewTab(wt.path) }

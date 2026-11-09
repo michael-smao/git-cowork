@@ -433,7 +433,6 @@
 "Remove from Recents" = "Aus „Zuletzt geöffnet“ entfernen";
 "Remove label" = "Label entfernen";
 "Remove Reviewer" = "Reviewer entfernen";
-"Remove worktree" = "Worktree entfernen";
 "Remove worktree %@?" = "Worktree %@ entfernen?";
 "Remove Worktree for %@…" = "Worktree für %@ entfernen …";
 "Remove Worktree…" = "Worktree entfernen …";
@@ -656,3 +655,5 @@
 "Push and Create" = "Pushen und erstellen";
 "Running" = "Läuft";
 "Sign In to See Them…" = "Anmelden, um sie zu sehen…";
+"Removing…" = "Wird entfernt …";
+"Remove worktree failed" = "Worktree entfernen fehlgeschlagen";

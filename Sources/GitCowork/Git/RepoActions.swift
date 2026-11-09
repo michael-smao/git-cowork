@@ -430,9 +430,10 @@ extension RepoModel {
 
     /// Asks, then removes the worktree's folder (the branch stays). The main
     /// worktree is never removed. For the worktree this window shows, `leave`
-    /// gets the main worktree's path afterwards and must switch the window there.
+    /// gets the main worktree's path first and must switch the window there.
+    /// Runs in the background: the row shows "Removing…" and the app stays usable.
     func removeWorktree(_ wt: Worktree, leave: ((String) -> Void)? = nil) {
-        guard !wt.isMain else { return }
+        guard !wt.isMain, !WorktreeRemovals.shared.contains(wt.path) else { return }
         let isCurrent = sidebarIsCurrent(wt)
         guard !isCurrent || (leave != nil && canLeaveForMainWorktree) else { return }
         let main = mainWorktreePath
@@ -447,11 +448,11 @@ extension RepoModel {
             message: message,
             confirmTitle: "Remove"
         ) { [weak self] in
-            if isCurrent, let main, let leave {
-                await self?.removeCurrentWorktree(args, main: main, leave: leave)
-            } else {
-                await self?.perform("Remove worktree", args)
-            }
+            guard let self else { return }
+            // Never in the folder being deleted: run it from the main worktree.
+            let dir = main.map { URL(fileURLWithPath: $0) } ?? self.root
+            let leaveFirst = isCurrent ? leave.flatMap { leave in main.map { main in { leave(main) } } } : nil
+            Task { await self.removeInBackground(wt, args: args, in: dir, leaveFirst: leaveFirst) }
         }
     }
 
@@ -462,21 +463,28 @@ extension RepoModel {
         return !main.isBare
     }
 
-    /// Like `perform`, but runs in the main worktree and doesn't refresh this
-    /// window: its folder is gone, so `leave` moves the window to the main worktree.
-    private func removeCurrentWorktree(_ args: [String], main: String, leave: (String) -> Void) async {
-        let label = "Remove worktree"
-        await waitForAutoFetch()
-        guard beginBusy(label) else { return }
-        lastUndo = nil
+    /// Removes the worktree without taking `busy`, so pull, commit and the rest
+    /// keep working meanwhile. `leaveFirst` moves this window off the worktree
+    /// before its folder goes away.
+    private func removeInBackground(_ wt: Worktree, args: [String], in dir: URL, leaveFirst: (() -> Void)?) async {
+        let removals = WorktreeRemovals.shared
+        guard removals.begin(wt.path) else { return }
+        defer { removals.end(wt.path) }
+        if let leaveFirst {
+            lastUndo = nil
+            leaveFirst()
+        }
         do {
-            try await git.run(args, in: URL(fileURLWithPath: main), logged: true)
-            endBusy(label)
-            leave(main)
+            try await git.run(args, in: dir, logged: true)
+            if leaveFirst == nil { await refresh() }
         } catch {
-            endBusy(label)
-            await refresh()
-            alert = AlertItem(title: String(localized: "\(label) failed"), message: error.localizedDescription)
+            let title = String(localized: "Remove worktree failed")
+            if leaveFirst == nil {
+                await refresh()
+                alert = AlertItem(title: title, message: error.localizedDescription)
+            } else {
+                WorktreeRemovals.reportFailure(title, error.localizedDescription)
+            }
         }
     }
 

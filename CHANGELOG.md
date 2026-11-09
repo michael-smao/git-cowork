@@ -13,6 +13,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - Remove Worktree… in the sidebar also works for the worktree the tab shows:
   the tab then switches to the main worktree (or closes, when the main
   worktree is already open in another tab). The main worktree is never removed.
+- Removing a worktree runs in the background: its row shows "Removing…" right
+  away in every tab of the repository, and the rest of the app stays usable
+  while git deletes the folder.
 
 ### Fixed
 - After removing a worktree, its "// WIP" row could stay in the graph.
