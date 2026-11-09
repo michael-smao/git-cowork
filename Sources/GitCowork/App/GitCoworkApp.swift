@@ -18,6 +18,8 @@ struct GitCoworkApp: App {
         Settings {
             SettingsView()
         }
+        // Only the height can change; the form scrolls inside.
+        .windowResizability(.contentSize)
     }
 }
 
