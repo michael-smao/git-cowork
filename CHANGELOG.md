@@ -39,6 +39,13 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - The history scrolls to the checked-out branch when it opens and after a
   checkout, instead of always starting at the newest commit. With no changes
   to commit, the commit panel opens on that branch's commit too.
+- Pull no longer stops with git's "divergent branches" error. It
+  fast-forwards when only the remote moved, and when both sides have new
+  commits it asks: Merge or Rebase. Uncommitted changes are put aside and
+  back. A pull.rebase or pull.ff you set in git config is still followed,
+  and Pull ▾ keeps its explicit variants.
+- Double-clicking a remote branch checks out its local branch and brings it
+  up to date the same way (a new tracking branch if there is none).
 
 ### Fixed
 - A short tag or branch name like `v1` in a narrow Branch / Tag column no

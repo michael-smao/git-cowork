@@ -203,6 +203,9 @@ private struct RepoDialogs: ViewModifier {
             }
             .alert(Text(ui: model.confirmation?.title ?? ""), isPresented: isPresented(\.confirmation), presenting: model.confirmation) { c in
                 Button(L(c.confirmTitle), role: c.destructive ? .destructive : nil) { Task { await c.action() } }
+                if let title = c.alternativeTitle, let alternative = c.alternative {
+                    Button(title) { Task { await alternative() } }
+                }
                 Button("Cancel", role: .cancel) {}
             } message: { c in
                 Text(ui: c.message)
