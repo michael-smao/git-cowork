@@ -248,7 +248,8 @@ final class HistoryCell: NSTableCellView {
         let isStrong = badge.isLocal
         let fill: NSColor = isStrong ? GraphStyle.badgeFill(lane) : lane.withAlphaComponent(style.remoteOnlyAlpha)
         let fg: NSColor = isStrong ? GraphStyle.readableText(on: fill) : .labelColor
-        let attrs: [NSAttributedString.Key: Any] = [.font: style.font, .foregroundColor: fg, .paragraphStyle: Self.truncating]
+        let attrs: [NSAttributedString.Key: Any] = [.font: badge.isHead ? style.headFont : style.font, .foregroundColor: fg,
+                                                    .paragraphStyle: Self.truncating]
 
         let leading = badge.leadingIcon
         let trailing = badge.trailingIcons
@@ -265,7 +266,14 @@ final class HistoryCell: NSTableCellView {
             let path = NSBezierPath(roundedRect: rect, xRadius: Theme.Radius.badge, yRadius: Theme.Radius.badge)
             fill.setFill()
             path.fill()
-            if !isStrong {
+            if badge.isHead {
+                // The checked-out branch: a light ring, so it reads at a glance.
+                let ring = NSBezierPath(roundedRect: rect.insetBy(dx: -style.headOutline / 2, dy: -style.headOutline / 2),
+                                        xRadius: Theme.Radius.badge + 1, yRadius: Theme.Radius.badge + 1)
+                ring.lineWidth = style.headOutline
+                NSColor.labelColor.withAlphaComponent(0.85).setStroke()
+                ring.stroke()
+            } else if !isStrong {
                 lane.setStroke()
                 path.lineWidth = 1
                 path.stroke()

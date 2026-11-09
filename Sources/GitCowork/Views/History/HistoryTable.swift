@@ -440,7 +440,8 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         let rect = table.rect(ofColumn: graphIndex)
         let x = rect.minX + GraphStyle.nodeX(node.lane, width: rect.width)
         let isCommit: Bool = if case .commit = rows[row] { true } else { false }
-        return HistoryBand(color: Theme.lane(node.color), nodeX: x, dimmed: isDimmed(row: row), showsResting: isCommit)
+        let isHead: Bool = if case .commit(let i) = rows[row], i < commits.count { commits[i].id == headSHA } else { false }
+        return HistoryBand(color: Theme.lane(node.color), nodeX: x, dimmed: isDimmed(row: row), showsResting: isCommit, isHead: isHead)
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {

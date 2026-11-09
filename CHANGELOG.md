@@ -6,6 +6,11 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Changed
+- The checked-out commit stands out in the history: its row has a stronger
+  band in its lane color that reaches under the badges, and its branch badge
+  is bold with a light ring.
+
 ## [0.4.0] - 2026-11-09
 
 ### Added
