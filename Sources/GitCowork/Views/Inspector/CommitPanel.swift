@@ -194,7 +194,7 @@ struct CommitPanel: View {
     }
 }
 
-/// Accent-tinted strip at the top of the commit panel: "4 file changes in working directory".
+/// Accent-tinted strip at the top of the commit panel: "4 uncommitted files".
 struct WorkingCopyBanner: View {
     let count: Int
     let action: () -> Void
@@ -203,7 +203,7 @@ struct WorkingCopyBanner: View {
         HStack(spacing: Theme.Space.m) {
             Image(systemName: "pencil.line")
                 .foregroundStyle(InspectorStyle.bannerTint)
-            Text(verbatim: count == 1 ? L("1 file change in working directory") : String(localized: "\(count) file changes in working directory"))
+            Text(verbatim: count == 1 ? L("1 uncommitted file") : String(localized: "\(count) uncommitted files"))
                 .font(Theme.Font.body.weight(.medium))
                 .lineLimit(1)
             Spacer(minLength: Theme.Space.s)

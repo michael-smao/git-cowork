@@ -51,6 +51,9 @@ final class RepoModel {
     var selection: HistorySelection? = .workingCopy
     var revealToken = 0
     var filterText = ""
+    /// What the toolbar search holds on the Board and in Reviews (History uses filterText).
+    var taskQuery = ""
+    var reviewQuery = ""
     var busy: String?
     var alert: AlertItem?
     var confirmation: Confirmation?

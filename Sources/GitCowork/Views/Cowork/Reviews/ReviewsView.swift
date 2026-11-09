@@ -68,7 +68,15 @@ struct ReviewsView: View {
 
     private func reviews(_ f: Filter) -> [ReviewRequest] {
         let me = store.me.id
-        return store.reviews.filter { Self.matches($0, f, me: me) }.sorted { $0.updated > $1.updated }
+        let q = model.reviewQuery.trimmingCharacters(in: .whitespaces)
+        return store.reviews
+            .filter { Self.matches($0, f, me: me) && Self.matches($0, query: q) }
+            .sorted { $0.updated > $1.updated }
+    }
+
+    /// The toolbar search: title, branch, base or ID.
+    private static func matches(_ r: ReviewRequest, query q: String) -> Bool {
+        q.isEmpty || [r.title, r.branch, r.base, r.id].contains { $0.localizedCaseInsensitiveContains(q) }
     }
 
     private var selection: Binding<String?> {

@@ -229,6 +229,34 @@ struct FlowRow: Layout {
 }
 
 /// Centered placeholder for empty panels, with an optional button below.
+/// A keyboard shortcut drawn as a small keycap.
+struct Keycap: View {
+    let keys: String
+
+    var body: some View {
+        Text(verbatim: keys)
+            .font(Theme.Font.small.monospaced())
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, Theme.Space.s)
+            .padding(.vertical, 1)
+            .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: Theme.Radius.badge))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.badge).strokeBorder(Theme.cardBorder))
+    }
+}
+
+/// "New task ⇧⌘T": what a shortcut does, then its keycap.
+struct ShortcutHint: View {
+    let title: String
+    let keys: String
+
+    var body: some View {
+        HStack(spacing: Theme.Space.s) {
+            Text(ui: title).font(Theme.Font.small).foregroundStyle(.secondary)
+            Keycap(keys: keys)
+        }
+    }
+}
+
 struct EmptyState<Actions: View>: View {
     let symbol: String
     let title: String

@@ -9,12 +9,10 @@ struct BoardView: View {
     /// "" = everyone, "me", "unassigned", or an email.
     @AppStorage(Prefs.Key.boardAssignee) private var assignee = ""
     @State private var labelFilter: String?
-    @State private var query = ""
     @State private var showAllDone = false
     @State private var dropSpot: DropSpot?
     @State private var draggingID: String?
     @FocusState private var boardFocused: Bool
-    @FocusState private var searchFocused: Bool
 
     /// Done shows this many until "Show all".
     private static let doneLimit = 20
@@ -25,7 +23,7 @@ struct BoardView: View {
     }
 
     var body: some View {
-        let data = BoardData(store: model.cowork, assignee: assignee, label: labelFilter, query: query)
+        let data = BoardData(store: model.cowork, assignee: assignee, label: labelFilter, query: model.taskQuery)
         VStack(spacing: 0) {
             header(data)
             if model.cowork.loaded && model.cowork.tasks.isEmpty {
@@ -52,7 +50,6 @@ struct BoardView: View {
 
             Spacer(minLength: Theme.Space.m)
 
-            searchField
             Button {
                 model.sheet = .newTask(status: .todo)
             } label: {
@@ -124,12 +121,6 @@ struct BoardView: View {
         .help("Filter by label")
     }
 
-    private var searchField: some View {
-        SearchField("Search tasks", text: $query, focus: $searchFocused, compact: true) {
-            boardFocused = true
-        }
-        .frame(minWidth: 100, idealWidth: 200, maxWidth: 200)
-    }
 
     // MARK: Columns
 
@@ -149,7 +140,7 @@ struct BoardView: View {
                 .padding(inset)
                 .frame(height: geo.size.height)
             }
-            .scrollIndicators(.automatic)
+            .scrollIndicators(.visible)
         }
         .contentShape(Rectangle())
         .onTapGesture { boardFocused = true }
@@ -176,8 +167,9 @@ struct BoardView: View {
         }
     }
 
-    /// Small enough that all five columns fit next to the sidebar and the
-    /// inspector at the default window size; narrower than this, the board scrolls.
+    /// The narrowest a card stays readable. Next to the sidebar and the
+    /// inspector at the default window size five columns don't fit, so the
+    /// board scrolls sideways (its scroller stays visible to say so).
     private static let minColumnWidth: CGFloat = 164
     private static let columnGap: CGFloat = Theme.Space.m
 

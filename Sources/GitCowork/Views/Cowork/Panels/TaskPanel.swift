@@ -300,8 +300,9 @@ private struct TaskBranchRow: View {
         }
     }
 
+    /// Wraps like the linked state, so a narrow panel never gets wider than itself.
     private var unlinked: some View {
-        HStack(spacing: Theme.Space.s) {
+        FlowRow {
             Button { model.startTask(task.id) } label: { Label("Start Task", systemImage: "play.fill") }
                 .buttonStyle(ActionButtonStyle.primary())
                 .help("Check out \(RefName.branch(for: task)) here (created if needed), then link it")

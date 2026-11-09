@@ -40,12 +40,29 @@ struct RepoView: View {
                 withAnimation(.easeOut(duration: 0.15)) { sidebarVisible.toggle() }
             }
         }
-        .searchable(text: $model.filterText, placement: .toolbar, prompt: "Filter commits")
+        // One search field, for whatever the center shows.
+        .searchable(text: searchText, placement: .toolbar, prompt: Text(searchPrompt))
         .navigationTitle(title)
         .modifier(HideToolbarTitle())
         .background(RepoTabLabelReporter(label: tabLabel))
         .modifier(RepoDialogs(model: model, openInNewTab: openInNewTab))
         .focusedSceneValue(\.repoModel, model)
+    }
+
+    private var searchText: Binding<String> {
+        switch model.centerMode {
+        case .history: $model.filterText
+        case .board: $model.taskQuery
+        case .reviews: $model.reviewQuery
+        }
+    }
+
+    private var searchPrompt: String {
+        switch model.centerMode {
+        case .history: L("Filter commits")
+        case .board: L("Search tasks")
+        case .reviews: L("Search reviews")
+        }
     }
 
     /// Column widths, close to GitKraken's defaults.
@@ -233,7 +250,9 @@ private struct InspectorColumn: View {
             case nil:
                 if model.centerMode == .board {
                     EmptyState(symbol: "rectangle.split.3x1", title: "No task selected",
-                               message: "Pick a card to see its details and comments, or press ⇧⌘T for a new task.")
+                               message: "Pick a card to see its details and comments.") {
+                        ShortcutHint(title: "New task", keys: "⇧⌘T")
+                    }
                 } else {
                     EmptyState(symbol: "checkmark.bubble", title: "No review selected",
                                message: "Pick a review request to see its changes and comments.")

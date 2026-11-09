@@ -60,7 +60,7 @@ struct AppCommands: Commands {
 
         // Ahead of Edit > Find so ⌘F filters commits in a repo window.
         CommandGroup(before: .textEditing) {
-            Button("Filter Commits") { WindowChrome.focusFilter() }
+            Button(searchCommandTitle) { WindowChrome.focusFilter() }
                 .keyboardShortcut("f")
                 .disabled(model == nil)
         }
@@ -147,6 +147,15 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("j")
             .disabled(model == nil)
+        }
+    }
+
+    /// ⌘F goes to the toolbar search, which searches what the center shows.
+    private var searchCommandTitle: String {
+        switch model?.centerMode {
+        case .board: L("Search Tasks")
+        case .reviews: L("Search Reviews")
+        default: L("Filter Commits")
         }
     }
 

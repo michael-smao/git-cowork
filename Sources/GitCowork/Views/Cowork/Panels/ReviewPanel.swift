@@ -78,10 +78,12 @@ private struct ReviewPanelContent: View {
             .font(Theme.Font.mono)
             .lineLimit(1)
             .truncationMode(.middle)
+            .layoutPriority(1)
             .help("\(review.branch) into \(review.base)")
             Spacer(minLength: Theme.Space.s)
             VerdictChip(verdict: review.overall)
-            ReviewStateChip(status: review.status)
+            // Open is every listed review's normal state; only Closed needs saying.
+            if review.status != .open { ReviewStateChip(status: review.status) }
             Menu {
                 Button("Copy Branch Name") { External.copy(review.branch) }
                 Button("Copy Review ID") { External.copy(review.id) }

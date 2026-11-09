@@ -35,7 +35,7 @@
 "%lld commits ahead of %@" = "%1$lld Commits vor %2$@";
 "%lld commits on %@ not pushed yet." = "%1$lld Commits auf %2$@ sind noch nicht gepusht.";
 "%lld conflicted files: resolve, then stage." = "%lld Dateien mit Konflikten: lösen, dann vormerken.";
-"%lld file changes in working directory" = "%lld geänderte Dateien in der Arbeitskopie";
+"%lld uncommitted files" = "%lld nicht committete Dateien";
 "%lld file changes on " = "%lld geänderte Dateien auf ";
 "%lld matches" = "%lld Treffer";
 "%lld of %lld" = "%1$lld von %2$lld";
@@ -49,7 +49,7 @@
 "1 commit ahead of %@" = "1 Commit vor %@";
 "1 commit on %@ not pushed yet." = "1 Commit auf %@ ist noch nicht gepusht.";
 "1 conflicted file: resolve, then stage." = "1 Datei mit Konflikt: lösen, dann vormerken.";
-"1 file change in working directory" = "1 geänderte Datei in der Arbeitskopie";
+"1 uncommitted file" = "1 nicht committete Datei";
 "1 file change on " = "1 geänderte Datei auf ";
 "1 match" = "1 Treffer";
 "A new version of git-cowork is available" = "Eine neue Version von git-cowork ist verfügbar";
@@ -393,7 +393,7 @@
 "parent:" = "Eltern-Commit:";
 "parents:" = "Eltern-Commits:";
 "Path" = "Pfad";
-"Pick a card to see its details and comments, or press ⇧⌘T for a new task." = "Wähle eine Karte, um Details und Kommentare zu sehen, oder drücke ⇧⌘T für eine neue Aufgabe.";
+"Pick a card to see its details and comments." = "Wähle eine Karte, um Details und Kommentare zu sehen.";
 "Pick a review request to see its changes and comments." = "Wähle eine Review-Anfrage, um ihre Änderungen und Kommentare zu sehen.";
 "Pop" = "Pop";
 "Pop latest stash" = "Neuesten Stash anwenden";
@@ -468,6 +468,9 @@
 "Saved in the repository for everyone. Handles are used for @mentions; emails match commits and git config user.email." = "Wird für alle im Repository gespeichert. Handles werden für @Erwähnungen verwendet; E-Mail-Adressen werden Commits und git config user.email zugeordnet.";
 "Saving…" = "Wird gespeichert …";
 "Search tasks" = "Aufgaben durchsuchen";
+"Search Reviews" = "Reviews durchsuchen";
+"Search Tasks" = "Aufgaben durchsuchen";
+"Search reviews" = "Reviews durchsuchen";
 "Select a commit" = "Wähle einen Commit";
 "Select All" = "Alles auswählen";
 "Self-hosted servers" = "Eigene Server";

@@ -15,6 +15,20 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - Reverting or cherry-picking a merge commit asks once and uses the side it
   was merged into (`-m 1`), instead of git's "is a merge but no -m option".
 
+### Changed
+- The search field in the toolbar searches what the window shows: commits in
+  History, tasks on the Board, reviews in Reviews (by title, branch or ID).
+  The Board's second search field is gone.
+- The commit message in the commit panel is plain text instead of a box that
+  looked like a field. The empty task panel shows the New Task shortcut as a
+  keycap.
+
+### Fixed
+- A task without a linked branch cut off the left and right edges of its
+  panel: its three branch buttons now wrap.
+- Short names no longer get cut in the review header and the commit panel's
+  "uncommitted files" strip.
+
 ## [0.5.0] - 2026-11-09
 
 ### Added

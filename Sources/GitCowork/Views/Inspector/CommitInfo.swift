@@ -81,8 +81,9 @@ enum CommitText {
     }
 }
 
-/// Rounded card holding the subject in large type and the body below it.
-/// As tall as its content, scrolling when the message is very long.
+/// The subject in large type and the body below it, as plain selectable
+/// text (no box, so it doesn't read as a field to type in). As tall as its
+/// content, scrolling when the message is very long.
 struct MessageCard: View {
     let subject: String
     let text: String
@@ -103,7 +104,6 @@ struct MessageCard: View {
             }
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Theme.Metrics.cardPadding)
             .background(GeometryReader { g in
                 Color.clear
                     .onAppear { height = g.size.height }
@@ -112,8 +112,6 @@ struct MessageCard: View {
         }
         .scrollIndicators(.automatic)
         .frame(height: min(height, InspectorStyle.messageMaxHeight))
-        .background(Theme.cardFill, in: RoundedRectangle(cornerRadius: Theme.Radius.card))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.card).strokeBorder(Theme.cardBorder))
     }
 }
 
