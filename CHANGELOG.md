@@ -6,6 +6,13 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Changed
+- Repository tabs sit in their own row at the top of the window, next to the
+  traffic lights, like GitKraken's, and are always shown, even with one
+  repository open. Each tab shows the repository (and the folder of a linked
+  worktree); click to switch, × or middle-click to close, + for a new tab.
+  Before, the tabs could be missing altogether.
+
 ## [0.4.0] - 2026-11-09
 
 ### Added
