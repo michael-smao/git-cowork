@@ -94,6 +94,9 @@ private struct CenterColumn: View {
                 HistoryCenter(model: model)
                     .opacity(diff == nil ? 1 : 0)
                     .allowsHitTesting(diff == nil)
+                if diff == nil, model.isLoaded, model.headSHA == nil, model.commits.isEmpty {
+                    EmptyRepoState(model: model)
+                }
             } else if diff == nil {
                 switch mode {
                 case .board: BoardView(model: model)
@@ -191,9 +194,15 @@ private struct RepoDialogs: ViewModifier {
             }
             .alert(Text(ui: model.confirmation?.title ?? ""), isPresented: isPresented(\.confirmation), presenting: model.confirmation) { c in
                 Button(L(c.confirmTitle), role: c.destructive ? .destructive : nil) { Task { await c.action() } }
+                if let title = c.alternativeTitle, let alternative = c.alternative {
+                    Button(title, role: c.destructive ? .destructive : nil) { Task { await alternative() } }
+                }
                 Button("Cancel", role: .cancel) {}
             } message: { c in
                 Text(ui: c.message)
+            }
+            .sheet(item: $model.problem) { p in
+                ProblemSheet(problem: p) { model.showCommandLog = true }
             }
             .sheet(item: $model.sheet) { kind in
                 RepoSheet(model: model, kind: kind, openInNewTab: openInNewTab)
@@ -202,5 +211,22 @@ private struct RepoDialogs: ViewModifier {
 
     private func isPresented<T>(_ key: ReferenceWritableKeyPath<RepoModel, T?>) -> Binding<Bool> {
         Binding(get: { model[keyPath: key] != nil }, set: { if !$0 { model[keyPath: key] = nil } })
+    }
+}
+
+/// A repository without any commit (a fresh `git init`, or a clone of an
+/// empty one): one button makes the first commit, with a README if needed.
+private struct EmptyRepoState: View {
+    let model: RepoModel
+
+    var body: some View {
+        EmptyState(symbol: "sparkles", title: "No commits yet",
+                   message: "Make the first commit to start the history. If there's no README.md yet, git-cowork adds one with the repository's name.",
+                   messageWidth: 360) {
+            Button("Create Initial Commit") { Task { await model.makeInitialCommit() } }
+                .buttonStyle(ActionButtonStyle.primary())
+                .disabled(model.busy != nil)
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
     }
 }

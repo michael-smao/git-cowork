@@ -101,4 +101,12 @@ public enum WorktreePath {
         let safe = branch.replacingOccurrences(of: "/", with: "-")
         return url.deletingLastPathComponent().appendingPathComponent("\(url.lastPathComponent)-\(safe)").path
     }
+
+    /// `path`, or `path-2`, `path-3` … when that folder exists.
+    public static func unique(_ path: String, exists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }) -> String {
+        guard exists(path) else { return path }
+        var n = 2
+        while exists("\(path)-\(n)") { n += 1 }
+        return "\(path)-\(n)"
+    }
 }

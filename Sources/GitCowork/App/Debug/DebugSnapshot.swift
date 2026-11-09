@@ -18,6 +18,13 @@ enum DebugSnapshot {
         await applyHostDemo(model)
         // GITCOWORK_DEBUG_LOG = "1": open the command log.
         if ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_LOG"] != nil { model.showCommandLog = true }
+        // GITCOWORK_DEBUG_GIT = "Label|git args": run it like a button would, to see how a failure is shown.
+        if let run = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_GIT"] {
+            let parts = run.split(separator: "|", maxSplits: 1).map(String.init)
+            if parts.count == 2 { await model.perform(parts[0], parts[1].split(separator: " ").map(String.init)) }
+        }
+        // GITCOWORK_DEBUG_PUSH = "1": the toolbar's Push.
+        if ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_PUSH"] != nil { await model.push() }
         guard let sel = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_SELECT"] else { return }
         let parts = sel.split(separator: ":")
         let n = parts.count > 1 ? Int(parts[1]) ?? 0 : 0

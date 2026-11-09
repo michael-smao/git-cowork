@@ -99,7 +99,14 @@ struct CommitComposer: View {
         if model.busy != nil { return false }
         if model.operation == .merge { return model.status.conflicted.isEmpty }
         if amend { return true }
-        return !model.status.staged.isEmpty && hasSummary
+        // Nothing staged but changes there: the button stages them all, then commits.
+        return (!model.status.staged.isEmpty || stagesAll) && hasSummary
+    }
+
+    /// Nothing staged yet, but there are changes to commit.
+    private var stagesAll: Bool {
+        model.status.staged.isEmpty && model.operation == nil && !amend
+            && !(model.status.unstaged.isEmpty && model.status.untracked.isEmpty)
     }
 
     private var buttonTitle: String {
@@ -109,15 +116,21 @@ struct CommitComposer: View {
             if n == 0 { return L("Amend Previous Commit") }
             return n == 1 ? L("Amend Previous Commit with 1 file") : String(localized: "Amend Previous Commit with \(n) files")
         }
-        if n == 0 { return L("Stage Changes to Commit") }
+        if n == 0 {
+            guard stagesAll else { return L("Stage Changes to Commit") }
+            let all = model.status.unstaged.count + model.status.untracked.count
+            return all == 1 ? L("Stage All and Commit 1 file") : String(localized: "Stage All and Commit \(all) files")
+        }
         return n == 1 ? L("Commit Changes to 1 file") : String(localized: "Commit Changes to \(n) files")
     }
 
     private func commit() {
         let msg = message
         let isAmend = amend
+        let all = stagesAll
         Task {
-            if await model.commit(message: msg, amend: isAmend) {
+            let ok = all ? await model.stageAllAndCommit(message: msg) : await model.commit(message: msg, amend: isAmend)
+            if ok {
                 model.draftSummary = ""
                 model.draftDetails = ""
                 session.resetAmend()

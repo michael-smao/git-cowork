@@ -19,6 +19,9 @@ struct RepoSheet: View {
         case .requestReview(let branch): RequestReviewSheet(model: model, branch: branch)
         case .createPull(let branch): CreatePullSheet(model: model, branch: branch)
         case .team: TeamSheet(model: model)
+        case .pushTarget(let branch): PushTargetSheet(model: model, branch: branch)
+        case .addRemote(let branch): AddRemoteSheet(model: model, thenPush: branch)
+        case .identity: IdentitySheet(model: model)
         }
     }
 }
@@ -30,14 +33,21 @@ struct NewBranchSheet: View {
     let startLabel: String
     @State private var name = ""
     @State private var checkout = true
+    @State private var error: String?
+    @Environment(\.dismiss) private var dismiss
+
+    private var taken: Bool { model.localBranches.contains { $0.name == name } }
 
     var body: some View {
         SheetScaffold(title: "New Branch", confirmTitle: "Create Branch",
-                      confirmDisabled: !RefName.isValid(name) || model.localBranches.contains { $0.name == name } || model.busy != nil) {
-            Task { await model.createBranch(name, from: start, checkout: checkout) }
+                      confirmDisabled: !RefName.isValid(name) || taken || model.busy != nil, error: error, dismissOnConfirm: false) {
+            Task {
+                if await model.createBranch(name, from: start, checkout: checkout, quiet: true) { dismiss() } else { error = model.lastProblemText }
+            }
         } content: {
             TextField("Branch name", text: $name)
                 .textFieldStyle(.roundedBorder)
+            if taken { NameTaken(text: String(localized: "A branch named \(name) already exists.")) }
             Text("Starts from \(startLabel)").font(Theme.Font.small).foregroundStyle(.secondary)
             Toggle("Check out after creating", isOn: $checkout).toggleStyle(.checkbox)
         }
@@ -49,12 +59,20 @@ struct NewTagSheet: View {
     let sha: String
     @State private var name = ""
     @State private var message = ""
+    @State private var error: String?
+    @Environment(\.dismiss) private var dismiss
+
+    private var taken: Bool { model.tags.contains { $0.name == name } }
 
     var body: some View {
-        SheetScaffold(title: "New Tag", confirmTitle: "Create Tag", confirmDisabled: !RefName.isValid(name) || model.busy != nil) {
-            Task { await model.createTag(name, at: sha, message: message) }
+        SheetScaffold(title: "New Tag", confirmTitle: "Create Tag", confirmDisabled: !RefName.isValid(name) || taken || model.busy != nil,
+                      error: error, dismissOnConfirm: false) {
+            Task {
+                if await model.createTag(name, at: sha, message: message, quiet: true) { dismiss() } else { error = model.lastProblemText }
+            }
         } content: {
             TextField("Tag name, e.g. v1.2.0", text: $name).textFieldStyle(.roundedBorder)
+            if taken { NameTaken(text: String(localized: "A tag named \(name) already exists.")) }
             TextField("Message (optional, makes an annotated tag)", text: $message).textFieldStyle(.roundedBorder)
             Text("On commit \(String(sha.prefix(7)))").font(Theme.Font.small).foregroundStyle(.secondary)
         }
@@ -65,6 +83,8 @@ struct RenameBranchSheet: View {
     let model: RepoModel
     let old: String
     @State private var name: String
+    @State private var error: String?
+    @Environment(\.dismiss) private var dismiss
 
     init(model: RepoModel, old: String) {
         self.model = model
@@ -72,11 +92,18 @@ struct RenameBranchSheet: View {
         _name = State(initialValue: old)
     }
 
+    private var taken: Bool { name != old && model.localBranches.contains { $0.name == name } }
+
     var body: some View {
-        SheetScaffold(title: String(localized: "Rename \(old)"), confirmTitle: "Rename", confirmDisabled: !RefName.isValid(name) || name == old || model.busy != nil) {
-            Task { await model.renameBranch(old, to: name) }
+        SheetScaffold(title: String(localized: "Rename \(old)"), confirmTitle: "Rename",
+                      confirmDisabled: !RefName.isValid(name) || name == old || taken || model.busy != nil,
+                      error: error, dismissOnConfirm: false) {
+            Task {
+                if await model.renameBranch(old, to: name, quiet: true) { dismiss() } else { error = model.lastProblemText }
+            }
         } content: {
             TextField("New name", text: $name).textFieldStyle(.roundedBorder)
+            if taken { NameTaken(text: String(localized: "A branch named \(name) already exists.")) }
         }
     }
 }
@@ -84,10 +111,15 @@ struct RenameBranchSheet: View {
 struct StashSheet: View {
     let model: RepoModel
     @State private var message = ""
+    @State private var error: String?
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        SheetScaffold(title: "Stash Changes", confirmTitle: "Stash", confirmDisabled: model.busy != nil) {
-            Task { await model.stash(message: message) }
+        SheetScaffold(title: "Stash Changes", confirmTitle: "Stash", confirmDisabled: model.busy != nil,
+                      error: error, dismissOnConfirm: false) {
+            Task {
+                if await model.stash(message: message, quiet: true) { dismiss() } else { error = model.lastProblemText }
+            }
         } content: {
             TextField("Message (optional)", text: $message).textFieldStyle(.roundedBorder)
             Text("Stashes all changes, including new files, and leaves a clean working copy.")
@@ -207,6 +239,8 @@ struct CloneSheet: View {
     @State private var listAccount: HostAccount?
     @State private var running = false
     @State private var error: String?
+    /// The destination already holds a git repository: offer to open it.
+    @State private var existingRepo: String?
     @Environment(\.dismiss) private var dismiss
 
     static var defaultParent: String {
@@ -245,18 +279,40 @@ struct CloneSheet: View {
                 }
             }
             .font(Theme.Font.small)
-            if !folderName.isEmpty {
-                Text("Clones into \(parent)/\(folderName)").font(Theme.Font.small).foregroundStyle(.secondary)
+            if let existingRepo {
+                SheetNotice(symbol: "folder.fill", color: .accentColor,
+                            text: String(localized: "\(existingRepo) already holds a git repository.")) {
+                    Button("Open It") {
+                        dismiss()
+                        onCloned(existingRepo)
+                    }
+                    .buttonStyle(ActionButtonStyle.secondary())
+                }
+            } else if !folderName.isEmpty {
+                Text("Clones into \(destination(for: folderName))").font(Theme.Font.small).foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// `parent/name`, or `name-2` … when a folder of that name exists (a
+    /// repository there is offered for opening before it gets this far).
+    private func destination(for name: String) -> String {
+        WorktreePath.unique(parent + "/" + name)
     }
 
     private func clone(_ source: String) {
         let name = RemoteLinks.cloneFolderName(source)
         guard !name.isEmpty else { return }
-        running = true
         error = nil
-        let dest = parent + "/" + name
+        let taken = parent + "/" + name
+        // Same folder, already a repository (cloned before): open it instead of failing.
+        if FileManager.default.fileExists(atPath: taken + "/.git") {
+            existingRepo = taken
+            return
+        }
+        existingRepo = nil
+        running = true
+        let dest = destination(for: name)
         Task {
             do {
                 try await RepoModel.clone(source.trimmingCharacters(in: .whitespaces), into: dest, picked: listAccount)
@@ -268,5 +324,13 @@ struct CloneSheet: View {
                 self.error = error.localizedDescription
             }
         }
+    }
+}
+
+/// "A branch named x already exists." under a name field.
+private struct NameTaken: View {
+    let text: String
+    var body: some View {
+        Text(verbatim: text).font(Theme.Font.small).foregroundStyle(Theme.Status.error)
     }
 }

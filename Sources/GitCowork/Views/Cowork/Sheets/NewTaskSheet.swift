@@ -12,6 +12,8 @@ struct NewTaskSheet: View {
     @State private var pickedStatus: TaskStatus
     @State private var assignee = ""          // "" = unassigned
     @State private var labels: [String] = []
+    @State private var error: String?
+    @Environment(\.dismiss) private var dismiss
 
     init(model: RepoModel, status: TaskStatus) {
         self.model = model
@@ -22,7 +24,8 @@ struct NewTaskSheet: View {
     private var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        SheetScaffold(title: "New Task", confirmTitle: "Create Task", confirmDisabled: trimmedTitle.isEmpty) {
+        SheetScaffold(title: "New Task", confirmTitle: "Create Task", confirmDisabled: trimmedTitle.isEmpty, error: error,
+                      dismissOnConfirm: false) {
             create()
         } content: {
             TextField("Title", text: $title, prompt: Text("What needs doing?"))
@@ -54,9 +57,11 @@ struct NewTaskSheet: View {
         let s = pickedStatus, a = assignee.isEmpty ? nil : assignee, l = labels
         Task {
             guard let task = await model.cowork.createTask(title: t, status: s, assignee: a, labels: l, body: body) else {
-                model.alert = AlertItem(title: "Couldn't create the task", message: model.cowork.syncError ?? "Writing to refs/cowork/main failed.")
+                // The sheet stays open, so nothing typed is lost.
+                error = L("Couldn't save the task.") + " " + (model.cowork.syncError ?? L("Try again in a moment."))
                 return
             }
+            dismiss()
             model.openDiff = nil
             model.centerMode = .board
             model.coworkSelection = .task(task.id)

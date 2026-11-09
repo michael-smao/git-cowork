@@ -27,6 +27,32 @@ struct Confirmation: Identifiable {
     let confirmTitle: String
     var destructive = true
     let action: () async -> Void
+    /// A second choice next to the confirm button, already localized.
+    var alternativeTitle: String?
+    var alternative: (() async -> Void)?
+}
+
+/// A failed git action, said in plain words: what happened, what to do next
+/// (buttons that run it), and git's own output underneath for the details.
+struct GitProblem: Identifiable {
+    struct Action: Identifiable {
+        enum Role { case primary, normal, destructive }
+        let id = UUID()
+        let title: String
+        var role: Role = .normal
+        let run: () async -> Void
+    }
+
+    let id = UUID()
+    var title: String
+    var message: String
+    var actions: [Action] = []
+    /// "git push origin main", shown like a shell prompt above the output.
+    var command: String?
+    /// git's raw output (stderr, else stdout).
+    var output: String?
+    /// Information rather than a failure (e.g. "already deleted on the server").
+    var isInfo = false
 }
 
 enum DiffTarget: Hashable {
@@ -77,6 +103,12 @@ enum SheetKind: Identifiable {
     case requestReview(branch: String)
     case createPull(branch: String)
     case team
+    /// Push a branch that has no upstream yet: pick the remote and the name there.
+    case pushTarget(branch: String)
+    /// The repository has no remote: add one, then push `branch` if given.
+    case addRemote(thenPush: String?)
+    /// git doesn't know the user's name and email yet.
+    case identity
 
     var id: String {
         switch self {
@@ -89,6 +121,9 @@ enum SheetKind: Identifiable {
         case .requestReview(let b): "review:\(b)"
         case .createPull(let b): "pull:\(b)"
         case .team: "team"
+        case .pushTarget(let b): "pushTarget:\(b)"
+        case .addRemote(let b): "addRemote:\(b ?? "")"
+        case .identity: "identity"
         }
     }
 }
