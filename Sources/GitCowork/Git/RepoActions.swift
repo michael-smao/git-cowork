@@ -49,9 +49,73 @@ extension RepoModel {
         await syncCowork()
     }
 
+    /// Pull ▾ variants run as chosen. The plain Pull fast-forwards when it can
+    /// and asks merge or rebase when both sides have new commits, instead of
+    /// git's "divergent branches" error. If the user set pull.rebase or pull.ff
+    /// in git config, plain `git pull` already follows that choice.
     func pull(_ mode: PullMode = .default) async {
-        let ok = await perform("Pull", mode.args)
-        noteRemoteAction(fetched: true, succeeded: ok)
+        guard mode == .default, status.upstream != nil, await !hasPullPreference() else {
+            let ok = await perform("Pull", mode.args)
+            noteRemoteAction(fetched: true, succeeded: ok)
+            return
+        }
+        let fetched = await perform("Pull", ["fetch"])
+        noteRemoteAction(fetched: true, succeeded: fetched)
+        guard fetched else { return }
+        await catchUp(with: "@{upstream}", named: status.upstream ?? "upstream")
+    }
+
+    private func hasPullPreference() async -> Bool {
+        for key in CatchUp.pullPreferenceKeys {
+            if let value = await git.tryRun(["config", "--get", key], in: root),
+               !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        }
+        return false
+    }
+
+    /// Brings the checked-out branch up to `target` (a remote branch):
+    /// fast-forward when only `target` moved, nothing when it has no new
+    /// commits, and a question when both moved. Uncommitted changes are
+    /// stashed around it and put back (`--autostash`).
+    func catchUp(with target: String, named name: String) async {
+        guard let out = await git.tryRun(["rev-list", "--left-right", "--count", "HEAD...\(target)"], in: root),
+              let plan = CatchUp(revListCounts: out) else { return }
+        let branch = currentBranch ?? "HEAD"
+        switch plan {
+        case .upToDate, .aheadOnly:
+            return
+        case .fastForward:
+            await perform("Pull", ["merge", "--ff-only", "--autostash", target])
+        case .diverged(let ahead, let behind):
+            confirmation = Confirmation(
+                title: String(localized: "\(branch) and \(name) both have new commits"),
+                message: String(localized: "\(branch) has \(ahead) commits that \(name) doesn't, and \(name) has \(behind) new ones. Merge joins them with a merge commit. Rebase puts your \(ahead) commits on top of \(name). Nothing is lost either way."),
+                confirmTitle: "Merge",
+                destructive: false,
+                action: { [weak self] in await self?.perform("Pull", ["merge", "--no-edit", "--autostash", target]) },
+                alternativeTitle: L("Rebase"),
+                alternative: { [weak self] in await self?.perform("Pull", ["rebase", "--autostash", target]) }
+            )
+        }
+    }
+
+    /// Double-click on a remote branch: check out its local branch (a new
+    /// tracking one if there is none) and bring it up to date with the remote,
+    /// asking first when both have new commits.
+    func checkoutAndPull(_ remote: Ref) async {
+        guard remote.kind == .remoteBranch, let (remoteName, branch) = split(remote),
+              localBranch(named: branch) != nil else {
+            await checkout(remote)
+            return
+        }
+        if currentBranch != branch {
+            await checkout(remote)
+            guard currentBranch == branch else { return }   // refused or failed: it said why
+        }
+        // Fresh remote state first; offline, the last fetch still works.
+        _ = await git.tryRun(["fetch", "--end-of-options", remoteName, branch], in: root)
+        await refresh()
+        await catchUp(with: remote.name, named: remote.name)
     }
 
     func push(force: Bool = false) async {

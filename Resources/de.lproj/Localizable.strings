@@ -652,3 +652,7 @@
 "Push and Create" = "Pushen und erstellen";
 "Running" = "Läuft";
 "Sign In to See Them…" = "Anmelden, um sie zu sehen…";
+"%@ and %@ both have new commits" = "%1$@ und %2$@ haben beide neue Commits";
+"%@ has %lld commits that %@ doesn't, and %@ has %lld new ones. Merge joins them with a merge commit. Rebase puts your %lld commits on top of %@. Nothing is lost either way." = "%1$@ hat %2$lld Commits, die %3$@ nicht hat, und %4$@ hat %5$lld neue. Merge verbindet beide mit einem Merge-Commit. Rebase setzt deine %6$lld Commits oben auf %7$@. In beiden Fällen geht nichts verloren.";
+"Merge" = "Merge";
+"Rebase" = "Rebase";

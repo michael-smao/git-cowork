@@ -407,14 +407,14 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         guard let table, table.clickedRow >= 0, table.clickedRow < rows.count else { return }
         if focusSummaryIfWIP(row: table.clickedRow) { return }
         guard let commit = commit(atRow: table.clickedRow) else { return }
-        // Double-click a branch tip: check out that branch (a remote-only tip
-        // gets a tracking branch). Otherwise do nothing.
+        // Double-click a branch tip: check out that branch. A remote-only tip
+        // checks out its local branch (or a new tracking one) and pulls.
         let refs = refsByCommit[commit.id] ?? []
         if refs.contains(where: { $0.kind == .localBranch && $0.isHead }) { return }
         if let local = refs.first(where: { $0.kind == .localBranch }) {
             Task { await model.checkout(local) }
         } else if let remote = refs.first(where: { $0.kind == .remoteBranch && !$0.name.hasSuffix("/HEAD") }) {
-            Task { await model.checkout(remote) }
+            Task { await model.checkoutAndPull(remote) }
         }
     }
 

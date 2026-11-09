@@ -6,6 +6,15 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Changed
+- Pull no longer stops with git's "divergent branches" error. It
+  fast-forwards when only the remote moved, and when both sides have new
+  commits it asks: Merge or Rebase. Uncommitted changes are put aside and
+  back. A pull.rebase or pull.ff you set in git config is still followed,
+  and Pull ▾ keeps its explicit variants.
+- Double-clicking a remote branch checks out its local branch and brings it
+  up to date the same way (a new tracking branch if there is none).
+
 ## [0.4.0] - 2026-11-09
 
 ### Added
