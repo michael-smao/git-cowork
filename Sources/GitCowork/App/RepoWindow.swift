@@ -30,6 +30,10 @@ struct RepoWindow: View {
                 showClone = true
             }
         }
+        // The first window can appear before the command line is read.
+        .onReceive(NotificationCenter.default.publisher(for: .launchFoldersPending)) { _ in
+            if path == nil { openLaunchFolders() }
+        }
         .onOpenURL { url in
             if url.isFileURL { open(url.path) }
         }
