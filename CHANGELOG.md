@@ -6,6 +6,13 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- The repositories open when git-cowork quits open again at the next launch,
+  as tabs in the same order with the same one in front. It no longer depends
+  on macOS's "Close windows when quitting an app" setting. Turn it off in
+  Settings › Reopen repositories at launch. Folders passed on the command line
+  open after them, in front.
+
 ## [0.5.1] - 2026-11-09
 
 ### Added

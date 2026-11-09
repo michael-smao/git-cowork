@@ -1,4 +1,5 @@
 import AppKit
+import GitCoworkCore
 import SwiftUI
 
 @main
@@ -41,6 +42,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
         LaunchFolders.openFromCommandLine()
         Updater.shared.startAutomaticChecks()
+    }
+
+    /// Before any window closes: remember which repositories were open.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        OpenSession.saveForQuit()
+        return .terminateNow
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -96,18 +103,42 @@ enum LaunchFolders {
         return pending
     }
 
+    /// At launch: the repositories open at the last quit (Settings › Reopen
+    /// repositories), then folders from the command line, as tabs.
     static func openFromCommandLine() {
-        pending = CommandLine.arguments.dropFirst().filter { arg in
-            var isDir: ObjCBool = false
-            return !arg.hasPrefix("-") && FileManager.default.fileExists(atPath: arg, isDirectory: &isDir) && isDir.boolValue
+        let commandLine = CommandLine.arguments.dropFirst().filter { arg in
+            !arg.hasPrefix("-") && isDirectory(arg)
         }.map { realPath($0) }
-        guard !pending.isEmpty else { return }
-        // SwiftUI often shows the first (empty) window before this runs, so it
-        // found nothing to take. Tell it there are folders now.
-        NotificationCenter.default.post(name: .launchFoldersPending, object: nil)
+        let saved: (paths: [String], selected: String?) = Prefs.reopenRepos ? OpenSession.saved : ([], nil)
+        // A moment for SwiftUI's first window and anything macOS restores itself.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) { newWindow() }
+            let plan = SessionRestore.plan(saved: saved.paths.map { realPath($0) }, selected: saved.selected.map { realPath($0) },
+                                           commandLine: commandLine, alreadyOpen: OpenRepos.paths, exists: isDirectory)
+            guard !plan.open.isEmpty else {
+                OpenSession.finishLaunching()
+                return
+            }
+            pending = plan.open
+            // The first, empty window takes them: the first here, the rest as tabs.
+            NotificationCenter.default.post(name: .launchFoldersPending, object: nil)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                if !pending.isEmpty {
+                    // No empty window (macOS restored repositories): a new tab next to them.
+                    WindowAccessor.setPendingParent(NSApp.orderedWindows.first { $0.isVisible && $0.tabbingIdentifier == WindowChrome.tabbingIdentifier })
+                    newWindow()
+                }
+                // Tabs open one after another; then the one that was in front comes back to the front.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if let select = plan.select { OpenSession.window(for: select)?.makeKeyAndOrderFront(nil) }
+                    OpenSession.finishLaunching()
+                }
+            }
         }
+    }
+
+    private static func isDirectory(_ path: String) -> Bool {
+        var isDir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
     }
 
     /// Same as File > New Window, which is how SwiftUI creates WindowGroup windows.
