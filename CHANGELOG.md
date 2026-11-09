@@ -10,6 +10,15 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - Hovering a commit's branch and tag badges in the graph, when names are cut
   or some are behind "+N", shows all of them at full length in a list over the
   rows below. Click it to select the commit; right-click for the commit's menu.
+- Remove a worktree from the graph: a branch checked out in another worktree,
+  and another worktree's "// WIP" row, offer Open Worktree, Open Worktree in
+  New Tab and Remove Worktree… in their right-click menu.
+- Remove Worktree… in the sidebar also works for the worktree the tab shows:
+  the tab then switches to the main worktree (or closes, when the main
+  worktree is already open in another tab). The main worktree is never removed.
+- Removing a worktree runs in the background: its row shows "Removing…" right
+  away in every tab of the repository, and the rest of the app stays usable
+  while git deletes the folder.
 
 ### Changed
 - Repository tabs sit in their own row at the top of the window, next to the
@@ -25,6 +34,7 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 ### Fixed
 - A short tag or branch name like `v1` in a narrow Branch / Tag column no
   longer folds into "+1" when it fits.
+- After removing a worktree, its "// WIP" row could stay in the graph.
 
 ## [0.4.0] - 2026-11-09
 

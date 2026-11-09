@@ -16,6 +16,9 @@ struct HistoryTable: NSViewRepresentable {
     let worktreeInfoVersion: Int
     /// Shown inside the "// WIP" row, like GitKraken's inline commit summary.
     let draftSummary: String
+    /// Switch this window to a worktree, or open it in a new tab (right-click menu).
+    let openHere: (String) -> Void
+    let openInNewTab: (String) -> Void
 
     func makeCoordinator() -> HistoryTableCoordinator { HistoryTableCoordinator(model: model) }
 
@@ -79,6 +82,8 @@ struct HistoryTable: NSViewRepresentable {
     }
 
     private func sync(_ coordinator: HistoryTableCoordinator) {
+        coordinator.openHere = openHere
+        coordinator.openInNewTab = openInNewTab
         coordinator.sync(version: version, filter: filter, wipCount: wipCount, selection: selection,
                          revealToken: revealToken, worktreeInfoVersion: worktreeInfoVersion, draftSummary: draftSummary)
     }
@@ -136,6 +141,9 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     lazy var badgeHover = HistoryBadgeHover(coordinator: self)
     private var wipCountsCache: [WIPCount]?
     lazy var headerMenuDelegate = HistoryHeaderMenu(coordinator: self)
+    /// From the window, for "Open Worktree" in the right-click menu.
+    var openHere: (String) -> Void = { _ in }
+    var openInNewTab: (String) -> Void = { _ in }
 
     // Cowork: tasks and reviews linked to branches, plus pull requests and CI,
     // rebuilt when their stores change (HistoryCoworkMarks.swift).

@@ -28,6 +28,15 @@ extension HistoryTableCoordinator {
             menu.addItem(ActionItem("Stash Changes…") { model.sheet = .stash })
             return
         case .otherWIP(let path):
+            if let wt = model.worktrees.first(where: { $0.path == path }) {
+                let openHere = self.openHere, openInNewTab = self.openInNewTab
+                menu.addItem(ActionItem("Open Worktree") { openHere(wt.path) })
+                menu.addItem(ActionItem("Open Worktree in New Tab") { openInNewTab(wt.path) })
+                if !wt.isMain {
+                    menu.addItem(ActionItem("Remove Worktree…") { model.removeWorktree(wt) })
+                }
+                menu.addItem(.separator())
+            }
             menu.addItem(ActionItem("Open in Terminal") { External.openTerminal(path) })
             menu.addItem(ActionItem("Open in Editor") { External.openEditor(path) })
             menu.addItem(ActionItem("Reveal in Finder") { External.reveal(path) })
@@ -53,6 +62,15 @@ extension HistoryTableCoordinator {
                     menu.addItem(ActionItem("Checkout \(local.name)") { Task { await model.checkout(local) } })
                 }
                 menu.addItem(ActionItem("Push \(local.name)") { Task { await model.push(branch: local.name) } })
+                // Checked out in another worktree: open or remove that one.
+                if let wt = model.sidebarOtherWorktree(for: local.name) {
+                    let openHere = self.openHere, openInNewTab = self.openInNewTab
+                    menu.addItem(ActionItem("Open Worktree for \(local.name)") { openHere(wt.path) })
+                    menu.addItem(ActionItem("Open Worktree for \(local.name) in New Tab") { openInNewTab(wt.path) })
+                    if !wt.isMain {
+                        menu.addItem(ActionItem("Remove Worktree for \(local.name)…") { model.removeWorktree(wt) })
+                    }
+                }
             } else if let remote {
                 // Remote-only here. If a local branch of that name exists elsewhere,
                 // checking out switches to it, so say where it is.

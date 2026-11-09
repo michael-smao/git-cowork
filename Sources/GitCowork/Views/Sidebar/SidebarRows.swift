@@ -184,6 +184,7 @@ struct SidebarWorktreeRow: View {
 
     var body: some View {
         let folder = wt.sidebarFolderLabel(repoName: repoName)
+        let removing = WorktreeRemovals.shared.contains(wt.path)
         SidebarRowLayout {
             if isCurrent {
                 Circle().fill(Color.accentColor).frame(width: SidebarStyle.currentDot, height: SidebarStyle.currentDot)
@@ -204,7 +205,13 @@ struct SidebarWorktreeRow: View {
             }
             Spacer(minLength: Theme.Space.s)
             SidebarTrailing {
-                if wt.isPrunable {
+                if removing {
+                    HStack(spacing: Theme.Space.xs) {
+                        ProgressView().controlSize(.mini)
+                        Text("Removing…").font(Theme.Font.small)
+                    }
+                    .foregroundStyle(.secondary)
+                } else if wt.isPrunable {
                     Image(systemName: "exclamationmark.triangle")
                         .foregroundStyle(.tertiary)
                         .help("Folder is missing; prune to clean up")
@@ -218,6 +225,7 @@ struct SidebarWorktreeRow: View {
                 WorktreeInfoBadges(model: model, path: wt.path)
             }
         }
+        .opacity(removing ? 0.6 : 1)
         .modifier(CurrentBand(active: isCurrent))
         .help(folder.map { "\(branchLabel)\n\($0) — \(wt.path)" } ?? "\(branchLabel)\n\(wt.path)")
     }

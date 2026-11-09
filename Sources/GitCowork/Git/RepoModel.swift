@@ -271,6 +271,12 @@ final class RepoModel {
         let newWorktrees = Parsers.parseWorktrees(wt)
         if newWorktrees != worktrees {
             worktrees = newWorktrees
+            // Forget removed worktrees, so the graph drops their "// WIP" rows.
+            let kept = worktreeInfo.filter { info in newWorktrees.contains { $0.path == info.key } }
+            if kept.count != worktreeInfo.count {
+                worktreeInfo = kept
+                worktreeInfoVersion += 1
+            }
             restartWatcher()
             await refreshWorktreeInfo(paths: worktrees.map(\.path))
         } else {
