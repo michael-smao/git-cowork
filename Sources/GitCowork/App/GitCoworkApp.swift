@@ -101,6 +101,9 @@ enum LaunchFolders {
             return !arg.hasPrefix("-") && FileManager.default.fileExists(atPath: arg, isDirectory: &isDir) && isDir.boolValue
         }.map { realPath($0) }
         guard !pending.isEmpty else { return }
+        // SwiftUI often shows the first (empty) window before this runs, so it
+        // found nothing to take. Tell it there are folders now.
+        NotificationCenter.default.post(name: .launchFoldersPending, object: nil)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             if !NSApp.windows.contains(where: { $0.isVisible && $0.canBecomeMain }) { newWindow() }
         }
@@ -115,4 +118,9 @@ enum LaunchFolders {
             return
         }
     }
+}
+
+extension Notification.Name {
+    /// Folders from the command line are waiting in `LaunchFolders.pending`.
+    static let launchFoldersPending = Notification.Name("gitcowork.launchFoldersPending")
 }

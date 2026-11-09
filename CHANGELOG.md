@@ -52,6 +52,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - Check for Updates could freeze the app: its message could open off screen
   while still blocking every window, so nothing could be clicked and the app
   could not even be quit. Its messages now open as a sheet on the front window.
+- `GitCowork /path/to/repo` from a terminal could open the welcome screen
+  instead of the folder: the first window often appeared before the command
+  line was read, and nothing told it there was a folder to open.
 
 ## [0.4.0] - 2026-11-09
 
