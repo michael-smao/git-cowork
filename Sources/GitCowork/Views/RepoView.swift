@@ -43,6 +43,7 @@ struct RepoView: View {
         .searchable(text: $model.filterText, placement: .toolbar, prompt: "Filter commits")
         .navigationTitle(title)
         .modifier(HideToolbarTitle())
+        .background(RepoTabLabelReporter(label: tabLabel))
         .modifier(RepoDialogs(model: model, openInNewTab: openInNewTab))
         .focusedSceneValue(\.repoModel, model)
     }
@@ -59,10 +60,15 @@ struct RepoView: View {
         static let inspectorMax: CGFloat = 680
     }
 
-    /// Window and tab title: "repo", or "repo · folder" for a linked worktree.
+    /// Window title: "repo", or "repo · folder" for a linked worktree.
     private var title: String {
+        tabLabel.worktree.map { "\(model.name) · \($0)" } ?? model.name
+    }
+
+    /// The tab shows the same, with the folder in a quieter style.
+    private var tabLabel: RepoTabLabel {
         let isMain = model.mainWorktreePath == nil || model.mainWorktreePath == model.root.path
-        return isMain ? model.name : "\(model.name) · \(model.root.lastPathComponent)"
+        return RepoTabLabel(name: model.name, worktree: isMain ? nil : model.root.lastPathComponent)
     }
 }
 

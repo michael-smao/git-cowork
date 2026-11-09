@@ -6,12 +6,24 @@ extension HistoryTableCoordinator {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
-        guard let table, table.clickedRow >= 0, table.clickedRow < rows.count else { return }
+        guard let table else { return }
+        fill(menu, row: table.clickedRow)
+    }
+
+    /// The row's menu, for the badge list that hovers over the table. With
+    /// `onlyBadge`, the branch items are only those of that badge.
+    func contextMenu(forRow row: Int, onlyBadge: String? = nil) -> NSMenu? {
+        let menu = NSMenu()
+        fill(menu, row: row, onlyBadge: onlyBadge)
+        return menu.items.isEmpty ? nil : menu
+    }
+
+    private func fill(_ menu: NSMenu, row: Int, onlyBadge: String? = nil) {
+        guard row >= 0, row < rows.count else { return }
         let model = self.model
         let i: Int
-        switch rows[table.clickedRow] {
+        switch rows[row] {
         case .wip:
-            let row = table.clickedRow
             menu.addItem(ActionItem("Write Commit Message") { [weak self] in _ = self?.focusSummaryIfWIP(row: row) })
             menu.addItem(ActionItem("Stash Changes…") { model.sheet = .stash })
             return
@@ -42,7 +54,7 @@ extension HistoryTableCoordinator {
         let refs = refsByCommit[sha] ?? []
 
         // One group per branch badge: a local branch and its remote share items.
-        for badge in badges(forCommit: i) where badge.kind == .branch {
+        for badge in badges(forCommit: i) where badge.kind == .branch && (onlyBadge == nil || badge.name == onlyBadge) {
             let local = refs.first { $0.kind == .localBranch && badge.refNames.contains($0.name) }
             let remote = refs.first { $0.kind == .remoteBranch && badge.refNames.contains($0.name) }
             if let local {

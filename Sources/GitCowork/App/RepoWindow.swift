@@ -219,10 +219,7 @@ struct WindowAccessor: NSViewRepresentable {
                 DispatchQueue.main.async {
                     parent.addTabbedWindow(window, ordered: .above)
                     window.makeKeyAndOrderFront(nil)
-                    WindowChrome.showTabBar(window)
                 }
-            } else {
-                DispatchQueue.main.async { WindowChrome.showTabBar(window) }
             }
         }
     }
