@@ -30,6 +30,10 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   recent ones), like GitKraken. Worktrees get their own picker between
   repository and branch, shown when a repository has more than one: switch,
   open one in a new tab, or add one.
+- Checking out a branch that another worktree has checked out (double-click
+  or Checkout in the graph, a task's or review's Checkout, Start Task) opens
+  that worktree instead of showing an alert: its tab comes to the front, or
+  this window switches to it. Changes in this worktree stay where they are.
 
 ### Fixed
 - A short tag or branch name like `v1` in a narrow Branch / Tag column no

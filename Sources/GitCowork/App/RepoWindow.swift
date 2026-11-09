@@ -158,9 +158,13 @@ private struct RepoContainer: View {
             await DebugSnapshot.applySelection(model)
             #endif
         }
-        .onAppear { OpenRepos.add(path) }
+        .onAppear {
+            OpenRepos.add(path)
+            model.openWorktree = openHere
+        }
         .onDisappear {
             OpenRepos.remove(path)
+            model.openWorktree = nil
             model.stopWatching()
         }
     }

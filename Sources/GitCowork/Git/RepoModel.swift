@@ -73,6 +73,9 @@ final class RepoModel {
     var draftDetails = ""
     /// Bump to move keyboard focus to the commit summary field.
     var focusSummaryToken = 0
+    /// Shows another worktree of this repository: focuses its tab, else
+    /// switches this window to it. Set by the window; nil without one.
+    @ObservationIgnored var openWorktree: ((String) -> Void)?
     /// Bumped on every refresh; open working-copy diffs reload on it.
     private(set) var refreshCount = 0
     private var loadingMore = false

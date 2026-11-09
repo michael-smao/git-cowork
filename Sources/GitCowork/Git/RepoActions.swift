@@ -93,9 +93,23 @@ extension RepoModel {
         return true
     }
 
+    /// When `branch` is checked out in another worktree, goes there instead:
+    /// focuses its tab, else switches this window to it. Changes here stay in
+    /// this worktree. Without a window to switch (`openWorktree` is nil), it
+    /// alerts like `refuseIfCheckedOutElsewhere`. Returns true when the branch
+    /// is elsewhere, so the caller stops.
+    func openWorktreeIfCheckedOutElsewhere(_ branch: String) -> Bool {
+        guard let wt = worktree(holding: branch) else { return false }
+        guard let openWorktree else { return refuseIfCheckedOutElsewhere(branch) }
+        openWorktree(wt.path)
+        return true
+    }
+
+    /// Checks out a branch or tag. A branch another worktree has checked out
+    /// (also as the local branch of a remote one) opens that worktree instead.
     func checkout(_ ref: Ref) async {
         let local = split(ref)?.branch ?? ref.name
-        if ref.kind != .tag, refuseIfCheckedOutElsewhere(local) { return }
+        if ref.kind != .tag, openWorktreeIfCheckedOutElsewhere(local) { return }
         let args: [String]
         switch ref.kind {
         case .localBranch:
