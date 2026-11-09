@@ -13,12 +13,14 @@ enum PullMode: String, CaseIterable {
         }
     }
 
+    /// `--autostash`: uncommitted changes are put aside and back instead of
+    /// git refusing to pull.
     var args: [String] {
         switch self {
-        case .default: ["pull"]
-        case .ffOnly: ["pull", "--ff-only"]
-        case .rebase: ["pull", "--rebase"]
-        case .merge: ["pull", "--no-rebase"]
+        case .default: ["pull", "--autostash"]
+        case .ffOnly: ["pull", "--ff-only", "--autostash"]
+        case .rebase: ["pull", "--rebase", "--autostash"]
+        case .merge: ["pull", "--no-rebase", "--autostash"]
         }
     }
 }

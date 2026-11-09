@@ -29,6 +29,10 @@ struct ChangesPanel: View {
 
             if let op = model.operation {
                 OperationBanner(model: model, operation: op)
+            } else if let stash = model.stashConflict {
+                StashConflictBanner(model: model, stash: stash)
+            } else if model.currentBranch == nil, let sha = model.headSHA {
+                DetachedBanner(model: model, sha: sha)
             }
 
             if st.isClean {
@@ -333,6 +337,67 @@ private struct FileLists: View {
                 Button("Copy Path") { External.copy(c.path) }
             }
         }
+    }
+}
+
+/// A stash applied with conflicts: git kept it. Once the conflicts are
+/// resolved it can go; until then it's the safe copy of those changes.
+private struct StashConflictBanner: View {
+    let model: RepoModel
+    let stash: Stash
+
+    var body: some View {
+        let conflicts = model.status.conflicted.count
+        HStack(spacing: Theme.Space.m) {
+            Image(systemName: conflicts > 0 ? "exclamationmark.triangle.fill" : "tray.full")
+                .foregroundStyle(conflicts > 0 ? Theme.Status.warning : Color.accentColor)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("The stash was applied with conflicts").font(Theme.Font.body.weight(.semibold))
+                Text(conflicts > 0 ? "Resolve the conflicted files and stage them. The stash is kept until you delete it."
+                     : "All resolved. The stash is still in the list; delete it if you don't need it anymore.")
+                    .font(Theme.Font.small).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button("Keep Stash") { model.stashConflict = nil }
+                .buttonStyle(ActionButtonStyle.secondary())
+            Button("Delete Stash") {
+                model.stashConflict = nil
+                model.dropStash(stash)
+            }
+            .buttonStyle(ActionButtonStyle.primary())
+            .disabled(conflicts > 0)
+        }
+        .padding(Theme.Metrics.cardPadding)
+        .background(Theme.Status.warning.opacity(Theme.Tint.banner), in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+        .padding(.horizontal, Theme.Metrics.panelPadding)
+        .padding(.top, Theme.Metrics.panelPadding)
+    }
+}
+
+/// HEAD is on a commit, not a branch: new commits would belong to no branch.
+private struct DetachedBanner: View {
+    let model: RepoModel
+    let sha: String
+
+    var body: some View {
+        let short = String(sha.prefix(7))
+        HStack(spacing: Theme.Space.m) {
+            Image(systemName: "smallcircle.filled.circle").foregroundStyle(Theme.Status.warning)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Not on a branch").font(Theme.Font.body.weight(.semibold))
+                Text("You're on commit \(short). Commits made here belong to no branch and are easy to lose. Create a branch to keep them.")
+                    .font(Theme.Font.small).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+            Button("Create Branch Here…") { model.sheet = .newBranch(from: sha, label: short) }
+                .buttonStyle(ActionButtonStyle.primary())
+        }
+        .padding(Theme.Metrics.cardPadding)
+        .background(Theme.Status.warning.opacity(Theme.Tint.banner), in: RoundedRectangle(cornerRadius: Theme.Radius.card))
+        .padding(.horizontal, Theme.Metrics.panelPadding)
+        .padding(.top, Theme.Metrics.panelPadding)
     }
 }
 

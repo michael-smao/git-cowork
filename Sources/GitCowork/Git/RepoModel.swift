@@ -54,6 +54,14 @@ final class RepoModel {
     var busy: String?
     var alert: AlertItem?
     var confirmation: Confirmation?
+    /// A failed git action shown in plain words (ProblemSheet).
+    var problem: GitProblem?
+    /// The last failure, also when it wasn't shown (sheets show it inline).
+    var lastProblem: GitProblem?
+    /// A stash applied with conflicts; it is kept until the user drops it.
+    var stashConflict: Stash?
+    /// Runs after the identity sheet saved a name and email (the commit that needed it).
+    @ObservationIgnored var afterIdentity: (() async -> Void)?
     var sheet: SheetKind?
     var openDiff: DiffTarget?
     var showCommandLog = false
@@ -71,11 +79,11 @@ final class RepoModel {
     /// Commit message being written. Shared by the commit box and the "// WIP" row.
     var draftSummary = ""
     var draftDetails = ""
-    /// Bump to move keyboard focus to the commit summary field.
-    var focusSummaryToken = 0
     /// Shows another worktree of this repository: focuses its tab, else
     /// switches this window to it. Set by the window; nil without one.
     @ObservationIgnored var openWorktree: ((String) -> Void)?
+    /// Bump to move keyboard focus to the commit summary field.
+    var focusSummaryToken = 0
     /// Bumped on every refresh; open working-copy diffs reload on it.
     private(set) var refreshCount = 0
     private var loadingMore = false

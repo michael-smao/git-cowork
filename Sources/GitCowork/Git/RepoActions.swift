@@ -4,11 +4,14 @@ import GitCoworkCore
 /// Everything the user can do to a repo. Each action is one or two plain git
 /// commands; they all show up in the command log.
 extension RepoModel {
-    /// Runs a git command that changes the repo, then refreshes.
-    /// Errors are shown as an alert with git's own message.
+    /// Runs a git command that changes the repo, then refreshes. A failure
+    /// is shown in plain words with next steps (RepoProblems), unless `quiet`
+    /// (a sheet shows `lastProblem` inline instead). When the command left
+    /// conflicts to resolve, Changes opens instead: its banner says what to do.
     @discardableResult
-    func perform(_ label: String, _ args: [String], okCodes: Set<Int32> = [0]) async -> Bool {
+    func perform(_ label: String, _ args: [String], okCodes: Set<Int32> = [0], quiet: Bool = false) async -> Bool {
         await waitForAutoFetch()
+        await waitUntilIdle()
         guard beginBusy(label) else { return false }
         defer { endBusy(label) }
         if !UndoRecord.survives(args) { lastUndo = nil }
@@ -18,13 +21,37 @@ extension RepoModel {
             return true
         } catch {
             await refresh()
-            alert = AlertItem(title: String(localized: "\(label) failed"), message: error.localizedDescription)
+            report(error, label: label, args: args, quiet: quiet)
             return false
         }
     }
 
-    /// One git action at a time. Claims `busy` for `label`, or tells the user
-    /// why nothing happened when another action is still running.
+    /// Shows a failed command as a GitProblem, or opens Changes when it
+    /// stopped with conflicts (the operation banner explains the rest).
+    func report(_ error: Error, label: String, args: [String], quiet: Bool = false) {
+        let problem = problem(for: error, label: label, args: args)
+        lastProblem = problem
+        if operation != nil || !status.conflicted.isEmpty {
+            openDiff = nil
+            centerMode = .history
+            selection = .workingCopy
+            return
+        }
+        if !quiet { self.problem = problem }
+    }
+
+    /// Waits for the action that's running to finish, so a second click runs
+    /// next instead of being refused.
+    func waitUntilIdle() async {
+        var waited = 0
+        while busy != nil, waited < 6000 {   // 10 minutes at most
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 1
+        }
+    }
+
+    /// One git action at a time. Claims `busy` for `label`; if another action
+    /// is still running after waiting, says why nothing happened.
     func beginBusy(_ label: String) -> Bool {
         if let running = busy {
             if alert == nil {
@@ -123,25 +150,45 @@ extension RepoModel {
         await catchUp(with: remote.name, named: remote.name)
     }
 
+    /// A branch without an upstream asks where to push first (like
+    /// GitKraken); without any remote, it asks to add one.
     func push(force: Bool = false) async {
         var args = ["push"]
         if force { args.append("--force-with-lease") }
         if status.upstream == nil {
-            guard let remote = defaultRemote else {
-                alert = AlertItem(title: "Push failed", message: "This repository has no remote.")
+            guard let branch = currentBranch else {
+                problem = GitProblem(title: L("Not on a branch"), message: L("You're on a commit, not a branch, so there's nothing to push. Create a branch here first."))
                 return
             }
-            args += ["-u", remote, "HEAD"]
+            sheet = remoteNames.isEmpty ? .addRemote(thenPush: branch) : .pushTarget(branch: branch)
+            return
         }
         if await perform(force ? "Force push" : "Push", args) {
             noteRemoteAction(fetched: false, succeeded: true)
         }
     }
 
+    /// Pushes `branch` to `remoteBranch` on `remote` and tracks it from now on.
+    @discardableResult
+    func push(branch: String, to remote: String, as remoteBranch: String, quiet: Bool = false) async -> Bool {
+        let ok = await perform("Push", ["push", "-u", "--end-of-options", remote, "refs/heads/\(branch):refs/heads/\(remoteBranch)"], quiet: quiet)
+        if ok { noteRemoteAction(fetched: false, succeeded: true) }
+        return ok
+    }
+
+    /// Adds a remote (the repository had none).
+    @discardableResult
+    func addRemote(name: String, url: String, quiet: Bool = false) async -> Bool {
+        await perform("Add remote", ["remote", "add", name, url], quiet: quiet)
+    }
+
+    /// Always asks: a force push replaces the branch on the server.
     func confirmForcePush() {
+        let branch = currentBranch ?? "HEAD"
+        let upstream = status.upstream ?? String(localized: "the remote branch")
         confirmation = Confirmation(
-            title: String(localized: "Force push \(currentBranch ?? "HEAD")?"),
-            message: "Uses --force-with-lease: it overwrites the remote branch, but only if nobody else pushed to it since your last fetch.",
+            title: String(localized: "Force push \(branch)?"),
+            message: String(localized: "This replaces \(upstream) on the server with your \(branch). Commits there that you don't have are removed for everyone. --force-with-lease refuses if somebody pushed since your last fetch."),
             confirmTitle: "Force Push"
         ) { [weak self] in await self?.push(force: true) }
     }
@@ -201,30 +248,43 @@ extension RepoModel {
 
     /// `--no-track`: a new branch made from e.g. origin/main shouldn't use main as its upstream.
     @discardableResult
-    func createBranch(_ name: String, from start: String, checkout: Bool) async -> Bool {
+    func createBranch(_ name: String, from start: String, checkout: Bool, quiet: Bool = false) async -> Bool {
         if checkout {
-            return await perform("Create branch", ["switch", "--no-track", "-c", name, "--end-of-options", start])
+            return await perform("Create branch", ["switch", "--no-track", "-c", name, "--end-of-options", start], quiet: quiet)
         } else {
-            return await perform("Create branch", ["branch", "--no-track", "--end-of-options", name, start])
+            return await perform("Create branch", ["branch", "--no-track", "--end-of-options", name, start], quiet: quiet)
         }
+    }
+
+    /// The last failure in one paragraph, for sheets that show it inline.
+    var lastProblemText: String? {
+        lastProblem.map { "\($0.title)\n\($0.message)" }
     }
 
     /// Pushes a branch that may not be checked out here, or is checked out in
     /// another worktree. A branch without an upstream gets one.
+    /// `askWhere: false` (sheets that push on their own) pushes a branch
+    /// without upstream to the default remote under the same name.
     @discardableResult
-    func push(branch: String) async -> Bool {
-        guard let args = BranchLookup.pushArguments(branch: branch, upstream: localBranch(named: branch)?.upstream,
-                                                    remotes: remoteNames, fallbackRemote: defaultRemote) else {
-            alert = AlertItem(title: "Push failed", message: "This repository has no remote.")
+    func push(branch: String, quiet: Bool = false, askWhere: Bool = true) async -> Bool {
+        let upstream = localBranch(named: branch)?.upstream
+        if upstream == nil, askWhere {
+            sheet = remoteNames.isEmpty ? .addRemote(thenPush: branch) : .pushTarget(branch: branch)
             return false
         }
-        let pushed = await perform("Push", args)
+        guard let args = BranchLookup.pushArguments(branch: branch, upstream: upstream,
+                                                    remotes: remoteNames, fallbackRemote: defaultRemote) else {
+            sheet = .addRemote(thenPush: branch)
+            return false
+        }
+        let pushed = await perform("Push", args, quiet: quiet)
         if pushed { noteRemoteAction(fetched: false, succeeded: true) }
         return pushed
     }
 
-    func renameBranch(_ old: String, to new: String) async {
-        await perform("Rename branch", ["branch", "-m", old, new])
+    @discardableResult
+    func renameBranch(_ old: String, to new: String, quiet: Bool = false) async -> Bool {
+        await perform("Rename branch", ["branch", "-m", old, new], quiet: quiet)
     }
 
     func deleteBranch(_ ref: Ref) {
@@ -234,47 +294,70 @@ extension RepoModel {
                 title: String(localized: "Delete \(ref.name) on \(remote)?"),
                 message: "This deletes the branch on the server for everyone.",
                 confirmTitle: "Delete Remote Branch"
-            ) { [weak self] in
-                await self?.perform("Delete remote branch", ["push", remote, "--delete", "refs/heads/\(branch)"])
-            }
+            ) { [weak self] in await self?.deleteRemoteBranch(branch, on: remote) }
             return
         }
-        Task {
-            guard beginBusy("Delete branch") else { return }
-            let r = await git.execute(["branch", "-d", ref.name], in: root)
-            endBusy("Delete branch")
-            if r.exitCode == 0 {
-                CommandLog.shared.add(.init(args: ["branch", "-d", ref.name], directory: root, start: .now, duration: 0, result: r))
-                lastUndo = nil
-                await refresh()
-                recordDeletedBranch(ref)
-            } else if r.stderr.contains("not fully merged") {
-                confirmation = Confirmation(
-                    title: String(localized: "\(ref.name) is not fully merged"),
-                    message: "Its commits aren't in your current branch or its upstream. Delete it anyway? Edit > Undo brings it back until you run another git command.",
-                    confirmTitle: "Delete Anyway"
-                ) { [weak self] in
-                    guard let self, await perform("Delete branch", ["branch", "-D", ref.name]) else { return }
-                    recordDeletedBranch(ref)
-                }
-            } else {
-                alert = AlertItem(title: "Delete branch failed", message: GitError(command: "", result: r).localizedDescription)
+        Task { await confirmDeleteLocalBranch(ref) }
+    }
+
+    /// Always asks first. Says how many commits exist only on the branch, and
+    /// offers deleting its remote branch too.
+    private func confirmDeleteLocalBranch(_ ref: Ref) async {
+        let only = await git.tryLine(["rev-list", "--count", "refs/heads/\(ref.name)", "--not",
+                                      "--exclude=refs/heads/\(ref.name)", "--branches", "--remotes"], in: root)
+            .flatMap(Int.init) ?? 0
+        var message = only == 0
+            ? L("All its commits are also on other branches, so nothing is lost.")
+            : only == 1
+                ? L("1 commit exists only on this branch and goes away with it.")
+                : String(localized: "\(only) commits exist only on this branch and go away with it.")
+        message += " " + L("Edit > Undo brings the branch back until you run another git command.")
+        let remote = ref.upstream.flatMap { up in remoteBranch(named: up) != nil && !ref.upstreamGone ? up : nil }
+        let deleteLocal: () async -> Void = { [weak self] in
+            guard let self, await perform("Delete branch", ["branch", "-D", ref.name]) else { return }
+            recordDeletedBranch(ref)
+        }
+        var c = Confirmation(title: String(localized: "Delete \(ref.name)?"), message: message,
+                             confirmTitle: "Delete", action: deleteLocal)
+        if let remote, let parts = remoteBranch(named: remote).flatMap(split) {
+            c.alternativeTitle = String(localized: "Delete Here and on \(parts.remote)")
+            c.alternative = { [weak self] in
+                await deleteLocal()
+                await self?.deleteRemoteBranch(parts.branch, on: parts.remote)
             }
+        }
+        confirmation = c
+    }
+
+    /// Deletes a branch on the server. If it's already gone there, cleans up
+    /// the stale entry here and says so instead of failing.
+    func deleteRemoteBranch(_ branch: String, on remote: String) async {
+        let args = ["push", remote, "--delete", "refs/heads/\(branch)"]
+        await waitUntilIdle()
+        guard beginBusy("Delete remote branch") else { return }
+        do {
+            try await git.run(args, in: root, logged: true)
+            endBusy("Delete remote branch")
+            await refresh()
+        } catch {
+            endBusy("Delete remote branch")
+            let raw = (error as? GitError)?.result.stderr ?? ""
+            if GitFailure.classify(raw) == .remoteRefMissing {
+                _ = try? await git.run(["fetch", "--prune", remote], in: root, logged: true)
+                await refresh()
+            }
+            report(error, label: "Delete remote branch", args: args)
         }
     }
 
+    /// `--autostash`: uncommitted changes are put aside and back, like GitKraken.
+    /// Conflicts open Changes (see `report`).
     func merge(_ name: String) async {
-        let ok = await perform("Merge", ["merge", name], okCodes: [0])
-        if !ok, !status.conflicted.isEmpty {
-            alert = AlertItem(title: "Merge has conflicts",
-                              message: "Resolve the conflicted files in Changes, then Continue, or Abort the merge.")
-            selection = .workingCopy
-        }
+        await perform("Merge", ["merge", "--autostash", "--no-edit", name])
     }
 
     func rebase(onto name: String) async {
-        let ok = await perform("Rebase", ["rebase", name])
-        if !ok, !status.conflicted.isEmpty { selection = .workingCopy }
+        await perform("Rebase", ["rebase", "--autostash", name])
     }
 
     // MARK: Commits
@@ -301,11 +384,12 @@ extension RepoModel {
         }
     }
 
-    func createTag(_ name: String, at sha: String, message: String) async {
+    @discardableResult
+    func createTag(_ name: String, at sha: String, message: String, quiet: Bool = false) async -> Bool {
         if message.isEmpty {
-            await perform("Create tag", ["tag", name, sha])
+            return await perform("Create tag", ["tag", name, sha], quiet: quiet)
         } else {
-            await perform("Create tag", ["tag", "-a", name, "-m", message, sha])
+            return await perform("Create tag", ["tag", "-a", name, "-m", message, sha], quiet: quiet)
         }
     }
 
@@ -371,6 +455,16 @@ extension RepoModel {
     }
 
     func commit(message: String, amend: Bool) async -> Bool {
+        // No name or email yet: ask for them once, then commit (git would only print instructions).
+        if await git.tryRun(["var", "GIT_AUTHOR_IDENT"], in: root) == nil {
+            afterIdentity = { [weak self] in
+                guard let self, await commit(message: message, amend: amend) else { return }
+                draftSummary = ""
+                draftDetails = ""
+            }
+            sheet = .identity
+            return false
+        }
         var args = ["commit"]
         if amend { args.append("--amend") }
         if message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -382,6 +476,35 @@ extension RepoModel {
         // a soft reset would silently drop the operation's state.
         if operation != nil { return await perform(amend ? "Amend" : "Commit", args) }
         return await performUndoable(amend ? .amend : .commit, amend ? "Amend" : "Commit", args)
+    }
+
+    /// Nothing staged yet: stage everything, then commit.
+    func stageAllAndCommit(message: String) async -> Bool {
+        guard await perform("Stage all", ["add", "-A"]) else { return false }
+        return await commit(message: message, amend: false)
+    }
+
+    /// A repository without commits (e.g. a fresh clone of an empty one):
+    /// adds a README if there's none and makes the first commit.
+    func makeInitialCommit() async {
+        let readme = root.appendingPathComponent("README.md")
+        if !FileManager.default.fileExists(atPath: readme.path) {
+            try? "# \(name)\n".write(to: readme, atomically: true, encoding: .utf8)
+        }
+        guard await perform("Stage", ["add", "--", "README.md"]) else { return }
+        _ = await commit(message: "Initial commit", amend: false)
+    }
+
+    /// Saves the name and email git signs commits with, for all repositories
+    /// (`--global`) or just this one, then runs what was waiting for them.
+    func saveIdentity(name: String, email: String, global: Bool, quiet: Bool = true) async -> Bool {
+        let scope = global ? "--global" : "--local"
+        guard await perform("Set name", ["config", scope, "user.name", name], quiet: quiet),
+              await perform("Set email", ["config", scope, "user.email", email], quiet: quiet) else { return false }
+        let next = afterIdentity
+        afterIdentity = nil
+        await next?()
+        return true
     }
 
     /// Resolves a conflict with one whole side. `mine` is the user's own
@@ -406,6 +529,7 @@ extension RepoModel {
         }
         if zeroContext { args.append("--unidiff-zero") }   // diff.context=0
         args.append("-")
+        await waitUntilIdle()
         guard beginBusy(action.title) else { return false }
         defer { endBusy(action.title) }
         do {
@@ -414,7 +538,7 @@ extension RepoModel {
             return true
         } catch {
             await refresh()
-            alert = AlertItem(title: String(localized: "\(action.title) failed"), message: error.localizedDescription)
+            report(error, label: action.title, args: args)
             return false
         }
     }
@@ -443,8 +567,7 @@ extension RepoModel {
             autoFetcher.note(fetched: false, succeeded: true)   // a sign-in pause was about the old account
             await updateHostStatus(force: true)
         } catch {
-            let label = L("Switch account")
-            alert = AlertItem(title: String(localized: "\(label) failed"), message: error.localizedDescription)
+            report(error, label: "Switch account", args: args)
         }
     }
 
@@ -476,18 +599,23 @@ extension RepoModel {
 
     // MARK: Stash
 
-    func stash(message: String) async {
+    @discardableResult
+    func stash(message: String, quiet: Bool = false) async -> Bool {
         var args = ["stash", "push", "--include-untracked"]
         if !message.isEmpty { args += ["-m", message] }
-        await perform("Stash", args)
+        return await perform("Stash", args, quiet: quiet)
     }
 
+    /// With conflicts git keeps the stash; Changes then says so and offers to drop it.
     func popStash(_ stash: Stash? = nil) async {
-        await perform("Pop stash", ["stash", "pop"] + (stash.map { [$0.selector] } ?? []))
+        let target = stash ?? stashes.first
+        let ok = await perform("Pop stash", ["stash", "pop"] + (stash.map { [$0.selector] } ?? []))
+        if !ok, !status.conflicted.isEmpty { stashConflict = target }
     }
 
     func applyStash(_ stash: Stash) async {
-        await perform("Apply stash", ["stash", "apply", stash.selector])
+        let ok = await perform("Apply stash", ["stash", "apply", stash.selector])
+        if !ok, !status.conflicted.isEmpty { stashConflict = stash }
     }
 
     func dropStash(_ stash: Stash) {

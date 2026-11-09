@@ -21,6 +21,15 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   while git deletes the folder.
 - A Fetch button in the toolbar, next to Pull: fetches all remotes
   (`git fetch --all --prune`) without merging anything.
+- The first commit without a git name and email asks for them once (for all
+  repositories or this one) and then commits.
+- A repository without commits shows Create Initial Commit (adds a README.md
+  if there is none).
+- Stage All and Commit when nothing is staged yet.
+- A banner when HEAD isn't on a branch, with Create Branch Here….
+- Cloning into a folder that already holds the repository offers to open it;
+  another folder of that name gets a `-2` suffix. Start Task in New Worktree
+  does the same for its folder.
 
 ### Changed
 - Repository tabs sit in their own row at the top of the window, next to the
@@ -49,6 +58,30 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - The checked-out commit stands out in the history: its row has a stronger
   band in its lane color that reaches under the badges, and its branch badge
   is bold with a light ring.
+- Failed git actions are explained in plain words with buttons for the next
+  step, instead of git's raw output in an alert. git's own output is still
+  there under Details, shown like a terminal (prompt, errors in red, hints
+  dimmed), with Copy and the command log. Among them:
+  - Push rejected because the remote moved: Pull, Then Push, or Force Push…,
+    which always asks first and says what it overwrites.
+  - Uncommitted changes in the way of a switch: Stash & Switch, or Bring
+    Changes Along (to the branch's own remote branch, that's the default).
+  - Pull or merge with no upstream, a deleted upstream, a protected branch,
+    a stale lease, no write access, a new SSH host key, signed out, offline.
+- Conflicts from a merge, rebase, cherry-pick, revert or stash open Changes
+  instead of an alert; a stash applied with conflicts is kept and Changes
+  offers to delete it once everything is resolved.
+- Merge, rebase and all Pull variants put uncommitted changes aside and back
+  (`--autostash`) instead of refusing.
+- Deleting a local branch always asks, says how many commits exist only on
+  it, and offers to delete its remote branch too. Deleting a remote branch
+  that is already gone cleans up the leftover entry instead of failing.
+- Pushing a branch without an upstream asks where to (remote and name, like
+  GitKraken); a repository without a remote asks for one.
+- A second git action waits for the running one instead of being refused.
+- Sheets (new branch, tag, rename, stash, task, review request, create pull
+  request) stay open with the error inline when something fails, and say
+  when a branch or tag name is taken.
 
 ### Fixed
 - A short tag or branch name like `v1` in a narrow Branch / Tag column no

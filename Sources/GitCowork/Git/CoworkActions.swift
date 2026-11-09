@@ -65,7 +65,17 @@ extension RepoModel {
             alert = AlertItem(title: L("Start task failed"), message: String(localized: "\(t.id) has no usable branch name."))
             return nil
         }
-        let path = suggestedWorktreePath(branch: name)
+        var path = suggestedWorktreePath(branch: name)
+        if let existing = worktrees.first(where: { realPath($0.path) == realPath(path) }) {
+            // Already a worktree of this repository (on another branch): say so rather than fail.
+            problem = GitProblem(title: L("That worktree already exists"),
+                                 message: String(localized: "\(path) is already a worktree, on \(existing.branch ?? L("detached")). Open it, or remove it first."),
+                                 actions: [.init(title: L("Open It"), role: .primary) { [weak self] in self?.openWorktree?(existing.path) }])
+            return nil
+        }
+        if FileManager.default.fileExists(atPath: path) {
+            path = WorktreePath.unique(path)
+        }
         let args = TaskStart.plan(branch: name, hasLocal: localBranch(named: name) != nil,
                                   remoteBranch: remoteBranch(named: name)?.name, base: baseBranch()?.ref ?? "HEAD",
                                   worktreePath: path)

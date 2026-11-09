@@ -64,8 +64,8 @@ struct CreatePullSheet: View {
         task = Task {
             defer { working = false }
             do {
-                if needsPush, await !model.push(branch: branch) {
-                    error = String(localized: "Couldn't push \(branch).")
+                if needsPush, await !model.push(branch: branch, quiet: true, askWhere: false) {
+                    error = model.lastProblem.map { "\($0.title)\n\($0.message)" } ?? String(localized: "Couldn't push \(branch).")
                     return
                 }
                 let pull = try await status.createPull(title: title, description: details, branch: branch, base: base, draft: draft)

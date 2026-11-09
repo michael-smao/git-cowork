@@ -14,6 +14,8 @@ struct RequestReviewSheet: View {
     @State private var taskID: String
     @State private var openPR = false
     @State private var pushing = false
+    @State private var error: String?
+    @Environment(\.dismiss) private var dismiss
 
     init(model: RepoModel, branch: String) {
         self.model = model
@@ -44,7 +46,8 @@ struct RequestReviewSheet: View {
     }
 
     var body: some View {
-        SheetScaffold(title: "Request Review", confirmTitle: "Request Review", confirmDisabled: !valid) {
+        SheetScaffold(title: "Request Review", confirmTitle: "Request Review", confirmDisabled: !valid, error: error,
+                      dismissOnConfirm: false) {
             request()
         } content: {
             SheetGrid {
@@ -138,11 +141,10 @@ struct RequestReviewSheet: View {
         guard model.defaultRemote != nil else { return }
         pushing = true
         let b = branch
+        error = nil
         Task {
-            if model.currentBranch == b {
-                await model.push()
-            } else {
-                await model.push(branch: b)
+            if await !model.push(branch: b, quiet: true, askWhere: false) {
+                error = model.lastProblem.map { "\($0.title)\n\($0.message)" }
             }
             pushing = false
         }
@@ -157,10 +159,11 @@ struct RequestReviewSheet: View {
         Task {
             guard let r = await model.cowork.requestReview(branch: b, base: baseName, title: t, reviewers: rv,
                                                            body: body, taskID: task) else {
-                model.alert = AlertItem(title: "Couldn't request the review",
-                                        message: model.cowork.syncError ?? "Writing to refs/cowork/main failed.")
+                // The sheet stays open, so nothing typed is lost.
+                error = L("Couldn't save the review request.") + " " + (model.cowork.syncError ?? L("Try again in a moment."))
                 return
             }
+            dismiss()
             model.openDiff = nil
             ReviewsView.showFilter(for: r, store: model.cowork)
             model.centerMode = .reviews

@@ -141,7 +141,10 @@ enum UndoSelfTest {
         await sh(["fetch", "-q", "origin"], in: repo)
         await model.refresh()
         guard let devRef = model.localBranches.first(where: { $0.name == "dev" }) else { check(false, "dev branch"); return false }
-        model.deleteBranch(devRef)    // merged into main: deleted without asking
+        model.deleteBranch(devRef)    // merged into main: still asks first
+        await settle(model) { model.confirmation != nil }
+        await model.confirmation?.action()
+        model.confirmation = nil
         await settle(model) { model.lastUndo != nil }
         check(!model.localBranches.contains { $0.name == "dev" }, "dev deleted")
         check(model.undoTitle == "Undo Delete Branch", "menu reads Undo Delete Branch")
@@ -170,7 +173,8 @@ enum UndoSelfTest {
         _ = await model.stageAll()
         _ = await model.commit(message: "three", amend: false)
         check(model.undoTitle == "Undo Commit", "commit undoable before pushing")
-        await model.push()
+        // No upstream yet: the toolbar's Push would ask where to; push it there directly.
+        await model.push(branch: "main", askWhere: false)
         check(model.undoTitle == nil, "no undo after push")
 
         print("6. push a branch another worktree has checked out")
@@ -178,13 +182,13 @@ enum UndoSelfTest {
         let here = await branch()
         await sh(["worktree", "add", "-q", "-b", "side", side.path], in: repo)
         await model.refresh()
-        check(await model.push(branch: "side"), "first push succeeds")
+        check(await model.push(branch: "side", askWhere: false), "first push succeeds")
         check(await sh(["rev-parse", "--abbrev-ref", "side@{upstream}"], in: repo) == "origin/side", "first push sets the upstream")
         write("side\n", "b.txt", in: side)
         await sh(["add", "."], in: side)
         await sh(["commit", "-qm", "side"], in: side)
         await model.refresh()
-        check(await model.push(branch: "side"), "second push succeeds")
+        check(await model.push(branch: "side", askWhere: false), "second push succeeds")
         check(await sh(["rev-parse", "refs/heads/side"], in: remote) == sh(["rev-parse", "HEAD"], in: side), "remote has the new commit")
         check(await branch() == here, "this worktree stayed on its branch")
 

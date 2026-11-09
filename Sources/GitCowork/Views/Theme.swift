@@ -150,6 +150,17 @@ enum Theme {
 
     static func lane(_ i: Int) -> NSColor { lanes[((i % lanes.count) + lanes.count) % lanes.count] }
 
+    /// git output shown like a terminal (ProblemSheet): dark in both appearances.
+    enum Terminal {
+        static let background = Color(red: 0.11, green: 0.11, blue: 0.12)
+        static let text = Color(red: 0.86, green: 0.86, blue: 0.86)
+        static let command = Color.white
+        static let prompt = Color(red: 0.45, green: 0.85, blue: 0.45)
+        static let error = Color(red: 1.0, green: 0.42, blue: 0.40)
+        static let warning = Color(red: 0.98, green: 0.78, blue: 0.35)
+        static let hint = Color(red: 0.55, green: 0.55, blue: 0.58)
+    }
+
     enum Status {
         static let added = Color(nsColor: .systemGreen)
         static let modified = Color(nsColor: .systemOrange)
