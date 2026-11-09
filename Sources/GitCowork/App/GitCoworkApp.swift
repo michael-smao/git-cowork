@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DebugSnapshot.scheduleIfRequested()
         CoworkSelfTest.runIfRequested()
         UndoSelfTest.runIfRequested()
+        GitActionsSelfTest.runIfRequested()
         UpdaterSelfTest.runIfRequested()
         #endif
         LaunchFolders.openFromCommandLine()

@@ -18,6 +18,7 @@ extension RepoModel {
         do {
             try await git.run(args, in: root, logged: true, okCodes: okCodes)
             await refresh()
+            if args.contains("--autostash"), !status.conflicted.isEmpty { showAutostashConflict() }
             return true
         } catch {
             await refresh()
@@ -38,6 +39,16 @@ extension RepoModel {
             return
         }
         if !quiet { self.problem = problem }
+    }
+
+    /// `--autostash` put the changes back with conflicts: git still counts
+    /// that as success and keeps them in a stash. Changes says so (like a
+    /// stash popped with conflicts) instead of nothing.
+    private func showAutostashConflict() {
+        stashConflict = stashes.first
+        openDiff = nil
+        centerMode = .history
+        selection = .workingCopy
     }
 
     /// Waits for the action that's running to finish, so a second click runs
@@ -304,7 +315,7 @@ extension RepoModel {
     /// offers deleting its remote branch too.
     private func confirmDeleteLocalBranch(_ ref: Ref) async {
         let only = await git.tryLine(["rev-list", "--count", "refs/heads/\(ref.name)", "--not",
-                                      "--exclude=refs/heads/\(ref.name)", "--branches", "--remotes"], in: root)
+                                      "--exclude=\(ref.name)", "--branches", "--remotes"], in: root)
             .flatMap(Int.init) ?? 0
         var message = only == 0
             ? L("All its commits are also on other branches, so nothing is lost.")
@@ -312,14 +323,14 @@ extension RepoModel {
                 ? L("1 commit exists only on this branch and goes away with it.")
                 : String(localized: "\(only) commits exist only on this branch and go away with it.")
         message += " " + L("Edit > Undo brings the branch back until you run another git command.")
-        let remote = ref.upstream.flatMap { up in remoteBranch(named: up) != nil && !ref.upstreamGone ? up : nil }
+        let remote = ref.upstream.flatMap { up in remoteBranch(fullName: up) != nil && !ref.upstreamGone ? up : nil }
         let deleteLocal: () async -> Void = { [weak self] in
             guard let self, await perform("Delete branch", ["branch", "-D", ref.name]) else { return }
             recordDeletedBranch(ref)
         }
         var c = Confirmation(title: String(localized: "Delete \(ref.name)?"), message: message,
                              confirmTitle: "Delete", action: deleteLocal)
-        if let remote, let parts = remoteBranch(named: remote).flatMap(split) {
+        if let remote, let parts = remoteBranch(fullName: remote).flatMap(split) {
             c.alternativeTitle = String(localized: "Delete Here and on \(parts.remote)")
             c.alternative = { [weak self] in
                 await deleteLocal()

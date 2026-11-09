@@ -37,7 +37,7 @@ struct PushTargetSheet: View {
                 Text(verbatim: "/").foregroundStyle(.secondary)
                 TextField("Branch name", text: $name).textFieldStyle(.roundedBorder)
             }
-            if model.remoteBranch(named: "\(remote)/\(name)") != nil {
+            if model.remoteBranch(fullName: "\(remote)/\(name)") != nil {
                 Text("\(remote)/\(name) already exists; the push adds your commits to it if it can.")
                     .font(Theme.Font.small).foregroundStyle(.secondary)
             }

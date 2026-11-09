@@ -15,6 +15,12 @@ extension RepoModel {
         BranchLookup.remote(named: name, in: refs, preferred: defaultRemote ?? "origin", remotes: remoteNames)
     }
 
+    /// Remote-tracking ref by its full short name, like "origin/main"
+    /// (`remoteBranch(named:)` takes a branch name without the remote).
+    func remoteBranch(fullName: String) -> Ref? {
+        remoteBranches.first { $0.name == fullName }
+    }
+
     /// Local branch if there is one, else the remote-tracking one.
     func branch(named name: String) -> Ref? {
         localBranch(named: name) ?? remoteBranch(named: name)

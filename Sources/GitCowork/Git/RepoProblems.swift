@@ -40,7 +40,7 @@ extension RepoModel {
         case .noUpstream:
             p.title = String(localized: "\(branch) doesn't track a remote branch")
             p.message = L("Git doesn't know where to pull from.")
-            if let remote = defaultRemote, let ref = remoteBranch(named: "\(remote)/\(branch)") {
+            if let remote = defaultRemote, let ref = remoteBranch(fullName: "\(remote)/\(branch)") {
                 p.message = String(localized: "Git doesn't know where to pull from. \(ref.name) has the same name: track it and pull?")
                 p.actions = [.init(title: String(localized: "Track \(ref.name) and Pull"), role: .primary) { [weak self] in
                     guard let self, await perform("Track", ["branch", "--set-upstream-to=\(ref.name)"]) else { return }

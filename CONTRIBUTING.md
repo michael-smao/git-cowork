@@ -98,6 +98,10 @@ End-to-end cowork sync test against a local bare remote with two clones:
 GITCOWORK_SELFTEST=/tmp/empty-dir .build/debug/GitCowork
 ```
 
+The same for Edit > Undo (`GITCOWORK_UNDO_SELFTEST`) and for the actions that
+touch your files or the remote, like pull with uncommitted changes, force push,
+deleting branches and removing worktrees (`GITCOWORK_ACTIONS_SELFTEST`).
+
 The folder must be empty or one a previous self-test created; anything else
 is refused, never deleted. Add `GITCOWORK_SELFTEST_SEED=1` for extra demo tasks.
 

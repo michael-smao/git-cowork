@@ -35,6 +35,12 @@ jobs:
           out="$(GITCOWORK_UNDO_SELFTEST="$(mktemp -d)/selftest" .build/debug/GitCowork -ApplePersistenceIgnoreState YES 2>&1)" || { echo "$out"; exit 1; }
           echo "$out"
           grep -q "SELFTEST PASS" <<<"$out"
+      - name: Git actions self-test
+        timeout-minutes: 5
+        run: |
+          out="$(GITCOWORK_ACTIONS_SELFTEST="$(mktemp -d)/selftest" .build/debug/GitCowork -ApplePersistenceIgnoreState YES 2>&1)" || { echo "$out"; exit 1; }
+          echo "$out"
+          grep -q "SELFTEST PASS" <<<"$out"
       - name: Check install.sh
         run: |
           bash -n install.sh

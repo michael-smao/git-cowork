@@ -557,7 +557,6 @@
 "They include git. macOS sometimes removes them during an update. Installing them is free and takes a few minutes; git-cowork works again as soon as they're done." = "Sie enthalten git. macOS entfernt sie manchmal bei einem Update. Die Installation ist kostenlos und dauert ein paar Minuten; danach funktioniert git-cowork sofort wieder.";
 "This can't be undone." = "Das lässt sich nicht rückgängig machen.";
 "This deletes the branch on the server for everyone." = "Damit wird der Branch auf dem Server für alle gelöscht.";
-"This repository has no remote." = "Dieses Repository hat kein Remote.";
 "This tab then shows the main worktree." = "Dieser Tab zeigt danach den Haupt-Worktree.";
 "This worktree only" = "Nur dieser Worktree";
 "Tip: drop a folder anywhere in this window" = "Tipp: Zieh einen Ordner irgendwohin in dieses Fenster";
