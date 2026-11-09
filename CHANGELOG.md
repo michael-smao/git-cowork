@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-09
+
 ### Added
 - Discarding changes can be undone: Edit > Undo (⌘Z) brings them back,
   including new and deleted files, while staged changes stay untouched.
