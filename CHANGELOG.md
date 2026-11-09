@@ -6,6 +6,10 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- A Fetch button in the toolbar, next to Pull: fetches all remotes
+  (`git fetch --all --prune`) without merging anything.
+
 ## [0.4.0] - 2026-11-09
 
 ### Added
