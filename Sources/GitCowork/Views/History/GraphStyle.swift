@@ -47,6 +47,8 @@ enum GraphStyle {
         static let selectedWashAlpha: CGFloat = 0.10   // left of the node on the selected row
         static let hoverAlpha: CGFloat = 0.05
         static let dimFactor: CGFloat = 0.4            // band alpha multiplier for dimmed rows
+        static let headAlpha: CGFloat = 0.34           // the checked-out commit's row, not selected
+        static let headWashAlpha: CGFloat = 0.20       // left of its node, behind the badges
     }
 
     /// Text and node alpha for commits not on the current branch.
@@ -78,6 +80,8 @@ enum GraphStyle {
         static let remoteOnlyAlpha: CGFloat = 0.5
         static let fillDarken: CGFloat = 0.2           // local badges: lane color, slightly darker for text contrast
         static let connectorWidth: CGFloat = 1.5
+        static let headFont = NSFont.systemFont(ofSize: Theme.AppKitFont.caption.pointSize, weight: .bold)
+        static let headOutline: CGFloat = 1.5          // ring around the checked-out branch's badge
         /// The list a row's badges expand into on hover.
         static let listPadding: CGFloat = 4
         static let listSpacing: CGFloat = 4

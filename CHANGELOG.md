@@ -46,6 +46,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   and Pull ▾ keeps its explicit variants.
 - Double-clicking a remote branch checks out its local branch and brings it
   up to date the same way (a new tracking branch if there is none).
+- The checked-out commit stands out in the history: its row has a stronger
+  band in its lane color that reaches under the badges, and its branch badge
+  is bold with a light ring.
 
 ### Fixed
 - A short tag or branch name like `v1` in a narrow Branch / Tag column no

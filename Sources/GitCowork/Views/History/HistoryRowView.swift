@@ -6,6 +6,7 @@ struct HistoryBand {
     let nodeX: CGFloat        // in table coordinates
     let dimmed: Bool
     let showsResting: Bool    // false for WIP rows: band only when selected or hovered
+    var isHead = false        // the checked-out commit: a stronger band, out to the badges
 }
 
 /// Row background: a lane-colored band from the commit's node to the right
@@ -54,6 +55,14 @@ final class HistoryRowView: NSTableRowView {
             bounds.fill()
         }
         guard let band, !isSelected else { return }
+        if band.isHead {
+            // Like GitKraken: the checked-out row stands out across the whole width.
+            band.color.withAlphaComponent(GraphStyle.Band.headWashAlpha).setFill()
+            NSRect(x: 0, y: GraphStyle.Band.verticalInset, width: band.nodeX,
+                   height: bounds.height - GraphStyle.Band.verticalInset * 2).fill()
+            fillBand(band, alpha: hovered ? GraphStyle.Band.headAlpha + 0.06 : GraphStyle.Band.headAlpha)
+            return
+        }
         var alpha = band.showsResting ? GraphStyle.Band.alpha : 0
         if hovered && !band.showsResting { alpha = GraphStyle.Band.alpha }
         if band.dimmed { alpha *= GraphStyle.Band.dimFactor }

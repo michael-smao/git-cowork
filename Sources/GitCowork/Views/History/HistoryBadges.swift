@@ -40,8 +40,11 @@ enum BadgePainter {
         return style.hPadding * 2 + leading + trailing
     }
 
+    /// The checked-out branch's name is bold.
+    private static func font(for badge: GraphBadge) -> NSFont { badge.isHead ? style.headFont : style.font }
+
     static func nameWidth(_ badge: GraphBadge) -> CGFloat {
-        ceil((badge.name as NSString).size(withAttributes: [.font: style.font]).width)
+        ceil((badge.name as NSString).size(withAttributes: [.font: font(for: badge)]).width)
     }
 
     static func fullWidth(_ badge: GraphBadge) -> CGFloat { chromeWidth(badge) + nameWidth(badge) }
@@ -54,13 +57,20 @@ enum BadgePainter {
         let isStrong = badge.isLocal
         let fill: NSColor = isStrong ? GraphStyle.badgeFill(lane) : lane.withAlphaComponent(style.remoteOnlyAlpha)
         let fg: NSColor = isStrong ? GraphStyle.readableText(on: fill) : .labelColor
-        let attrs: [NSAttributedString.Key: Any] = [.font: style.font, .foregroundColor: fg, .paragraphStyle: truncating]
+        let attrs: [NSAttributedString.Key: Any] = [.font: font(for: badge), .foregroundColor: fg, .paragraphStyle: truncating]
 
         let rect = NSRect(x: x, y: midY - style.height / 2, width: chromeWidth(badge) + textWidth, height: style.height)
         let path = NSBezierPath(roundedRect: rect, xRadius: Theme.Radius.badge, yRadius: Theme.Radius.badge)
         fill.setFill()
         path.fill()
-        if !isStrong {
+        if badge.isHead {
+            // The checked-out branch: a light ring, so it reads at a glance.
+            let ring = NSBezierPath(roundedRect: rect.insetBy(dx: -style.headOutline / 2, dy: -style.headOutline / 2),
+                                    xRadius: Theme.Radius.badge + 1, yRadius: Theme.Radius.badge + 1)
+            ring.lineWidth = style.headOutline
+            NSColor.labelColor.withAlphaComponent(0.85).setStroke()
+            ring.stroke()
+        } else if !isStrong {
             lane.setStroke()
             path.lineWidth = 1
             path.stroke()
