@@ -26,6 +26,9 @@ public struct UndoRecord: Hashable, Sendable {
         case checkout
         /// A local branch, with the commit it pointed at and its upstream.
         case deleteBranch(name: String, sha: String, upstream: String?)
+        /// Discarded working-copy changes of `paths`, saved first in a commit
+        /// (`snapshot`) that no branch points at; its tree is the working copy.
+        case discard(snapshot: String, paths: [String])
     }
 
     public let action: Action
@@ -45,7 +48,7 @@ public struct UndoRecord: Hashable, Sendable {
                   before.branch == after.branch else { return nil }
         case .checkout:
             guard before.sha != nil, before != after else { return nil }
-        case .deleteBranch:
+        case .deleteBranch, .discard:
             break
         }
         self.action = action
@@ -62,6 +65,7 @@ public struct UndoRecord: Hashable, Sendable {
         case .reset: "Undo Reset"
         case .checkout: "Undo Checkout"
         case .deleteBranch: "Undo Delete Branch"
+        case .discard: "Undo Discard"
         }
     }
 
@@ -74,6 +78,14 @@ public struct UndoRecord: Hashable, Sendable {
                 commands.append(["branch", "--set-upstream-to=\(upstream)", name])
             }
             return .ready(commands)
+        }
+        if case .discard(let snapshot, let paths) = action {
+            // The changes were made on this commit; on another one they may not fit.
+            guard repo.head == after else { return .blocked("HEAD moved since.") }
+            guard !repo.operationInProgress else { return .blocked("A merge, rebase, cherry-pick or revert is in progress.") }
+            // Only the working tree: staged changes were never touched. Files
+            // missing from the snapshot (deleted before) are deleted again.
+            return .ready([["restore", "--source=\(snapshot)", "--worktree", "--"] + paths])
         }
 
         // Everything else moved HEAD: only undo while HEAD is still where it was left.
@@ -103,7 +115,7 @@ public struct UndoRecord: Hashable, Sendable {
                 return .ready([["switch", branch]])
             }
             return .ready([["switch", "--detach", old]])
-        case .deleteBranch:
+        case .deleteBranch, .discard:
             return .blocked("")   // handled above
         }
     }

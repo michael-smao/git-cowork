@@ -96,7 +96,7 @@ private struct CenterColumn: View {
     var body: some View {
         let diff = model.openDiff
         let mode = model.centerMode
-        ZStack {
+        ZStack(alignment: .bottom) {
             // Kept alive under a diff so the graph keeps its scroll position.
             if mode == .history {
                 HistoryCenter(model: model, openHere: openHere, openInNewTab: openInNewTab)
@@ -116,6 +116,72 @@ private struct CenterColumn: View {
                 DiffPane(model: model, target: diff)
                     .background(Color(nsColor: .textBackgroundColor))
             }
+            UndoHint(model: model)
+                .padding(.bottom, Theme.Space.l)
+        }
+    }
+}
+
+/// "Committed · Undo" for a few seconds after an action Edit > Undo can take
+/// back, so it's clear that it can (and how). Goes away by itself.
+private struct UndoHint: View {
+    let model: RepoModel
+    @State private var shown: UndoRecord?
+    @State private var hide: Task<Void, Never>?
+
+    var body: some View {
+        ZStack {
+            if let record = shown, model.lastUndo == record {
+                HStack(spacing: Theme.Space.m) {
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.Status.success)
+                    Text(verbatim: record.doneText).font(Theme.Font.body.weight(.medium))
+                    Button("Undo") {
+                        shown = nil
+                        Task { await model.undoLastAction() }
+                    }
+                    .buttonStyle(ActionButtonStyle.secondary())
+                    .disabled(model.undoTitle == nil || model.busy != nil)
+                    Text(verbatim: "⌘Z").font(Theme.Font.small).foregroundStyle(.tertiary)
+                    Button {
+                        shown = nil
+                    } label: {
+                        Image(systemName: "xmark").font(.system(size: 9, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Hide")
+                }
+                .padding(.horizontal, Theme.Space.l)
+                .padding(.vertical, Theme.Space.s)
+                .background(.regularMaterial, in: Capsule())
+                .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08)))
+                .shadow(color: .black.opacity(0.18), radius: 8, y: 2)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: shown)
+        .onChange(of: model.lastUndo) { _, record in
+            hide?.cancel()
+            shown = record
+            guard record != nil else { return }
+            hide = Task {
+                try? await Task.sleep(for: .seconds(8))
+                if !Task.isCancelled { shown = nil }
+            }
+        }
+    }
+}
+
+extension UndoRecord {
+    /// What just happened, for the undo hint.
+    var doneText: String {
+        switch action {
+        case .commit: L("Committed")
+        case .amend: L("Amended the last commit")
+        case .reset: L("Reset the branch")
+        case .checkout: L("Switched")
+        case .deleteBranch(let name, _, _): String(localized: "Deleted \(name)")
+        case .discard: L("Discarded the changes")
         }
     }
 }
