@@ -6,6 +6,10 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Changed
+- The history scrolls to the checked-out branch when it opens and after a
+  checkout, instead of always starting at the newest commit.
+
 ## [0.4.0] - 2026-11-09
 
 ### Added
