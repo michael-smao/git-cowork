@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-09
+
 ### Added
 - Hovering a commit's branch and tag badges in the graph, when names are cut
   or some are behind "+N", shows all of them at full length in a list over the
