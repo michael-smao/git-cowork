@@ -143,7 +143,9 @@
 "Clone Repository…" = "Repository klonen …";
 "Clones into %@/%@" = "Wird nach %1$@/%2$@ geklont";
 "Cloning…" = "Wird geklont …";
+"Close Other Tabs" = "Andere Tabs schließen";
 "Close Review" = "Review schließen";
+"Close Tab" = "Tab schließen";
 "Closed" = "Geschlossen";
 "Co-authors" = "Co-Autoren";
 "Columns" = "Spalten";
