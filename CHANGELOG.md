@@ -36,6 +36,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   or Checkout in the graph, a task's or review's Checkout, Start Task) opens
   that worktree instead of showing an alert: its tab comes to the front, or
   this window switches to it. Changes in this worktree stay where they are.
+- The history scrolls to the checked-out branch when it opens and after a
+  checkout, instead of always starting at the newest commit. With no changes
+  to commit, the commit panel opens on that branch's commit too.
 
 ### Fixed
 - A short tag or branch name like `v1` in a narrow Branch / Tag column no

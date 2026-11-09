@@ -131,6 +131,8 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     private var wipCount = -1
     private var worktreeInfoVersion = -1
     private var revealToken = 0
+    /// HEAD the list last scrolled to (scrollToHeadIfMoved).
+    private var scrolledToHead: String?
     private var applyingSelection = false
     var fittingColumns = false
     /// The user dragged the graph column; stop auto-sizing it.
@@ -194,6 +196,37 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         let reveal = revealToken != self.revealToken
         self.revealToken = revealToken
         applySelection(selection, scroll: reveal)
+        scrollToHeadIfMoved(selection: selection, revealed: reveal)
+    }
+
+    /// Brings the checked-out branch into view when the history first shows
+    /// and whenever HEAD moves (checkout, switching worktree), instead of
+    /// leaving the list at the newest commit. Waits until HEAD's commit is loaded.
+    private func scrollToHeadIfMoved(selection: HistorySelection?, revealed: Bool) {
+        guard !isFiltering, let head = headSHA, head != scrolledToHead, let target = headRow() else { return }
+        let first = scrolledToHead == nil
+        scrolledToHead = head
+        // A reveal or a commit picked before the history loaded wins.
+        if revealed { return }
+        if first, case .commit = selection { return }
+        // After this pass, so the table has its new height.
+        DispatchQueue.main.async { [weak self] in self?.centerIfHidden(target) }
+    }
+
+    /// The working-copy row (it sits right above HEAD), else HEAD's commit.
+    private func headRow() -> Int? {
+        if let wip = rows.firstIndex(of: .wip) { return wip }
+        guard let head = headSHA, let i = commitIndex[head] else { return nil }
+        return rows.firstIndex(of: .commit(i))
+    }
+
+    private func centerIfHidden(_ row: Int) {
+        guard let table, let clip = table.enclosingScrollView?.contentView else { return }
+        let rect = table.rect(ofRow: row)
+        guard !clip.documentVisibleRect.contains(rect) else { return }
+        let maxY = max(0, table.bounds.height - clip.bounds.height)
+        let y = min(maxY, max(0, rect.midY - clip.bounds.height / 2))
+        table.scroll(NSPoint(x: clip.bounds.minX, y: y))
     }
 
     private func redrawWIPRow(onlyMessage: Bool) {
