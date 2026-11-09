@@ -6,6 +6,11 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Fixed
+- In a graph with more lanes than fit, a branch's line ran beside its commits:
+  the nodes were moved to the column's edge, their lines weren't. Lines now
+  move with them.
+
 ## [0.4.0] - 2026-11-09
 
 ### Added
