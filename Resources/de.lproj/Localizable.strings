@@ -765,3 +765,4 @@
 "Revert the merge %@?" = "Den Merge %@ rückgängig machen?";
 "Switched" = "Gewechselt";
 "Undo Discard" = "Verwerfen widerrufen";
+"Reopen repositories at launch" = "Repositorys beim Start wieder öffnen";

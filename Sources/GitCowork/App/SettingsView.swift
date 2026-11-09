@@ -9,6 +9,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.coworkAutoSync) private var coworkAutoSync = true
     @AppStorage(Prefs.Key.autoFetch) private var autoFetch = true
     @AppStorage(Prefs.Key.checkForUpdates) private var checkForUpdates = true
+    @AppStorage(Prefs.Key.reopenRepos) private var reopenRepos = true
 
     var body: some View {
         Form {
@@ -21,6 +22,7 @@ struct SettingsView: View {
                     ForEach(AppLanguage.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                Toggle("Reopen repositories at launch", isOn: $reopenRepos)
                 // Only the built app can reopen itself (and has the translations).
                 if language != AppLanguage.atLaunch, Updater.shared.current != nil {
                     HStack {

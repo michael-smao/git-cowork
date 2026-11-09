@@ -11,6 +11,11 @@ enum Prefs {
         static let terminalApp = "terminalApp"
         static let hostOverrides = "hostOverrides"
         static let recentRepos = "recentRepos"
+        /// Reopen the repositories that were open when the app quit.
+        static let reopenRepos = "session.reopen"
+        /// Repositories open at the last quit, in tab order, and the front one.
+        static let openRepos = "session.openRepos"
+        static let openReposSelected = "session.selected"
         /// Fetch/push refs/cowork/main about once a minute while the app is in front.
         /// (Which remote is `git config cowork.remote` in each repo; see CoworkRemote.)
         static let coworkAutoSync = "cowork.autoSync"
@@ -49,6 +54,7 @@ enum Prefs {
 
     static var coworkAutoSync: Bool { UserDefaults.standard.object(forKey: Key.coworkAutoSync) as? Bool ?? true }
     static var autoFetch: Bool { UserDefaults.standard.object(forKey: Key.autoFetch) as? Bool ?? true }
+    static var reopenRepos: Bool { UserDefaults.standard.object(forKey: Key.reopenRepos) as? Bool ?? true }
     static var checkForUpdates: Bool { UserDefaults.standard.object(forKey: Key.checkForUpdates) as? Bool ?? true }
 
     static var recentRepos: [String] {

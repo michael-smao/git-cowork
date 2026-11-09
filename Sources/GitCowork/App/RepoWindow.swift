@@ -21,6 +21,10 @@ struct RepoWindow: View {
         .environment(\.windowActions, actions)
         .frame(minWidth: 900, minHeight: 500)
         .background(WindowAccessor(host: host))
+        // Remembered for the next launch (OpenSession).
+        .onAppear { OpenSession.track(host, path: path) }
+        .onChange(of: path) { _, new in OpenSession.track(host, path: new) }
+        .onDisappear { OpenSession.untrack(host) }
         // Only an empty (welcome) window takes `open -a git-cowork <dir>`;
         // windows showing a repo decline, so SwiftUI opens a new tab instead.
         .handlesExternalEvents(preferring: path == nil ? ["*"] : [], allowing: path == nil ? ["*"] : [])
@@ -117,6 +121,9 @@ struct RepoWindow: View {
 @MainActor
 enum OpenRepos {
     private static var counts: [String: Int] = [:]
+
+    /// Every open path (resolved), for not opening a restored one twice.
+    static var paths: Set<String> { Set(counts.keys) }
 
     static func isOpen(_ path: String) -> Bool { counts[realPath(path), default: 0] > 0 }
     static func add(_ path: String) { counts[realPath(path), default: 0] += 1 }
