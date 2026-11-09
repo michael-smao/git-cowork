@@ -1,31 +1,29 @@
 import AppKit
 import SwiftUI
 
-/// AppKit-level window chrome: always-visible repo tabs, new tabs, filter focus.
+/// AppKit-level window chrome: repo tabs, new tabs, filter focus.
 @MainActor
 enum WindowChrome {
     static let tabbingIdentifier = "git-cowork.repo"
 
-    /// Called once when a window first appears. The tab bar stays visible even
-    /// with a single repo open, like GitKraken's repo tabs.
+    /// Called once when a window first appears. Adds the repo tab strip, which
+    /// stays visible even with a single repo open, like GitKraken's repo tabs.
     static func configure(_ window: NSWindow) {
         window.tabbingMode = .preferred
         window.tabbingIdentifier = tabbingIdentifier
         // The repository picker shows the name; keep the title for tabs only.
         window.titleVisibility = .hidden
-        // Full-height toolbar, so the icon-over-label buttons and their badges have room.
-        window.toolbarStyle = .unified
+        // Title row on top (the repo tabs go there, next to the traffic lights),
+        // then a full-height toolbar, so the icon-over-label buttons and their
+        // badges have room.
+        window.toolbarStyle = .expanded
+        RepoTabs.shared.install(in: window)
     }
 
-    static func showTabBar(_ window: NSWindow) {
-        guard let group = window.tabGroup, !group.isTabBarVisible else { return }
-        window.toggleTabBar(nil)
-    }
-
-    /// New empty tab (welcome screen) next to the key window. Used by the
-    /// tab bar's "+" and File > New Tab.
-    static func newTab() {
-        WindowAccessor.setPendingParent(NSApp.keyWindow ?? NSApp.mainWindow)
+    /// New empty tab (welcome screen) next to `window`, or the key window.
+    /// Used by the tab strip's "+" and File > New Tab.
+    static func newTab(nextTo window: NSWindow? = nil) {
+        WindowAccessor.setPendingParent(window ?? NSApp.keyWindow ?? NSApp.mainWindow)
         LaunchFolders.newWindow()
     }
 

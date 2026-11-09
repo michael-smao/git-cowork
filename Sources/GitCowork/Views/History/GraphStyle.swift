@@ -16,9 +16,8 @@ enum GraphStyle {
     static let headRingGap: CGFloat = 2.5        // space between node and HEAD ring
     static let headRingWidth: CGFloat = 2
     static let wipDash: [CGFloat] = [3, 2.5]
-    static let maxGraphWidth: CGFloat = 360        // about 14 lanes; wider graphs clip with a fade
+    static let maxGraphWidth: CGFloat = 360        // about 14 lanes; lanes past it share the last slot
     static let nodeRingWidth: CGFloat = 2          // lane-colored ring around the author-colored node
-    static let clipFadeWidth: CGFloat = 14
     static let minGraphWidth: CGFloat = 60
 
     /// Center x of a lane inside the graph column.
@@ -26,8 +25,9 @@ enum GraphStyle {
         graphInset + CGFloat(lane) * laneWidth + laneWidth / 2
     }
 
-    /// Center x of a node in a graph column `width` wide. Lanes past the
-    /// right edge are pinned to the last visible slot so the node never disappears.
+    /// Center x of a lane's nodes and lines in a graph column `width` wide.
+    /// Lanes past the right edge are pinned to the last visible slot, nodes
+    /// and lines alike, so a branch's line always runs through its nodes.
     static func nodeX(_ lane: Int, width: CGFloat) -> CGFloat {
         max(x(0), min(x(lane), width - laneWidth / 2))
     }
@@ -82,6 +82,9 @@ enum GraphStyle {
         static let connectorWidth: CGFloat = 1.5
         static let headFont = NSFont.systemFont(ofSize: Theme.AppKitFont.caption.pointSize, weight: .bold)
         static let headOutline: CGFloat = 1.5          // ring around the checked-out branch's badge
+        /// The list a row's badges expand into on hover.
+        static let listPadding: CGFloat = 4
+        static let listSpacing: CGFloat = 4
     }
 
     enum WIP {

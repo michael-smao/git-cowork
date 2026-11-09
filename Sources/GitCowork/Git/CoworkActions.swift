@@ -14,14 +14,27 @@ extension RepoModel {
 
     /// "Start Task": checks out the task's branch (an existing local one, else
     /// tracking the remote one, else a new one from the base branch), links
-    /// it, moves the task to In Progress and assigns it to me.
+    /// it, moves the task to In Progress and assigns it to me. When another
+    /// worktree has the branch checked out, starts the task and opens that
+    /// worktree instead.
     func startTask(_ id: String) {
         guard let t = cowork.task(id) else { return }
         guard let name = TaskStart.branchName(for: t) else {
             alert = AlertItem(title: L("Start task failed"), message: String(localized: "\(t.id) has no usable branch name."))
             return
         }
-        if refuseIfCheckedOutElsewhere(name) { return }
+        if let wt = worktree(holding: name) {
+            guard let openWorktree else {
+                _ = refuseIfCheckedOutElsewhere(name)
+                return
+            }
+            // Saved first: this window may show the other worktree next.
+            Task {
+                await cowork.markStarted(id, branch: name)
+                openWorktree(wt.path)
+            }
+            return
+        }
         let args = TaskStart.plan(branch: name, hasLocal: localBranch(named: name) != nil,
                                   remoteBranch: remoteBranch(named: name)?.name, base: baseBranch()?.ref ?? "HEAD")
         Task {

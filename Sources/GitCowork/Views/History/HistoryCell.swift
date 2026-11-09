@@ -25,10 +25,6 @@ final class HistoryCell: NSTableCellView {
         self.column = column
         self.row = row
         toolTip = nil
-        if column == .refs, row < coordinator.rows.count, case .commit(let i) = coordinator.rows[row] {
-            let names = coordinator.badges(forCommit: i).flatMap(\.refNames)
-            if !names.isEmpty { toolTip = names.joined(separator: "\n") }
-        }
         if column == .message, row < coordinator.rows.count, case .commit(let i) = coordinator.rows[row] {
             let info = coordinator.cowork(forCommit: i)
             if !info.isEmpty { toolTip = info.tooltip }
@@ -92,7 +88,6 @@ final class HistoryCell: NSTableCellView {
             if let g, !coordinator.isFiltering {
                 drawLines(g.lines)
                 for join in coordinator.wipJoins[i] ?? [] { drawWIPJoin(join, into: cx) }
-                drawClipFade(lanes: g.laneCount)
             }
             drawNode(cx: cx, color: color, author: coordinator.authorColor(commit.authorEmail),
                      initials: coordinator.initials(commit.authorName),
@@ -120,7 +115,7 @@ final class HistoryCell: NSTableCellView {
         for lane in w.passThrough {
             let path = NSBezierPath()
             path.lineWidth = width
-            let x = GraphStyle.x(lane.lane)
+            let x = GraphStyle.nodeX(lane.lane, width: bounds.width)
             if lane.lane == w.lane {
                 path.move(to: NSPoint(x: x, y: 0))
                 path.line(to: NSPoint(x: x, y: midY - r))
@@ -139,7 +134,7 @@ final class HistoryCell: NSTableCellView {
             let path = NSBezierPath()
             path.lineWidth = 2
             path.setLineDash(GraphStyle.wipDash, count: GraphStyle.wipDash.count, phase: 0)
-            let x = GraphStyle.x(other.lane)
+            let x = GraphStyle.nodeX(other.lane, width: bounds.width)
             path.move(to: NSPoint(x: x, y: 0))
             path.line(to: NSPoint(x: x, y: bounds.height))
             Theme.lane(other.color).withAlphaComponent(0.6).setStroke()
@@ -232,77 +227,18 @@ final class HistoryCell: NSTableCellView {
     // MARK: Branch / Tag column
 
     private func drawBadges(_ badges: [GraphBadge], lane: NSColor) {
-        guard let badge = badges.first else { return }
-        let style = GraphStyle.Badge.self
-        let pad = style.hPadding
-        let lead = Theme.Metrics.panelPadding   // same inset as the column title and other panels
-        let maxX = bounds.width - pad
-        let h = style.height
-        let top = midY - h / 2
-
-        let remaining = badges.count - 1
-        let more = remaining > 0 ? "+\(remaining)" : nil
-        let moreAttrs: [NSAttributedString.Key: Any] = [.font: style.moreFont, .foregroundColor: NSColor.secondaryLabelColor]
-        let moreWidth = more.map { ($0 as NSString).size(withAttributes: moreAttrs).width + 10 + style.gap } ?? 0
-
-        let isStrong = badge.isLocal
-        let fill: NSColor = isStrong ? GraphStyle.badgeFill(lane) : lane.withAlphaComponent(style.remoteOnlyAlpha)
-        let fg: NSColor = isStrong ? GraphStyle.readableText(on: fill) : .labelColor
-        let attrs: [NSAttributedString.Key: Any] = [.font: badge.isHead ? style.headFont : style.font, .foregroundColor: fg,
-                                                    .paragraphStyle: Self.truncating]
-
-        let leading = badge.leadingIcon
-        let trailing = badge.trailingIcons
-        let leadingWidth = leading.map { GraphSymbols.width($0, size: style.iconSize) + style.iconSpacing } ?? 0
-        let trailingWidth = trailing.reduce(0) { $0 + style.iconSpacing + GraphSymbols.width($1, size: style.iconSize) }
-        let nameWidth = (badge.name as NSString).size(withAttributes: attrs).width
-        let available = maxX - lead - moreWidth - leadingWidth - trailingWidth - pad * 2
-        let textWidth = min(nameWidth, max(available, 0))
-
-        var x = lead
-        let fits = textWidth >= 20
-        if fits {
-            let rect = NSRect(x: x, y: top, width: pad * 2 + leadingWidth + textWidth + trailingWidth, height: h)
-            let path = NSBezierPath(roundedRect: rect, xRadius: Theme.Radius.badge, yRadius: Theme.Radius.badge)
-            fill.setFill()
-            path.fill()
-            if badge.isHead {
-                // The checked-out branch: a light ring, so it reads at a glance.
-                let ring = NSBezierPath(roundedRect: rect.insetBy(dx: -style.headOutline / 2, dy: -style.headOutline / 2),
-                                        xRadius: Theme.Radius.badge + 1, yRadius: Theme.Radius.badge + 1)
-                ring.lineWidth = style.headOutline
-                NSColor.labelColor.withAlphaComponent(0.85).setStroke()
-                ring.stroke()
-            } else if !isStrong {
-                lane.setStroke()
-                path.lineWidth = 1
-                path.stroke()
-            }
-            var cx = rect.minX + pad
-            if let leading {
-                cx += GraphSymbols.draw(leading, x: cx, midY: midY, size: style.iconSize, color: fg) + style.iconSpacing
-            }
-            let th = (badge.name as NSString).size(withAttributes: attrs).height
-            (badge.name as NSString).draw(with: NSRect(x: cx, y: midY - th / 2, width: textWidth, height: th),
-                                          options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine], attributes: attrs)
-            cx += textWidth
-            for icon in trailing {
-                cx += style.iconSpacing
-                cx += GraphSymbols.draw(icon, x: cx, midY: midY, size: style.iconSize, color: fg.withAlphaComponent(0.9))
-            }
-            x = rect.maxX + style.gap
+        guard let badge = badges.first, let layout = BadgePainter.layout(badges, width: bounds.width) else { return }
+        let fit = layout.fit
+        // Hovering expands hidden badges into a list (HistoryBadgeHover), so the
+        // tooltip is only for rows that show everything.
+        let tip: String? = fit.hidesSomething ? nil : badges.flatMap(\.refNames).joined(separator: "\n")
+        if toolTip != tip { toolTip = tip }
+        var x = BadgePainter.lead
+        if fit.showsFirst {
+            x = BadgePainter.draw(badge, x: x, midY: midY, textWidth: fit.textWidth, lane: lane).maxX + GraphStyle.Badge.gap
         }
-        // Too narrow for the first badge: everything goes into the counter.
-        let counter = fits ? more : "+\(badges.count)"
-        if let more = counter {
-            let s = more as NSString
-            let size = s.size(withAttributes: moreAttrs)
-            let rect = NSRect(x: x, y: top + 2, width: size.width + 10, height: h - 4)
-            let path = NSBezierPath(roundedRect: rect, xRadius: Theme.Radius.badge, yRadius: Theme.Radius.badge)
-            lane.withAlphaComponent(0.22).setFill()
-            path.fill()
-            s.draw(at: NSPoint(x: rect.midX - size.width / 2, y: midY - size.height / 2), withAttributes: moreAttrs)
-            x = rect.maxX
+        if let counter = fit.counter {
+            x = BadgePainter.drawCounter(counter, x: x, midY: midY, lane: lane).maxX
         }
         drawConnector(from: x, to: bounds.width, color: lane)
     }

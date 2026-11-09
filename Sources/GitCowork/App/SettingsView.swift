@@ -68,7 +68,9 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .onChange(of: appearance) { _, new in new.apply() }
         .onChange(of: language) { _, new in new.save() }
+        // Fixed width, flexible height: the form scrolls when the window is
+        // shorter than it (on smaller screens it is taller than the screen).
         .frame(width: 520)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(minHeight: 360, idealHeight: 720, maxHeight: .infinity)
     }
 }

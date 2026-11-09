@@ -26,7 +26,7 @@ struct RepoView: View {
                         // Not under the tab bar: only the panel itself is tinted.
                         .background(Theme.sidebarBackground, ignoresSafeAreaEdges: [])
                 }
-                CenterColumn(model: model)
+                CenterColumn(model: model, openHere: openHere, openInNewTab: openInNewTab)
                     .frame(minWidth: Layout.centerMin, idealWidth: Layout.centerIdeal, maxWidth: .infinity, maxHeight: .infinity)
                 InspectorColumn(model: model)
                     .frame(minWidth: Layout.inspectorMin, idealWidth: Layout.inspectorIdeal, maxWidth: Layout.inspectorMax, maxHeight: .infinity)
@@ -43,6 +43,7 @@ struct RepoView: View {
         .searchable(text: $model.filterText, placement: .toolbar, prompt: "Filter commits")
         .navigationTitle(title)
         .modifier(HideToolbarTitle())
+        .background(RepoTabLabelReporter(label: tabLabel))
         .modifier(RepoDialogs(model: model, openInNewTab: openInNewTab))
         .focusedSceneValue(\.repoModel, model)
     }
@@ -59,10 +60,15 @@ struct RepoView: View {
         static let inspectorMax: CGFloat = 680
     }
 
-    /// Window and tab title: "repo", or "repo · folder" for a linked worktree.
+    /// Window title: "repo", or "repo · folder" for a linked worktree.
     private var title: String {
+        tabLabel.worktree.map { "\(model.name) · \($0)" } ?? model.name
+    }
+
+    /// The tab shows the same, with the folder in a quieter style.
+    private var tabLabel: RepoTabLabel {
         let isMain = model.mainWorktreePath == nil || model.mainWorktreePath == model.root.path
-        return isMain ? model.name : "\(model.name) · \(model.root.lastPathComponent)"
+        return RepoTabLabel(name: model.name, worktree: isMain ? nil : model.root.lastPathComponent)
     }
 }
 
@@ -84,6 +90,8 @@ private struct SidebarColumn: View, Equatable {
 /// is showing; Esc (which clears `openDiff`) returns to it.
 private struct CenterColumn: View {
     let model: RepoModel
+    let openHere: (String) -> Void
+    let openInNewTab: (String) -> Void
 
     var body: some View {
         let diff = model.openDiff
@@ -91,7 +99,7 @@ private struct CenterColumn: View {
         ZStack {
             // Kept alive under a diff so the graph keeps its scroll position.
             if mode == .history {
-                HistoryCenter(model: model)
+                HistoryCenter(model: model, openHere: openHere, openInNewTab: openInNewTab)
                     .opacity(diff == nil ? 1 : 0)
                     .allowsHitTesting(diff == nil)
             } else if diff == nil {
@@ -113,6 +121,8 @@ private struct CenterColumn: View {
 /// so only this view (and the table it wraps) updates for them.
 private struct HistoryCenter: View {
     let model: RepoModel
+    let openHere: (String) -> Void
+    let openInNewTab: (String) -> Void
 
     var body: some View {
         HistoryTable(
@@ -123,7 +133,9 @@ private struct HistoryCenter: View {
             selection: model.selection,
             revealToken: model.revealToken,
             worktreeInfoVersion: model.worktreeInfoVersion,
-            draftSummary: model.draftSummary)
+            draftSummary: model.draftSummary,
+            openHere: openHere,
+            openInNewTab: openInNewTab)
     }
 }
 
@@ -191,6 +203,9 @@ private struct RepoDialogs: ViewModifier {
             }
             .alert(Text(ui: model.confirmation?.title ?? ""), isPresented: isPresented(\.confirmation), presenting: model.confirmation) { c in
                 Button(L(c.confirmTitle), role: c.destructive ? .destructive : nil) { Task { await c.action() } }
+                if let title = c.alternativeTitle, let alternative = c.alternative {
+                    Button(title) { Task { await alternative() } }
+                }
                 Button("Cancel", role: .cancel) {}
             } message: { c in
                 Text(ui: c.message)
