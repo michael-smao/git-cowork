@@ -78,6 +78,9 @@ enum GraphStyle {
         static let remoteOnlyAlpha: CGFloat = 0.5
         static let fillDarken: CGFloat = 0.2           // local badges: lane color, slightly darker for text contrast
         static let connectorWidth: CGFloat = 1.5
+        /// The list a row's badges expand into on hover.
+        static let listPadding: CGFloat = 4
+        static let listSpacing: CGFloat = 4
     }
 
     enum WIP {

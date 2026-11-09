@@ -155,6 +155,16 @@ struct SidebarMenu: View {
 
     @ViewBuilder
     private func worktree(_ wt: Worktree) -> some View {
+        if WorktreeRemovals.shared.contains(wt.path) {
+            Button("Removing…") {}.disabled(true)
+            Button("Copy Path") { External.copy(wt.path) }
+        } else {
+            worktreeActions(wt)
+        }
+    }
+
+    @ViewBuilder
+    private func worktreeActions(_ wt: Worktree) -> some View {
         if !model.sidebarIsCurrent(wt) {
             Button("Open Here") { openHere(wt.path) }
             Button("Open in New Tab") { openInNewTab(wt.path) }
@@ -171,8 +181,9 @@ struct SidebarMenu: View {
         if !wt.isMain {
             Divider()
             Button("Prune Stale Worktrees") { Task { await model.pruneWorktrees() } }
-            Button("Remove Worktree…", role: .destructive) { model.removeWorktree(wt) }
-                .disabled(model.sidebarIsCurrent(wt))
+            // This window's own worktree too: it then moves to the main worktree.
+            Button("Remove Worktree…", role: .destructive) { model.removeWorktree(wt, leave: openHere) }
+                .disabled(model.sidebarIsCurrent(wt) && !model.canLeaveForMainWorktree)
         }
     }
 
