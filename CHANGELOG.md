@@ -19,6 +19,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - Removing a worktree runs in the background: its row shows "Removing…" right
   away in every tab of the repository, and the rest of the app stays usable
   while git deletes the folder.
+- A Fetch button in the toolbar, next to Pull: fetches all remotes
+  (`git fetch --all --prune`) without merging anything.
 
 ### Changed
 - Repository tabs sit in their own row at the top of the window, next to the

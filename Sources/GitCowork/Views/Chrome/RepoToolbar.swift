@@ -1,7 +1,7 @@
 import GitCoworkCore
 import SwiftUI
 
-/// repository ▾ > worktree ▾ > branch ▾  History|Board|Reviews  ·  Pull ▾ Push ▾ Branch Worktree Stash Pop | Terminal Editor  ·  inbox, filter
+/// repository ▾ > worktree ▾ > branch ▾  History|Board|Reviews  ·  Fetch Pull ▾ Push ▾ Branch Worktree Stash Pop | Terminal Editor  ·  inbox, filter
 ///
 /// Every item is its own small view, so each one only re-renders when the
 /// model values it reads change (not on every keystroke elsewhere).
@@ -97,6 +97,10 @@ private struct ActionButtons: View {
 
     var body: some View {
         HStack(spacing: Theme.Space.s) {
+            ChromeButton(title: "Fetch", symbol: "arrow.triangle.2.circlepath",
+                         help: L("Fetch all remotes (git fetch --all --prune, ⇧⌘F)"), disabled: busy) {
+                Task { await model.fetch() }
+            }
             ChromeSplitButton(title: "Pull", symbol: "arrow.down.to.line", badge: model.status.behind,
                               help: pullHelp, disabled: busy) {
                 Task { await model.pull() }

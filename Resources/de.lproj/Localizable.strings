@@ -243,6 +243,8 @@
 "Enter this code on %@ and approve git-cowork:" = "Gib diesen Code auf %@ ein und erlaube git-cowork den Zugriff:";
 "Everyone" = "Alle";
 "Executable" = "Programm";
+"Fetch" = "Fetch";
+"Fetch all remotes (git fetch --all --prune, ⇧⌘F)" = "Alle Remotes abrufen (git fetch --all --prune, ⇧⌘F)";
 "Fetch All" = "Alle abrufen (Fetch)";
 "Fetch automatically" = "Automatisch abrufen (Fetch)";
 "Fetch, push, commit and other actions show up here with git's output." = "Fetch, Push, Commit und andere Aktionen erscheinen hier mit der Ausgabe von git.";
