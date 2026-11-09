@@ -10,6 +10,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - Discarding changes can be undone: Edit > Undo (⌘Z) brings them back,
   including new and deleted files, while staged changes stay untouched.
   A snapshot is saved before discarding; nothing is added to the stash list.
+  Once those files are edited again, Undo refuses instead of overwriting the
+  new edits.
 - A short "Committed · Undo" hint after anything Edit > Undo can take back
   (commit, amend, reset, checkout, branch delete, discard).
 - Reverting or cherry-picking a merge commit asks once and uses the side it

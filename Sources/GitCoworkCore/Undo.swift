@@ -38,6 +38,21 @@ public struct UndoRecord: Hashable, Sendable {
     /// A hard reset can only be undone while this is unchanged.
     public let afterChanges: Set<String>
 
+    /// Whether the working copy (not the index) has a change at one of
+    /// `paths` or inside one of them (an untracked folder like "new/").
+    /// `changes` holds WorkingStatus.changeKeys: "area:status:path".
+    static func workingCopyTouches(_ paths: [String], in changes: Set<String>) -> Bool {
+        changes.contains { key in
+            let parts = key.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false)
+            guard parts.count == 3, parts[0] != ChangeArea.staged.rawValue else { return false }
+            let path = String(parts[2])
+            return paths.contains { p in
+                path == p || path.hasPrefix(p.hasSuffix("/") ? p : p + "/")
+                    || (p.hasSuffix("/") && path + "/" == p)
+            }
+        }
+    }
+
     /// Nil when the action left nothing that can be taken back safely:
     /// HEAD didn't move, the commit was the first one, or the branch changed
     /// underneath (which these actions never do).
@@ -83,6 +98,11 @@ public struct UndoRecord: Hashable, Sendable {
             // The changes were made on this commit; on another one they may not fit.
             guard repo.head == after else { return .blocked("HEAD moved since.") }
             guard !repo.operationInProgress else { return .blocked("A merge, rebase, cherry-pick or revert is in progress.") }
+            // Discard left these files as the index has them. Edited (or
+            // created) again since, restoring would silently overwrite that.
+            guard !Self.workingCopyTouches(paths, in: repo.changes) else {
+                return .blocked("Some of these files were changed again since. Undo would overwrite those changes.")
+            }
             // Only the working tree: staged changes were never touched. Files
             // missing from the snapshot (deleted before) are deleted again.
             return .ready([["restore", "--source=\(snapshot)", "--worktree", "--"] + paths])

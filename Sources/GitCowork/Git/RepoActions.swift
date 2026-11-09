@@ -477,7 +477,7 @@ extension RepoModel {
         let names = changes.count == 1 ? changes[0].path : String(localized: "\(changes.count) files")
         confirmation = Confirmation(
             title: String(localized: "Discard changes to \(names)?"),
-            message: L("Edit > Undo brings them back until you commit or switch branches."),
+            message: L("Edit > Undo brings them back until you edit them again, commit or switch branches."),
             confirmTitle: "Discard"
         ) { [weak self] in
             guard let self else { return }

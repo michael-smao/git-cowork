@@ -758,7 +758,7 @@
 "Committed" = "Committet";
 "Deleted %@" = "%@ gelöscht";
 "Discarded the changes" = "Änderungen verworfen";
-"Edit > Undo brings them back until you commit or switch branches." = "Bearbeiten > Widerrufen holt sie zurück, bis du committest oder den Branch wechselst.";
+"Edit > Undo brings them back until you edit them again, commit or switch branches." = "Bearbeiten > Widerrufen holt sie zurück, bis du sie erneut änderst, committest oder den Branch wechselst.";
 "Hide" = "Ausblenden";
 "Reset the branch" = "Branch zurückgesetzt";
 "Revert" = "Revert";

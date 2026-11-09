@@ -29,6 +29,18 @@ private func head(_ sha: String?, _ branch: String? = "main") -> HeadState { Hea
         #expect(r.check(in: UndoContext(head: head(a), operationInProgress: true)).commands == nil)
     }
 
+    @Test func discardRefusesOnceItsFilesChangedAgain() throws {
+        let r = try #require(UndoRecord(action: .discard(snapshot: c, paths: ["x.txt", "new/"]), before: head(a), after: head(a)))
+        // Staged changes to the same file and edits to other files don't count.
+        #expect(r.check(in: UndoContext(head: head(a), changes: ["staged:M:x.txt", "unstaged:M:other.txt"])).commands != nil)
+        // x.txt edited again, or something new in the discarded folder: refused.
+        #expect(r.check(in: UndoContext(head: head(a), changes: ["unstaged:M:x.txt"])).commands == nil)
+        #expect(r.check(in: UndoContext(head: head(a), changes: ["untracked:?:new/a.txt"])).commands == nil)
+        #expect(r.check(in: UndoContext(head: head(a), changes: ["untracked:?:new/"])).commands == nil)
+        // A path that only starts the same way isn't one of them.
+        #expect(r.check(in: UndoContext(head: head(a), changes: ["unstaged:M:x.txt.bak", "untracked:?:newer.txt"])).commands != nil)
+    }
+
     @Test func firstCommitIsNotUndoable() {
         #expect(UndoRecord(action: .commit, before: head(nil), after: head(a)) == nil)
     }

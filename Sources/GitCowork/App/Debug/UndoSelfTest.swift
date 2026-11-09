@@ -213,6 +213,26 @@ enum UndoSelfTest {
         check(FileManager.default.fileExists(atPath: repo.appendingPathComponent("new.txt").path), "undo discard brings the new file back")
         check(await sh(["diff", "--cached", "--name-only"], in: repo) == "a.txt", "undo discard leaves the index alone")
 
+        print("8. undo discard refuses once the file was edited again")
+        await model.refresh()
+        let again = model.status.unstaged.filter { $0.path == "a.txt" }
+        model.discard(again)
+        await settle(model) { model.confirmation != nil }
+        await model.confirmation?.action()
+        model.confirmation = nil
+        write("staged\nnewer edit\n", "a.txt", in: repo)
+        await model.refresh()
+        check(model.undoTitle == nil, "menu offers no Undo Discard")
+        model.alert = nil
+        await model.undoLastAction()
+        let kept = (try? String(contentsOf: repo.appendingPathComponent("a.txt"), encoding: .utf8)) == "staged\nnewer edit\n"
+        check(kept, "the newer edit is kept")
+        await sh(["checkout", "--", "a.txt"], in: repo)
+        await sh(["reset", "-q", "--", "a.txt"], in: repo)
+        await sh(["checkout", "--", "a.txt"], in: repo)
+        try? FileManager.default.removeItem(at: repo.appendingPathComponent("new.txt"))
+        await model.refresh()
+
         let log = CommandLog.shared.entries.map(\.commandLine)
         check(log.contains("git reset --soft \(c1)"), "undo shows in the command log")
         model.stopWatching()
