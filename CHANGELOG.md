@@ -6,6 +6,15 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Hovering a commit's branch and tag badges in the graph, when names are cut
+  or some are behind "+N", shows all of them at full length in a list over the
+  rows below. Click it to select the commit; right-click for the commit's menu.
+
+### Fixed
+- A short tag or branch name like `v1` in a narrow Branch / Tag column no
+  longer folds into "+1" when it fits.
+
 ## [0.4.0] - 2026-11-09
 
 ### Added
