@@ -35,6 +35,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - A short tag or branch name like `v1` in a narrow Branch / Tag column no
   longer folds into "+1" when it fits.
 - After removing a worktree, its "// WIP" row could stay in the graph.
+- Settings scroll when they are taller than the window, and the window can be
+  made taller. Before, the lower sections could not be reached on smaller screens.
 
 ## [0.4.0] - 2026-11-09
 
