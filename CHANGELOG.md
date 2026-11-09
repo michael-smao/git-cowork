@@ -6,11 +6,25 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Hovering a commit's branch and tag badges in the graph, when names are cut
+  or some are behind "+N", shows all of them at full length in a list over the
+  rows below. Click it to select the commit; right-click for the commit's menu.
+
 ### Changed
+- Repository tabs sit in their own row at the top of the window, next to the
+  traffic lights, like GitKraken's, and are always shown, even with one
+  repository open. Each tab shows the repository (and the folder of a linked
+  worktree); click to switch, × or middle-click to close, + for a new tab.
+  Before, the tabs could be missing altogether.
 - The repository menu in the toolbar lists only repositories (this one and
   recent ones), like GitKraken. Worktrees get their own picker between
   repository and branch, shown when a repository has more than one: switch,
   open one in a new tab, or add one.
+
+### Fixed
+- A short tag or branch name like `v1` in a narrow Branch / Tag column no
+  longer folds into "+1" when it fits.
 
 ## [0.4.0] - 2026-11-09
 
