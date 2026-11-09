@@ -23,6 +23,10 @@ enum DebugSnapshot {
             let parts = run.split(separator: "|", maxSplits: 1).map(String.init)
             if parts.count == 2 { await model.perform(parts[0], parts[1].split(separator: " ").map(String.init)) }
         }
+        // GITCOWORK_DEBUG_COMMIT = "message": Stage All and Commit (shows the undo hint).
+        if let message = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_COMMIT"] {
+            _ = await model.stageAllAndCommit(message: message)
+        }
         // GITCOWORK_DEBUG_PUSH = "1": the toolbar's Push.
         if ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_PUSH"] != nil { await model.push() }
         guard let sel = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_SELECT"] else { return }

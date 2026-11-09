@@ -74,7 +74,7 @@ keys = code_keys()
 tr = translations(LANG)
 # Task status names and undo titles come from GitCoworkCore and are looked up with L(title).
 extra = {"Backlog", "To Do", "In Progress", "In Review", "Done",
-         "Undo Commit", "Undo Amend", "Undo Reset", "Undo Checkout", "Undo Delete Branch"}
+         "Undo Commit", "Undo Amend", "Undo Reset", "Undo Checkout", "Undo Delete Branch", "Undo Discard"}
 missing = sorted(k for k in set(keys) | extra
                  if k not in tr and k not in KEEP and k not in COMMIT_MESSAGES and not SAME.match(k))
 bad = sorted(k for k, v in tr.items() if placeholders(k) != placeholders(v))

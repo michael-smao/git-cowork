@@ -373,12 +373,33 @@ extension RepoModel {
 
     // MARK: Commits
 
+    /// A merge commit has two parents, so git needs to know which side counts
+    /// as "before" (`-m`). Like GitKraken and Fork: the first parent, the
+    /// branch that was merged into, which is what you mean almost always.
     func cherryPick(_ sha: String) async {
-        await perform("Cherry-pick", ["cherry-pick", sha])
+        guard commit(sha)?.isMerge == true else {
+            await perform("Cherry-pick", ["cherry-pick", sha])
+            return
+        }
+        let subject = commit(sha)?.subject ?? String(sha.prefix(7))
+        confirmation = Confirmation(
+            title: String(localized: "Cherry-pick the merge \(String(sha.prefix(7)))?"),
+            message: String(localized: "\(subject)\n\nThis copies everything the merge brought in onto \(currentBranch ?? "HEAD") as one new commit."),
+            confirmTitle: "Cherry-pick", destructive: false
+        ) { [weak self] in await self?.perform("Cherry-pick", ["cherry-pick", "-m", "1", sha]) }
     }
 
     func revert(_ sha: String) async {
-        await perform("Revert", ["revert", "--no-edit", sha])
+        guard commit(sha)?.isMerge == true else {
+            await perform("Revert", ["revert", "--no-edit", sha])
+            return
+        }
+        let subject = commit(sha)?.subject ?? String(sha.prefix(7))
+        confirmation = Confirmation(
+            title: String(localized: "Revert the merge \(String(sha.prefix(7)))?"),
+            message: String(localized: "\(subject)\n\nThis adds a commit that takes out everything the merge brought in. Merging the same branch again later won't bring those changes back; revert this revert for that."),
+            confirmTitle: "Revert", destructive: false
+        ) { [weak self] in await self?.perform("Revert", ["revert", "--no-edit", "-m", "1", sha]) }
     }
 
     func reset(to sha: String, mode: ResetMode) {
@@ -449,20 +470,53 @@ extension RepoModel {
         }
     }
 
+    /// Discards working-copy changes (staged ones stay, like `git restore`).
+    /// A snapshot of the files is saved first, so Edit > Undo brings them back.
     func discard(_ changes: [FileChange]) {
-        guard !changes.isEmpty else { return }
-        let names = changes.count == 1 ? changes[0].path : "\(changes.count) files"
+        guard changes.contains(where: { $0.area != .conflicted }) else { return }
+        let names = changes.count == 1 ? changes[0].path : String(localized: "\(changes.count) files")
         confirmation = Confirmation(
             title: String(localized: "Discard changes to \(names)?"),
-            message: "This can't be undone.",
+            message: L("Edit > Undo brings them back until you commit or switch branches."),
             confirmTitle: "Discard"
         ) { [weak self] in
             guard let self else { return }
             let untracked = changes.filter { $0.area == .untracked }.map(\.path)
             let tracked = changes.filter { $0.area != .untracked && $0.area != .conflicted }.map(\.path)
-            if !tracked.isEmpty { await perform("Discard", ["restore", "--"] + tracked) }
-            if !untracked.isEmpty { await perform("Discard", ["clean", "-fdq", "--"] + untracked) }
+            let head = HeadState(sha: status.headOID, branch: status.branch)
+            let snapshot = await snapshotWorkingCopy(tracked + untracked)
+            var ok = true
+            if !tracked.isEmpty { ok = await perform("Discard", ["restore", "--"] + tracked) && ok }
+            if !untracked.isEmpty { ok = await perform("Discard", ["clean", "-fdq", "--"] + untracked) && ok }
+            if ok, let snapshot {
+                lastUndo = UndoRecord(action: .discard(snapshot: snapshot, paths: tracked + untracked), before: head, after: head)
+            }
         }
+    }
+
+    /// Saves the working-copy version of `paths` in a commit no branch points
+    /// at, without touching the index or the files (a separate index file).
+    /// Nil if that fails; the discard then can't be undone.
+    private func snapshotWorkingCopy(_ paths: [String]) async -> String? {
+        guard !paths.isEmpty, let gitDir else { return nil }
+        let index = FileManager.default.temporaryDirectory.appendingPathComponent("git-cowork-\(UUID().uuidString).index")
+        defer { try? FileManager.default.removeItem(at: index) }
+        let real = gitDir.appendingPathComponent("index")
+        if FileManager.default.fileExists(atPath: real.path) {
+            guard (try? FileManager.default.copyItem(at: real, to: index)) != nil else { return nil }
+        }
+        // A fixed author: the snapshot is never shown, and git may not know the user's name yet.
+        let env = ["GIT_INDEX_FILE": index.path,
+                   "GIT_AUTHOR_NAME": "git-cowork", "GIT_AUTHOR_EMAIL": "git-cowork@localhost",
+                   "GIT_COMMITTER_NAME": "git-cowork", "GIT_COMMITTER_EMAIL": "git-cowork@localhost"]
+        guard await git.execute(["add", "-A", "--"] + paths, in: root, env: env).exitCode == 0 else { return nil }
+        let tree = await git.execute(["write-tree"], in: root, env: env)
+        let treeSHA = tree.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard tree.exitCode == 0, !treeSHA.isEmpty else { return nil }
+        let parent = status.headOID.map { ["-p", $0] } ?? []
+        let commit = await git.execute(["commit-tree", treeSHA] + parent + ["-m", "git-cowork: discarded changes"], in: root, env: env)
+        let sha = commit.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return commit.exitCode == 0 && !sha.isEmpty ? sha : nil
     }
 
     func commit(message: String, amend: Bool) async -> Bool {

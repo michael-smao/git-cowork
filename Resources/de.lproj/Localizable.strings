@@ -555,7 +555,6 @@
 "The file may be binary, empty, or only its mode changed." = "Die Datei ist vielleicht binär oder leer, oder nur ihre Rechte haben sich geändert.";
 "The update didn't install." = "Das Update wurde nicht installiert.";
 "They include git. macOS sometimes removes them during an update. Installing them is free and takes a few minutes; git-cowork works again as soon as they're done." = "Sie enthalten git. macOS entfernt sie manchmal bei einem Update. Die Installation ist kostenlos und dauert ein paar Minuten; danach funktioniert git-cowork sofort wieder.";
-"This can't be undone." = "Das lässt sich nicht rückgängig machen.";
 "This deletes the branch on the server for everyone." = "Damit wird der Branch auf dem Server für alle gelöscht.";
 "This tab then shows the main worktree." = "Dieser Tab zeigt danach den Haupt-Worktree.";
 "This worktree only" = "Nur dieser Worktree";
@@ -747,3 +746,19 @@
 "Rebase" = "Rebase";
 "Removing…" = "Wird entfernt …";
 "Remove worktree failed" = "Worktree entfernen fehlgeschlagen";
+"%@\n\nThis adds a commit that takes out everything the merge brought in. Merging the same branch again later won't bring those changes back; revert this revert for that." = "%@\n\nDas fügt einen Commit hinzu, der alles herausnimmt, was der Merge gebracht hat. Ein späterer erneuter Merge desselben Branches bringt diese Änderungen nicht zurück; dafür diesen Revert rückgängig machen.";
+"%@\n\nThis copies everything the merge brought in onto %@ as one new commit." = "%1$@\n\nDas kopiert alles, was der Merge gebracht hat, als einen neuen Commit auf %2$@.";
+"%lld files" = "%lld Dateien";
+"Amended the last commit" = "Letzten Commit geändert";
+"Cherry-pick" = "Cherry-pick";
+"Cherry-pick the merge %@?" = "Den Merge %@ cherry-picken?";
+"Committed" = "Committet";
+"Deleted %@" = "%@ gelöscht";
+"Discarded the changes" = "Änderungen verworfen";
+"Edit > Undo brings them back until you commit or switch branches." = "Bearbeiten > Widerrufen holt sie zurück, bis du committest oder den Branch wechselst.";
+"Hide" = "Ausblenden";
+"Reset the branch" = "Branch zurückgesetzt";
+"Revert" = "Revert";
+"Revert the merge %@?" = "Den Merge %@ rückgängig machen?";
+"Switched" = "Gewechselt";
+"Undo Discard" = "Verwerfen widerrufen";

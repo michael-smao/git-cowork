@@ -192,6 +192,27 @@ enum UndoSelfTest {
         check(await sh(["rev-parse", "refs/heads/side"], in: remote) == sh(["rev-parse", "HEAD"], in: side), "remote has the new commit")
         check(await branch() == here, "this worktree stayed on its branch")
 
+        print("7. discard, then undo the discard")
+        write("staged\n", "a.txt", in: repo)
+        await sh(["add", "a.txt"], in: repo)
+        write("staged\nand more\n", "a.txt", in: repo)
+        write("brand new\n", "new.txt", in: repo)
+        await model.refresh()
+        let toDiscard = (model.status.unstaged + model.status.untracked).filter { ["a.txt", "new.txt"].contains($0.path) }
+        model.discard(toDiscard)
+        await settle(model) { model.confirmation != nil }
+        await model.confirmation?.action()
+        model.confirmation = nil
+        let discarded = (try? String(contentsOf: repo.appendingPathComponent("a.txt"), encoding: .utf8)) == "staged\n"
+        check(discarded, "discard keeps the staged version")
+        check(!FileManager.default.fileExists(atPath: repo.appendingPathComponent("new.txt").path), "discard removes the new file")
+        check(model.undoTitle == "Undo Discard", "menu reads Undo Discard")
+        await model.undoLastAction()
+        let restored = (try? String(contentsOf: repo.appendingPathComponent("a.txt"), encoding: .utf8)) == "staged\nand more\n"
+        check(restored, "undo discard brings the change back")
+        check(FileManager.default.fileExists(atPath: repo.appendingPathComponent("new.txt").path), "undo discard brings the new file back")
+        check(await sh(["diff", "--cached", "--name-only"], in: repo) == "a.txt", "undo discard leaves the index alone")
+
         let log = CommandLog.shared.entries.map(\.commandLine)
         check(log.contains("git reset --soft \(c1)"), "undo shows in the command log")
         model.stopWatching()

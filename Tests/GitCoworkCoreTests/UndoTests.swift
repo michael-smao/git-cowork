@@ -21,6 +21,14 @@ private func head(_ sha: String?, _ branch: String? = "main") -> HeadState { Hea
         #expect(r.check(in: UndoContext(head: head(b))).commands == [["reset", "--soft", a]])
     }
 
+    @Test func discardAppliesItsStash() throws {
+        let r = try #require(UndoRecord(action: .discard(snapshot: c, paths: ["x.txt", "new.txt"]), before: head(a), after: head(a)))
+        #expect(r.title == "Undo Discard")
+        #expect(r.check(in: UndoContext(head: head(a))) == .ready([["restore", "--source=\(c)", "--worktree", "--", "x.txt", "new.txt"]]))
+        #expect(r.check(in: UndoContext(head: head(b))).commands == nil)
+        #expect(r.check(in: UndoContext(head: head(a), operationInProgress: true)).commands == nil)
+    }
+
     @Test func firstCommitIsNotUndoable() {
         #expect(UndoRecord(action: .commit, before: head(nil), after: head(a)) == nil)
     }
