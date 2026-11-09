@@ -20,8 +20,8 @@ extension HistoryCell {
             path.lineWidth = GraphStyle.lineWidth
             path.lineCapStyle = .round
             path.lineJoinStyle = .round
-            let x1 = GraphStyle.x(line.fromLane), y1 = y(line.from)
-            let x2 = GraphStyle.x(line.toLane), y2 = y(line.to)
+            let x1 = GraphStyle.nodeX(line.fromLane, width: bounds.width), y1 = y(line.from)
+            let x2 = GraphStyle.nodeX(line.toLane, width: bounds.width), y2 = y(line.to)
             path.move(to: NSPoint(x: x1, y: y1))
             if x1 == x2 {
                 path.line(to: NSPoint(x: x2, y: y2))
@@ -84,7 +84,7 @@ extension HistoryCell {
     /// Dashed line of another worktree's WIP: down its own lane from the top,
     /// then sideways into the commit node.
     func drawWIPJoin(_ join: HistoryWIPJoin, into cx: CGFloat) {
-        let x = GraphStyle.x(join.lane)
+        let x = GraphStyle.nodeX(join.lane, width: bounds.width)
         let r = GraphStyle.bendRadius
         let dir: CGFloat = cx > x ? 1 : -1
         let path = NSBezierPath()
@@ -97,15 +97,6 @@ extension HistoryCell {
         let color = Theme.lane(join.color)
         (join.dimmed ? color.withAlphaComponent(0.6) : color).setStroke()
         path.stroke()
-    }
-
-    /// Lanes past the column edge are cut off; fade them out instead of a hard edge.
-    func drawClipFade(lanes: Int) {
-        guard GraphStyle.x(lanes - 1) + GraphStyle.laneWidth / 2 > bounds.width else { return }
-        let w = GraphStyle.clipFadeWidth
-        let bg = NSColor.controlBackgroundColor
-        NSGradient(starting: bg.withAlphaComponent(0), ending: bg)?
-            .draw(in: NSRect(x: bounds.width - w, y: 0, width: w, height: bounds.height), angle: 0)
     }
 
     /// Thin line tying a branch badge to its node.

@@ -143,7 +143,9 @@
 "Clone Repository…" = "Repository klonen …";
 "Clones into %@/%@" = "Wird nach %1$@/%2$@ geklont";
 "Cloning…" = "Wird geklont …";
+"Close Other Tabs" = "Andere Tabs schließen";
 "Close Review" = "Review schließen";
+"Close Tab" = "Tab schließen";
 "Closed" = "Geschlossen";
 "Co-authors" = "Co-Autoren";
 "Columns" = "Spalten";
@@ -241,6 +243,8 @@
 "Enter this code on %@ and approve git-cowork:" = "Gib diesen Code auf %@ ein und erlaube git-cowork den Zugriff:";
 "Everyone" = "Alle";
 "Executable" = "Programm";
+"Fetch" = "Fetch";
+"Fetch all remotes (git fetch --all --prune, ⇧⌘F)" = "Alle Remotes abrufen (git fetch --all --prune, ⇧⌘F)";
 "Fetch All" = "Alle abrufen (Fetch)";
 "Fetch automatically" = "Automatisch abrufen (Fetch)";
 "Fetch, push, commit and other actions show up here with git's output." = "Fetch, Push, Commit und andere Aktionen erscheinen hier mit der Ausgabe von git.";
@@ -300,6 +304,7 @@
 "Local" = "Lokal";
 "Locked" = "Gesperrt";
 "macOS's ssh-agent isn't available, so the key's passphrase can't be put in the Keychain." = "Der ssh-agent von macOS ist nicht verfügbar, daher kann die Passphrase des Schlüssels nicht im Schlüsselbund gespeichert werden.";
+"main worktree" = "Haupt-Worktree";
 "Make a new token with the scopes %@ and add it with Add Token." = "Erstelle ein neues Token mit den Scopes %@ und füge es mit „Token hinzufügen“ hinzu.";
 "Mark All as Read" = "Alle als gelesen markieren";
 "Mark Resolved" = "Als gelöst markieren";
@@ -390,6 +395,7 @@
 "Open Task %@" = "Aufgabe %@ öffnen";
 "Open Worktree" = "Worktree öffnen";
 "Open Worktree for %@" = "Worktree für %@ öffnen";
+"Open Worktree for %@ in New Tab" = "Worktree für %@ in neuem Tab öffnen";
 "Open Worktree in New Tab" = "Worktree in neuem Tab öffnen";
 "Or Enter a URL" = "Oder eine URL eingeben";
 "parent:" = "Eltern-Commit:";
@@ -433,6 +439,7 @@
 "Remove label" = "Label entfernen";
 "Remove Reviewer" = "Reviewer entfernen";
 "Remove worktree %@?" = "Worktree %@ entfernen?";
+"Remove Worktree for %@…" = "Worktree für %@ entfernen …";
 "Remove Worktree…" = "Worktree entfernen …";
 "Removes the change in %@%@ from the working copy. This can't be undone." = "Entfernt die Änderung in %1$@%2$@ aus der Arbeitskopie. Das lässt sich nicht rückgängig machen.";
 "Rename" = "Umbenennen";
@@ -561,6 +568,7 @@
 "This can't be undone." = "Das lässt sich nicht rückgängig machen.";
 "This deletes the branch on the server for everyone." = "Damit wird der Branch auf dem Server für alle gelöscht.";
 "This repository has no remote." = "Dieses Repository hat kein Remote.";
+"This tab then shows the main worktree." = "Dieser Tab zeigt danach den Haupt-Worktree.";
 "This worktree only" = "Nur dieser Worktree";
 "Tip: drop a folder anywhere in this window" = "Tipp: Zieh einen Ordner irgendwohin in dieses Fenster";
 "Title" = "Titel";
@@ -610,6 +618,7 @@
 "Working copy is clean" = "Keine Änderungen in der Arbeitskopie";
 "Worktree" = "Worktree";
 "Worktrees" = "Worktrees";
+"worktree" = "Worktree";
 "Write a comment" = "Kommentar schreiben";
 "Write Commit Message" = "Commit-Nachricht schreiben";
 "you" = "du";
@@ -658,3 +667,5 @@
 "Rebase" = "Rebase";
 "%@ doesn't exist anymore" = "%@ gibt es nicht mehr";
 "It was probably deleted on the server, for example after its pull request was merged. Nothing was pulled. Push to create it again, or switch to another branch." = "Er wurde wahrscheinlich auf dem Server gelöscht, zum Beispiel nachdem sein Pull Request gemergt wurde. Es wurde nichts geholt. Pushe, um ihn neu anzulegen, oder wechsle auf einen anderen Branch.";
+"Removing…" = "Wird entfernt …";
+"Remove worktree failed" = "Worktree entfernen fehlgeschlagen";
