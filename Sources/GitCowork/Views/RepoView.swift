@@ -26,7 +26,7 @@ struct RepoView: View {
                         // Not under the tab bar: only the panel itself is tinted.
                         .background(Theme.sidebarBackground, ignoresSafeAreaEdges: [])
                 }
-                CenterColumn(model: model)
+                CenterColumn(model: model, openHere: openHere, openInNewTab: openInNewTab)
                     .frame(minWidth: Layout.centerMin, idealWidth: Layout.centerIdeal, maxWidth: .infinity, maxHeight: .infinity)
                 InspectorColumn(model: model)
                     .frame(minWidth: Layout.inspectorMin, idealWidth: Layout.inspectorIdeal, maxWidth: Layout.inspectorMax, maxHeight: .infinity)
@@ -84,6 +84,8 @@ private struct SidebarColumn: View, Equatable {
 /// is showing; Esc (which clears `openDiff`) returns to it.
 private struct CenterColumn: View {
     let model: RepoModel
+    let openHere: (String) -> Void
+    let openInNewTab: (String) -> Void
 
     var body: some View {
         let diff = model.openDiff
@@ -91,7 +93,7 @@ private struct CenterColumn: View {
         ZStack {
             // Kept alive under a diff so the graph keeps its scroll position.
             if mode == .history {
-                HistoryCenter(model: model)
+                HistoryCenter(model: model, openHere: openHere, openInNewTab: openInNewTab)
                     .opacity(diff == nil ? 1 : 0)
                     .allowsHitTesting(diff == nil)
             } else if diff == nil {
@@ -113,6 +115,8 @@ private struct CenterColumn: View {
 /// so only this view (and the table it wraps) updates for them.
 private struct HistoryCenter: View {
     let model: RepoModel
+    let openHere: (String) -> Void
+    let openInNewTab: (String) -> Void
 
     var body: some View {
         HistoryTable(
@@ -123,7 +127,9 @@ private struct HistoryCenter: View {
             selection: model.selection,
             revealToken: model.revealToken,
             worktreeInfoVersion: model.worktreeInfoVersion,
-            draftSummary: model.draftSummary)
+            draftSummary: model.draftSummary,
+            openHere: openHere,
+            openInNewTab: openInNewTab)
     }
 }
 

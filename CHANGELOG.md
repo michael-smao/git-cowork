@@ -6,6 +6,17 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Remove a worktree from the graph: a branch checked out in another worktree,
+  and another worktree's "// WIP" row, offer Open Worktree, Open Worktree in
+  New Tab and Remove Worktree… in their right-click menu.
+- Remove Worktree… in the sidebar also works for the worktree the tab shows:
+  the tab then switches to the main worktree (or closes, when the main
+  worktree is already open in another tab). The main worktree is never removed.
+
+### Fixed
+- After removing a worktree, its "// WIP" row could stay in the graph.
+
 ## [0.4.0] - 2026-11-09
 
 ### Added

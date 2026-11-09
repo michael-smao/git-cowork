@@ -390,6 +390,7 @@
 "Open Task %@" = "Aufgabe %@ öffnen";
 "Open Worktree" = "Worktree öffnen";
 "Open Worktree for %@" = "Worktree für %@ öffnen";
+"Open Worktree for %@ in New Tab" = "Worktree für %@ in neuem Tab öffnen";
 "Open Worktree in New Tab" = "Worktree in neuem Tab öffnen";
 "Or Enter a URL" = "Oder eine URL eingeben";
 "parent:" = "Eltern-Commit:";
@@ -432,7 +433,9 @@
 "Remove from Recents" = "Aus „Zuletzt geöffnet“ entfernen";
 "Remove label" = "Label entfernen";
 "Remove Reviewer" = "Reviewer entfernen";
+"Remove worktree" = "Worktree entfernen";
 "Remove worktree %@?" = "Worktree %@ entfernen?";
+"Remove Worktree for %@…" = "Worktree für %@ entfernen …";
 "Remove Worktree…" = "Worktree entfernen …";
 "Removes the change in %@%@ from the working copy. This can't be undone." = "Entfernt die Änderung in %1$@%2$@ aus der Arbeitskopie. Das lässt sich nicht rückgängig machen.";
 "Rename" = "Umbenennen";
@@ -561,6 +564,7 @@
 "This can't be undone." = "Das lässt sich nicht rückgängig machen.";
 "This deletes the branch on the server for everyone." = "Damit wird der Branch auf dem Server für alle gelöscht.";
 "This repository has no remote." = "Dieses Repository hat kein Remote.";
+"This tab then shows the main worktree." = "Dieser Tab zeigt danach den Haupt-Worktree.";
 "This worktree only" = "Nur dieser Worktree";
 "Tip: drop a folder anywhere in this window" = "Tipp: Zieh einen Ordner irgendwohin in dieses Fenster";
 "Title" = "Titel";
