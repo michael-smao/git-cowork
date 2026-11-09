@@ -656,3 +656,5 @@
 "%@ has %lld commits that %@ doesn't, and %@ has %lld new ones. Merge joins them with a merge commit. Rebase puts your %lld commits on top of %@. Nothing is lost either way." = "%1$@ hat %2$lld Commits, die %3$@ nicht hat, und %4$@ hat %5$lld neue. Merge verbindet beide mit einem Merge-Commit. Rebase setzt deine %6$lld Commits oben auf %7$@. In beiden Fällen geht nichts verloren.";
 "Merge" = "Merge";
 "Rebase" = "Rebase";
+"%@ doesn't exist anymore" = "%@ gibt es nicht mehr";
+"It was probably deleted on the server, for example after its pull request was merged. Nothing was pulled. Push to create it again, or switch to another branch." = "Er wurde wahrscheinlich auf dem Server gelöscht, zum Beispiel nachdem sein Pull Request gemergt wurde. Es wurde nichts geholt. Pushe, um ihn neu anzulegen, oder wechsle auf einen anderen Branch.";

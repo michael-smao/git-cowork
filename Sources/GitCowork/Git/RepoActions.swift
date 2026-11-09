@@ -79,7 +79,12 @@ extension RepoModel {
     /// stashed around it and put back (`--autostash`).
     func catchUp(with target: String, named name: String) async {
         guard let out = await git.tryRun(["rev-list", "--left-right", "--count", "HEAD...\(target)"], in: root),
-              let plan = CatchUp(revListCounts: out) else { return }
+              let plan = CatchUp(revListCounts: out) else {
+            // Typically the upstream branch was deleted on the server (its pull request merged).
+            alert = AlertItem(title: String(localized: "\(name) doesn't exist anymore"),
+                              message: String(localized: "It was probably deleted on the server, for example after its pull request was merged. Nothing was pulled. Push to create it again, or switch to another branch."))
+            return
+        }
         let branch = currentBranch ?? "HEAD"
         switch plan {
         case .upToDate, .aheadOnly:
