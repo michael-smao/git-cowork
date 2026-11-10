@@ -423,6 +423,31 @@ enum GitActionsSelfTest {
         await slow.value
         check(model.historySearch?.commits.isEmpty == true, "a search that was typed over leaves no result behind")
 
+        print("17. a branch whose upstream has another name asks where to push")
+        await sh(["push", "-q", "origin", "HEAD:refs/heads/feat/remote-name"], in: repo)
+        await sh(["fetch", "-q", "origin"], in: repo)
+        await sh(["switch", "-q", "-c", "feat-local", "--track", "origin/feat/remote-name"], in: repo)
+        await commitHere("h.txt", "h\n")
+        await model.refresh()
+        await model.push()
+        let whereAsk = model.confirmation
+        check(whereAsk?.alternative != nil && whereAsk?.destructive == false, "asks: the upstream, or a new branch of the same name")
+        check(await sh(["rev-parse", "refs/heads/feat/remote-name"], in: remote) != (await head()), "nothing pushed before answering")
+        model.confirmation = nil
+        await whereAsk?.action()
+        check(await sh(["rev-parse", "refs/heads/feat/remote-name"], in: remote) == (await head()), "pushed to the upstream")
+        await commitHere("i.txt", "i\n")
+        await model.refresh()
+        await model.push()
+        let secondAsk = model.confirmation
+        model.confirmation = nil
+        await secondAsk?.alternative?()
+        check(await sh(["rev-parse", "refs/heads/feat-local"], in: remote) == (await head()), "or to a new branch of the same name")
+        await model.refresh()
+        check(model.status.upstream == "origin/feat-local", "which it follows from now on")
+        await model.push()
+        check(model.confirmation == nil && model.problem == nil, "then pushes without asking")
+
         model.stopWatching()
         return failures == 0
     }

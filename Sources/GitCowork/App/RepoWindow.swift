@@ -7,11 +7,20 @@ struct RepoWindow: View {
     @State private var showClone = false
     @State private var dropTargeted = false
     @State private var host = HostWindow()
+    /// A background tab from the launch: loads its repository once selected.
+    @State private var waitsUntilSelected: Bool
     @Environment(\.openWindow) private var openWindow
+
+    init(path: Binding<String?>) {
+        _path = path
+        _waitsUntilSelected = State(initialValue: path.wrappedValue.map(LaunchFolders.opensInBackground) ?? false)
+    }
 
     var body: some View {
         Group {
-            if let path {
+            if let path, waitsUntilSelected {
+                UnloadedTab(path: path)
+            } else if let path {
                 RepoContainer(path: path, openHere: openHere, openInNewTab: openTab, close: { self.path = nil })
                     .id(path)
             } else {
@@ -38,6 +47,12 @@ struct RepoWindow: View {
         // The first window can appear before the command line is read.
         .onReceive(NotificationCenter.default.publisher(for: .launchFoldersPending)) { _ in
             if path == nil { openLaunchFolders() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            // Selected for real: placed in its tab group (visible again) and in front there.
+            guard waitsUntilSelected, let window = host.window, note.object as? NSWindow === window,
+                  window.alphaValue > 0, window.tabGroup?.selectedWindow.map({ $0 === window }) ?? true else { return }
+            waitsUntilSelected = false
         }
         .onOpenURL { url in
             if url.isFileURL { open(url.path) }
@@ -66,15 +81,41 @@ struct RepoWindow: View {
         WindowActions(open: { open($0) }, showClone: { showClone = true })
     }
 
-    /// Folders passed on the command line: the first opens here, the rest as tabs.
+    /// At launch (last session, command line): the front repository opens
+    /// here right away; the others join as background tabs in their order,
+    /// one after another, without coming to the front or loading yet.
     private func openLaunchFolders() {
         let folders = LaunchFolders.takeAll()
         guard !folders.isEmpty else { return }
+        let wanted = LaunchFolders.front.flatMap(folders.firstIndex(of:)) ?? 0
         Task {
-            for folder in folders {
-                guard let resolved = await RepoLocator.resolve(folder) else { continue }
-                if path == nil { path = resolved } else { openTab(resolved) }
+            var resolved: [String?] = []
+            for folder in folders { resolved.append(await RepoLocator.resolve(folder)) }
+            // The front one, or the first that is still a repository.
+            let order = [wanted] + resolved.indices.filter { $0 != wanted }
+            guard let frontIndex = order.first(where: { resolved[$0] != nil }), let front = resolved[frontIndex] else {
+                LaunchFolders.finishRestore()
+                return
             }
+            if path == nil { path = front } else { openTab(front) }
+            // Where each tab goes: before the ones that come later in the saved order.
+            var placed: [Int] = [frontIndex]
+            for index in resolved.indices where index != frontIndex {
+                guard let folder = resolved[index], !OpenRepos.isOpen(folder) else { continue }
+                if await openBackgroundTab(folder, at: placed.filter { $0 < index }.count) { placed.append(index) }
+            }
+            LaunchFolders.finishRestore()
+        }
+    }
+
+    /// Opens `p` as a tab at `index` of this window's group, behind this one.
+    /// Returns once it is there (false if no window came within 2 seconds).
+    private func openBackgroundTab(_ p: String, at index: Int) async -> Bool {
+        guard let parent = host.window else { return false }
+        return await withCheckedContinuation { continuation in
+            WindowAccessor.setPendingBackground(parent: parent, index: index) { continuation.resume(returning: $0) }
+            LaunchFolders.markBackground(p)
+            openWindow(id: "repo", value: p)
         }
     }
 
@@ -181,6 +222,22 @@ private struct RepoContainer: View {
     }
 }
 
+/// A background tab from the launch before it's selected: just its name in
+/// the tab strip, no repository loaded, nothing watched or fetched.
+private struct UnloadedTab: View {
+    let path: String
+
+    var body: some View {
+        let label = LaunchFolders.tabLabel(for: path)
+        Color.clear
+            .navigationTitle(label.worktree.map { "\(label.name) · \($0)" } ?? label.name)
+            .background(RepoTabLabelReporter(label: label))
+            // Counts as open, so opening it again selects this tab.
+            .onAppear { OpenRepos.add(path) }
+            .onDisappear { OpenRepos.remove(path) }
+    }
+}
+
 /// The window a RepoWindow is shown in, so it can close itself.
 @MainActor
 final class HostWindow {
@@ -194,6 +251,29 @@ struct WindowAccessor: NSViewRepresentable {
     /// shortly after, so a later ⌘N isn't tabbed into a stale parent.
     @MainActor private(set) static weak var pendingTabParent: NSWindow?
     @MainActor private static var pendingGeneration = 0
+
+    /// The next new window joins `parent`'s group at `index` as a background
+    /// tab: hidden until placed, then `parent` stays selected.
+    private struct PendingBackground {
+        weak var parent: NSWindow?
+        let index: Int
+        let done: (Bool) -> Void
+    }
+
+    @MainActor private static var pendingBackground: PendingBackground?
+
+    @MainActor static func setPendingBackground(parent: NSWindow, index: Int, done: @escaping (Bool) -> Void) {
+        pendingBackground?.done(false)
+        pendingBackground = PendingBackground(parent: parent, index: index, done: done)
+        pendingGeneration += 1
+        let generation = pendingGeneration
+        // SwiftUI may only focus an existing window: don't wait forever.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            guard pendingGeneration == generation, let pending = pendingBackground else { return }
+            pendingBackground = nil
+            pending.done(false)
+        }
+    }
 
     @MainActor static func setPendingParent(_ window: NSWindow?) {
         pendingTabParent = window
@@ -228,6 +308,23 @@ struct WindowAccessor: NSViewRepresentable {
             guard let window, window !== configured else { return }
             configured = window
             WindowChrome.configure(window)
+            if let background = WindowAccessor.pendingBackground, let parent = background.parent, parent !== window {
+                WindowAccessor.pendingBackground = nil
+                // Invisible until it is a tab, so no window flashes up on its own.
+                window.alphaValue = 0
+                DispatchQueue.main.async {
+                    if let group = parent.tabGroup {
+                        group.insertWindow(window, at: min(max(0, background.index), group.windows.count))
+                        group.selectedWindow = parent
+                    } else {
+                        parent.addTabbedWindow(window, ordered: .above)
+                    }
+                    parent.makeKeyAndOrderFront(nil)
+                    window.alphaValue = 1
+                    background.done(true)
+                }
+                return
+            }
             let parent = WindowAccessor.pendingTabParent
             WindowAccessor.pendingTabParent = nil
             if let parent, parent !== window, parent.isVisible {

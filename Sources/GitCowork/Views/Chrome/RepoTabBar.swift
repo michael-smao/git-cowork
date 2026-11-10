@@ -333,13 +333,16 @@ private struct RepoTab: View {
                 .foregroundStyle(selected ? Color.accentColor : .secondary)
                 .frame(width: Theme.Metrics.iconWidth)
             HStack(spacing: Theme.Space.s) {
+                // The repository name gets the room first; the worktree folder is cut before it.
                 Text(verbatim: title.name)
                     .font(selected ? Theme.Font.headline : Theme.Font.body)
                     .foregroundStyle(selected ? .primary : .secondary)
+                    .layoutPriority(1)
                 if let detail = title.detail {
                     Text(verbatim: detail)
                         .font(Theme.Font.small)
                         .foregroundStyle(.tertiary)
+                        .truncationMode(.tail)
                 }
             }
             .lineLimit(1)

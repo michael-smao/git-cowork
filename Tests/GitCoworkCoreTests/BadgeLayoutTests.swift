@@ -49,6 +49,14 @@ import Testing
         BadgeListLayout.make(widths: widths, badgeHeight: 20, spacing: 4, padding: 4, anchor: anchor, container: container)
     }
 
+    @Test func coversTheCounterOfTheRow() {
+        // main (80) is the widest badge, but the row drew "main +1" over 110.
+        let l = BadgeListLayout.make(widths: [80, 60], badgeHeight: 20, spacing: 4, padding: 4,
+                                     anchor: CGPoint(x: 12, y: 200), container: container, covering: 110)
+        #expect(l.frame.width == 118)
+        #expect(l.widths == [80, 60])
+    }
+
     @Test func dropsDownFromTheRow() {
         let l = make([80, 150, 60], at: CGPoint(x: 12, y: 200))
         #expect(l.frame == CGRect(x: 8, y: 196, width: 158, height: 76))

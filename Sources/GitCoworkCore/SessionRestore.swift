@@ -24,3 +24,20 @@ public enum SessionRestore {
         return Plan(open: open, select: front)
     }
 }
+
+/// A linked worktree's `.git` is a file pointing into the main repository:
+/// "gitdir: /path/main/.git/worktrees/name". Read without running git, for
+/// naming a tab before its repository loads.
+public enum WorktreeLink {
+    /// The main worktree's folder, or nil when `contents` isn't such a link.
+    /// A relative gitdir is resolved against `worktree`.
+    public static func mainWorktree(gitFile contents: String, worktree: String) -> String? {
+        guard let line = contents.split(whereSeparator: \.isNewline).first(where: { $0.hasPrefix("gitdir:") }) else { return nil }
+        var dir = line.dropFirst("gitdir:".count).trimmingCharacters(in: .whitespaces)
+        if !dir.hasPrefix("/") { dir = (worktree as NSString).appendingPathComponent(dir) }
+        let parts = (dir as NSString).standardizingPath.split(separator: "/", omittingEmptySubsequences: false)
+        guard let wt = parts.lastIndex(of: "worktrees"), wt > 0, parts[wt - 1] == ".git" else { return nil }
+        let main = parts[..<(wt - 1)].joined(separator: "/")
+        return main.isEmpty ? "/" : main
+    }
+}
