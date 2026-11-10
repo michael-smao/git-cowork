@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-10
+
 ### Added
 - Drag a repository tab sideways to move it. The other tabs step aside while
   you drag, the tab you are on stays selected, and the next launch reopens the
