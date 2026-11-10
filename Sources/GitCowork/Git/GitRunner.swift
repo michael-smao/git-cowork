@@ -140,7 +140,8 @@ final class GitRunner: @unchecked Sendable {
             }
         }
         let configArgs = GitEnvironment.configArgs + credentials.configArgs(for: accounts)
-        return await Subprocess.run(gitPath, configArgs + args, input: input, env: env, dir: dir, cancellable: cancellable)
+        return await Subprocess.run(gitPath, configArgs + args, input: input, env: env, dir: dir,
+                                    timeout: GitDefaults.timeout(for: args), cancellable: cancellable)
     }
 
     /// The accounts a command that talks to a server uses, one per host. Only

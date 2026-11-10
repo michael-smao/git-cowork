@@ -2,7 +2,10 @@ import Foundation
 import GitCoworkCore
 
 /// Runs a program and collects its output without blocking the caller:
-/// the waiting happens on a GCD thread, never on Swift's cooperative pool.
+/// the waiting happens on a thread of its own, never on Swift's cooperative
+/// pool or GCD's. GCD has at most 64 worker threads: with that many commands
+/// waiting on it (ten repositories loading at once), the stderr readers they
+/// wait for got no thread, and every git command hung from then on.
 /// Every process the app and the `git cowork` tool start goes through here.
 public enum Subprocess {
     /// `env` nil inherits this process's environment. `timeout` stops the
@@ -15,7 +18,7 @@ public enum Subprocess {
         let stopper = cancellable ? Stopper() : nil
         return await withTaskCancellationHandler {
             await withCheckedContinuation { cont in
-                DispatchQueue.global(qos: .userInitiated).async {
+                onOwnThread {
                     cont.resume(returning: runBlocking(executable, args, input: input, env: env, dir: dir,
                                                        timeout: timeout, stopper: stopper))
                 }
@@ -23,6 +26,15 @@ public enum Subprocess {
         } onCancel: {
             stopper?.stop()
         }
+    }
+
+    /// Blocking work (waiting for a program, reading its pipes) gets a thread
+    /// of its own, so it can never wait for a pool thread that is itself waiting.
+    private static func onOwnThread(_ work: @escaping @Sendable () -> Void) {
+        let thread = Thread(block: work)
+        thread.qualityOfService = .userInitiated
+        thread.stackSize = 256 * 1024
+        thread.start()
     }
 
     /// Stops a program when its task is cancelled, also when the cancellation
@@ -68,7 +80,7 @@ public enum Subprocess {
         stopper?.attach(p)
         if let inPipe, let input {
             // Write on another thread so a large input can't deadlock against the output.
-            DispatchQueue.global(qos: .userInitiated).async {
+            onOwnThread {
                 try? inPipe.fileHandleForWriting.write(contentsOf: input)
                 try? inPipe.fileHandleForWriting.close()
             }
@@ -80,20 +92,29 @@ public enum Subprocess {
             }
         }
         // Read both pipes at once so a full stderr buffer can't block the program.
-        var errData = Data()
+        let errData = Collected()
         let group = DispatchGroup()
         group.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            errData = err.fileHandleForReading.readDataToEndOfFile()
+        onOwnThread {
+            errData.set(err.fileHandleForReading.readDataToEndOfFile())
             group.leave()
         }
         let outData = out.fileHandleForReading.readDataToEndOfFile()
         group.wait()
         p.waitUntilExit()
+        var stderr = errData.value
         if timedOut.value, let timeout {
-            errData += Data("\n\(URL(fileURLWithPath: executable).lastPathComponent) stopped after \(Int(timeout)) s.".utf8)
+            stderr += Data("\n\(URL(fileURLWithPath: executable).lastPathComponent) stopped after \(Int(timeout)) s.".utf8)
         }
-        return GitOutput(stdout: outData, stderr: errData, exitCode: p.terminationStatus)
+        return GitOutput(stdout: outData, stderr: stderr, exitCode: p.terminationStatus)
+    }
+
+    /// stderr, read on its own thread.
+    private final class Collected: @unchecked Sendable {
+        private let lock = NSLock()
+        private var data = Data()
+        func set(_ d: Data) { lock.lock(); data = d; lock.unlock() }
+        var value: Data { lock.lock(); defer { lock.unlock() }; return data }
     }
 
     private final class TimedOut: @unchecked Sendable {

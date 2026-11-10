@@ -23,6 +23,14 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   folder first.
 
 ### Fixed
+- The app no longer stops running git commands after a while. With many
+  commands at once (many repositories loading at launch), every worker thread
+  ended up waiting for another one, so from then on actions never finished,
+  deleting a remote branch waited forever and quitting hung. Each command now
+  waits on a thread of its own.
+- Commands that talk to a server can't hang forever: an HTTPS transfer that
+  stalls for a minute fails, and fetch, pull and push stop after 10 minutes
+  (ls-remote after 1). Clone has no limit.
 - Push on a branch that follows a remote branch with another name (git
   refused with "The upstream branch of your current branch does not match")
   asks where to push: to that remote branch, or to a new one of the same name
