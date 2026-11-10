@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-10
+
 ### Added
 - The repositories open when git-cowork quits open again at the next launch,
   as tabs in the same order with the same one in front. It no longer depends
