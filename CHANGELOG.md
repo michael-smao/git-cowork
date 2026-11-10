@@ -12,6 +12,25 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   on macOS's "Close windows when quitting an app" setting. Turn it off in
   Settings › Reopen repositories at launch. Folders passed on the command line
   open after them, in front.
+- Click a stash in the sidebar to see what's in it: its message, when and on
+  which branch it was made, and its files, including the new (untracked) ones
+  it took along. Click a file for its diff. Pop, Apply and Delete are in the
+  panel too.
+- The search field finds commits by content, across every branch and the whole
+  history, not only the commits that are loaded: `file:name` for commits that
+  changed a file whose path contains the text, `change:text` for commits that
+  added or removed that text (`git log -S`). Both ignore case, take quotes for
+  values with spaces (`change:"old name"`), and combine with plain words.
+- When a search finds nothing, the list says so, and what the search looked at.
+- Ignore for new files in Changes: right-click a file to ignore it, every file
+  of its type, or its folder. Right-click a folder or several files to ignore
+  those. It adds lines to `.gitignore` (creating it if needed), which then
+  shows under Changes like any other edit.
+- Remotes can be managed in the sidebar: + on Remote adds another one (a fork,
+  the repository you forked from) and fetches it. Right-click a remote to
+  fetch just that one, rename it, change its URL, copy the URL, open it on its
+  host, or remove it. Removing asks first and says how many local branches
+  follow it.
 
 ## [0.5.1] - 2026-11-09
 

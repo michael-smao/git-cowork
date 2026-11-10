@@ -99,9 +99,10 @@ final class GitRunner: @unchecked Sendable {
         return result.stdout
     }
 
-    /// Like `run` but never throws; for best-effort reads.
-    func tryRun(_ args: [String], in dir: URL) async -> String? {
-        let r = await executeData(args, in: dir)
+    /// Like `run` but never throws; for best-effort reads. `cancellable`
+    /// stops git when the calling task is cancelled (see Subprocess.run).
+    func tryRun(_ args: [String], in dir: URL, cancellable: Bool = false) async -> String? {
+        let r = await executeData(args, in: dir, cancellable: cancellable)
         return r.ok ? r.text : nil
     }
 
@@ -123,8 +124,8 @@ final class GitRunner: @unchecked Sendable {
 
     /// Like `execute`, but stdout stays raw bytes. Diffs need this: decoding
     /// non-UTF-8 content would corrupt patches built from it.
-    func executeData(_ args: [String], in dir: URL, input: Data? = nil,
-                     env extra: [String: String] = [:], account: HostAccount? = nil) async -> GitOutput {
+    func executeData(_ args: [String], in dir: URL, input: Data? = nil, env extra: [String: String] = [:],
+                     account: HostAccount? = nil, cancellable: Bool = false) async -> GitOutput {
         var env = environment.merging(extra) { _, new in new }
         let credentials = Credentials.shared
         var accounts = credentials.defaults
@@ -139,7 +140,7 @@ final class GitRunner: @unchecked Sendable {
             }
         }
         let configArgs = GitEnvironment.configArgs + credentials.configArgs(for: accounts)
-        return await Subprocess.run(gitPath, configArgs + args, input: input, env: env, dir: dir)
+        return await Subprocess.run(gitPath, configArgs + args, input: input, env: env, dir: dir, cancellable: cancellable)
     }
 
     /// The accounts a command that talks to a server uses, one per host. Only

@@ -288,8 +288,8 @@ struct EmptyState<Actions: View>: View {
 }
 
 extension EmptyState where Actions == EmptyView {
-    init(symbol: String, title: String, message: String? = nil) {
-        self.init(symbol: symbol, title: title, message: message) { EmptyView() }
+    init(symbol: String, title: String, message: String? = nil, messageWidth: CGFloat? = nil) {
+        self.init(symbol: symbol, title: title, message: message, messageWidth: messageWidth) { EmptyView() }
     }
 }
 

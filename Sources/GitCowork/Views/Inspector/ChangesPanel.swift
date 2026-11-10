@@ -321,6 +321,10 @@ private struct FileLists: View {
                 Button(rebasing ? "Use My Commit" : "Use Mine") { Task { await model.resolve(c, mine: true) } }
                 Button(rebasing ? "Use Upstream" : "Use Theirs") { Task { await model.resolve(c, mine: false) } }
             }
+            if changes.allSatisfy({ $0.area == .untracked }) {
+                Divider()
+                ignoreItems(changes, folder: folder)
+            }
             if !discardable.isEmpty {
                 Divider()
                 Button("Discard Changes…", role: .destructive) { model.discard(discardable) }
@@ -337,6 +341,34 @@ private struct FileLists: View {
                 Button("Copy Path") { External.copy(c.path) }
             }
         }
+    }
+}
+
+extension FileLists {
+    /// "Ignore" for new files: adds a line to .gitignore. One file offers the
+    /// file itself, every file of its type, or its folder; a folder row
+    /// ignores the folder; several files are added one by one.
+    @ViewBuilder
+    fileprivate func ignoreItems(_ files: [FileChange], folder: String?) -> some View {
+        if let folder {
+            Button("Ignore Folder") { ignore([GitIgnore.pattern(forFolder: folder)]) }
+        } else if files.count == 1, let file = files.first {
+            Menu("Ignore") {
+                Button(file.fileName) { ignore([GitIgnore.pattern(forFile: file.path)]) }
+                if let pattern = GitIgnore.pattern(forExtensionOf: file.path) {
+                    Button("All .\(GitIgnore.fileExtension(file.path)) Files") { ignore([pattern]) }
+                }
+                if let dir = GitIgnore.folder(of: file.path) {
+                    Button("Folder \(dir)/") { ignore([GitIgnore.pattern(forFolder: dir)]) }
+                }
+            }
+        } else {
+            Button("Ignore \(files.count) Files") { ignore(files.map { GitIgnore.pattern(forFile: $0.path) }) }
+        }
+    }
+
+    private func ignore(_ patterns: [String]) {
+        Task { await model.ignore(patterns) }
     }
 }
 

@@ -46,7 +46,22 @@ struct SidebarMenu: View {
         } else if id.hasPrefix("pull:"), let status = model.hostStatus,
                   let pull = status.pulls.first(where: { "pull:\($0.number)" == id }) {
             pullMenu(pull, host: status.links.host)
+        } else if id.hasPrefix("remote:"), let remote = model.remotes.first(where: { "remote:" + $0.name == id }) {
+            remoteMenu(remote)
         }
+    }
+
+    @ViewBuilder
+    private func remoteMenu(_ remote: Remote) -> some View {
+        Button("Fetch \(remote.name)") { Task { await model.fetch(remote: remote.name) } }
+        Divider()
+        Button("Edit Remote…") { model.sheet = .editRemote(remote.name) }
+        Button("Copy URL") { External.copy(remote.url) }
+        if let links = model.links(for: remote.name), let url = URL(string: links.webBase) {
+            Button("Open on \(links.host)") { External.browse(url) }
+        }
+        Divider()
+        Button("Remove Remote…", role: .destructive) { model.removeRemote(remote.name) }
     }
 
     @ViewBuilder

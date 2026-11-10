@@ -1,3 +1,4 @@
+import CoworkKit
 import Foundation
 import GitCoworkCore
 
@@ -187,10 +188,49 @@ extension RepoModel {
         return ok
     }
 
-    /// Adds a remote (the repository had none).
+    /// Adds a remote: the first one, or another (a fork, the repository it was forked from).
     @discardableResult
     func addRemote(name: String, url: String, quiet: Bool = false) async -> Bool {
-        await perform("Add remote", ["remote", "add", name, url], quiet: quiet)
+        await perform("Add remote", ["remote", "add", "--", name, url], quiet: quiet)
+    }
+
+    /// Fetches one remote (the toolbar's Fetch gets all of them).
+    func fetch(remote name: String) async {
+        let ok = await perform("Fetch", ["fetch", "--prune", "--", name])
+        noteRemoteAction(fetched: false, succeeded: ok)
+    }
+
+    /// Gives a remote a new name, a new URL, or both.
+    @discardableResult
+    func editRemote(_ old: String, name: String, url: String, quiet: Bool = false) async -> Bool {
+        if name != old {
+            guard await perform("Rename remote", ["remote", "rename", "--", old, name], quiet: quiet) else { return false }
+            // Tasks keep syncing with the same remote under its new name.
+            if await git.tryLine(["config", "--get", CoworkRemote.configKey], in: root) == old {
+                _ = try? await git.run(CoworkRemote.rememberArgs(name), in: root, logged: true)
+            }
+            cowork.remote = await resolveCoworkRemote()
+        }
+        if url != remotes.first(where: { $0.name == name })?.url {
+            guard await perform("Change remote URL", ["remote", "set-url", "--", name, url], quiet: quiet) else { return false }
+        }
+        return true
+    }
+
+    /// Always asks: the remote's branches disappear from the sidebar and the graph.
+    func removeRemote(_ name: String) {
+        let tracking = localBranches.filter { $0.upstream.flatMap { remoteBranch(fullName: $0) }.flatMap(split)?.remote == name }.count
+        var message = String(localized: "Its branches disappear from this repository. Nothing changes on the server, and your local branches and commits stay.")
+        if tracking == 1 {
+            message += " " + L("1 local branch pushes to and pulls from it and will have no remote branch afterwards.")
+        } else if tracking > 1 {
+            message += " " + String(localized: "\(tracking) local branches push to and pull from it and will have no remote branch afterwards.")
+        }
+        confirmation = Confirmation(title: String(localized: "Remove remote \(name)?"), message: message,
+                                    confirmTitle: "Remove") { [weak self] in
+            guard let self, await perform("Remove remote", ["remote", "remove", "--", name]) else { return }
+            cowork.remote = await resolveCoworkRemote()
+        }
     }
 
     /// Always asks: a force push replaces the branch on the server.
@@ -517,6 +557,32 @@ extension RepoModel {
         let commit = await git.execute(["commit-tree", treeSHA] + parent + ["-m", "git-cowork: discarded changes"], in: root, env: env)
         let sha = commit.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
         return commit.exitCode == 0 && !sha.isEmpty ? sha : nil
+    }
+
+    /// Adds `patterns` to this worktree's `.gitignore` (created if there is
+    /// none). Not a git command: only that file changes, and it then shows
+    /// under Changes like any other edit, where it can be reviewed or discarded.
+    func ignore(_ patterns: [String]) async {
+        let file = root.appendingPathComponent(".gitignore")
+        let old = (try? Data(contentsOf: file)).map { String(decoding: $0, as: UTF8.self) } ?? ""
+        let new = GitIgnore.adding(patterns, to: old)
+        // Only what was added is written, at the end: the bytes already there
+        // (whatever their encoding) and a symlinked file stay as they are.
+        let added = Data(new.utf8.dropFirst(old.utf8.count))
+        guard !added.isEmpty else { return }
+        do {
+            if !FileManager.default.fileExists(atPath: file.path) {
+                try Data().write(to: file)
+            }
+            let handle = try FileHandle(forWritingTo: file)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            try handle.write(contentsOf: added)
+        } catch {
+            alert = AlertItem(title: L("Couldn't change .gitignore"), message: error.localizedDescription)
+            return
+        }
+        await refresh()
     }
 
     func commit(message: String, amend: Bool) async -> Bool {

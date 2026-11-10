@@ -21,6 +21,7 @@ struct RepoSheet: View {
         case .team: TeamSheet(model: model)
         case .pushTarget(let branch): PushTargetSheet(model: model, branch: branch)
         case .addRemote(let branch): AddRemoteSheet(model: model, thenPush: branch)
+        case .editRemote(let name): EditRemoteSheet(model: model, old: name)
         case .identity: IdentitySheet(model: model)
         }
     }
@@ -328,7 +329,7 @@ struct CloneSheet: View {
 }
 
 /// "A branch named x already exists." under a name field.
-private struct NameTaken: View {
+struct NameTaken: View {
     let text: String
     var body: some View {
         Text(verbatim: text).font(Theme.Font.small).foregroundStyle(Theme.Status.error)

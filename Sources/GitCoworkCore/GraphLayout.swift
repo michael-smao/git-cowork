@@ -16,6 +16,13 @@ public struct GraphRow: Hashable, Sendable {
     public let color: Int       // color index of the commit's lane
     public let lines: [GraphLine]
     public let laneCount: Int   // columns needed to draw this row
+
+    public init(lane: Int, color: Int, lines: [GraphLine] = [], laneCount: Int = 1) {
+        self.lane = lane
+        self.color = color
+        self.lines = lines
+        self.laneCount = laneCount
+    }
 }
 
 /// Assigns each commit a lane (column) and works out the lines to draw.
