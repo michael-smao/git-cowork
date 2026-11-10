@@ -6,6 +6,15 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Drag a repository tab sideways to move it. The other tabs step aside while
+  you drag, the tab you are on stays selected, and the next launch reopens the
+  tabs in the new order.
+
+### Changed
+- Dragging a tab no longer moves the window; drag the empty space next to the
+  tabs for that. A tab in a window in the background reacts to the first click.
+
 ## [0.5.2] - 2026-11-10
 
 ### Added

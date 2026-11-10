@@ -1,4 +1,5 @@
 import AppKit
+import GitCoworkCore
 import SwiftUI
 
 /// What a tab shows: the repo name, plus the folder for a linked worktree.
@@ -62,7 +63,7 @@ final class RepoTabs {
             window.observe(\.title) { _, _ in Self.changed() },
             window.observe(\.tabGroup) { _, _ in Self.changed() },
         ]
-        let host = NSHostingView(rootView: RepoTabStrip(window: WindowRef(window)))
+        let host = TabStripHostingView(rootView: RepoTabStrip(window: WindowRef(window)))
         if let close = window.standardWindowButton(.closeButton), let zoom = window.standardWindowButton(.zoomButton),
            let bar = Self.titlebarView(of: close, in: window) {
             // The title row above the expanded toolbar, right of the traffic lights.
@@ -86,6 +87,19 @@ final class RepoTabs {
     }
 
     func label(for window: NSWindow) -> RepoTabLabel? { labels[ObjectIdentifier(window)] }
+
+    /// Moves a tab to `index` in its group. The selected tab stays selected,
+    /// and the new order is what the next launch reopens.
+    func move(_ window: NSWindow, to index: Int) {
+        guard let group = window.tabGroup, let from = group.windows.firstIndex(of: window), from != index,
+              group.windows.indices.contains(index) else { return }
+        let selected = group.selectedWindow
+        group.insertWindow(window, at: index)
+        // AppKit selects another tab while it moves one.
+        if let selected, group.selectedWindow !== selected { group.selectedWindow = selected }
+        OpenSession.save()
+        setNeedsUpdate()
+    }
 
     func setLabel(_ label: RepoTabLabel?, for window: NSWindow) {
         let id = ObjectIdentifier(window)
@@ -157,6 +171,15 @@ final class RepoTabs {
     }
 }
 
+/// The strip sits in the title bar, where a drag moves the window by default.
+/// Tabs are dragged to reorder them instead; the empty space still moves the
+/// window (`WindowDragArea`). Like the traffic lights, a tab reacts to the
+/// first click even while the window is in the background.
+private final class TabStripHostingView: NSHostingView<RepoTabStrip> {
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 /// Weak window reference that SwiftUI can hold in a view value.
 struct WindowRef {
     weak var window: NSWindow?
@@ -164,13 +187,30 @@ struct WindowRef {
 }
 
 /// The tab row: one tab per open worktree, × on the selected or hovered tab,
-/// middle-click closes, "+" opens a new tab. Empty space drags the window.
+/// middle-click closes, "+" opens a new tab, drag a tab sideways to move it.
+/// Empty space drags the window.
 struct RepoTabStrip: View {
     static let height: CGFloat = 26
     static let tabHeight: CGFloat = 24
+    private static let space = "repoTabStrip"
 
     let window: WindowRef
     private var tabs: RepoTabs { RepoTabs.shared }
+    @State private var drag: Drag?
+    @State private var tabWidth: CGFloat = 0
+
+    /// A tab being dragged: it follows the pointer, the others step aside, and
+    /// it moves in the tab group when let go.
+    private struct Drag {
+        let id: ObjectIdentifier
+        let from: Int
+        /// Pointer x minus the tab's leading edge when the drag started.
+        let grab: CGFloat
+        var x: CGFloat
+        var to: Int
+    }
+
+    private var stride: CGFloat { tabWidth + TabRowLayout.spacing }
 
     /// One tab's content, read in `body` so a change redraws the strip.
     private struct Item: Identifiable {
@@ -192,12 +232,21 @@ struct RepoTabStrip: View {
                         detail: label?.worktree, symbol: label?.symbol ?? "plus.square.dashed", selected: w === selected)
         }
         TabRowLayout {
-            ForEach(items) { item in
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 let w = item.window
+                let dragged = drag?.id == item.id
                 RepoTab(title: (item.name, item.detail), symbol: item.symbol,
                         selected: item.selected, canCloseOthers: items.count > 1,
                         select: { select(w) }, close: { w.performClose(nil) },
                         closeOthers: { closeOthers(than: w, in: windows) })
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tabWidth = $0 }
+                    .offset(x: offset(of: index, count: items.count))
+                    .animation(dragged ? nil : .snappy(duration: 0.2), value: drag?.to)
+                    .zIndex(dragged ? 1 : 0)
+                    .shadow(color: .black.opacity(dragged ? 0.18 : 0), radius: 4, y: 1)
+                    .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .named(Self.space))
+                        .onChanged { dragChanged($0, id: item.id, index: index, count: items.count) }
+                        .onEnded { _ in dragEnded(windows) })
             }
             Button { WindowChrome.newTab(nextTo: window.window) } label: {
                 Image(systemName: "plus")
@@ -209,7 +258,44 @@ struct RepoTabStrip: View {
             .help(Text("New Tab"))
             WindowDragArea()
         }
+        .coordinateSpace(.named(Self.space))
         .frame(height: Self.height)
+    }
+
+    private func offset(of index: Int, count: Int) -> CGFloat {
+        guard let drag else { return 0 }
+        if index == drag.from { return leadingEdge(drag, count: count) - CGFloat(drag.from) * stride }
+        return CGFloat(TabReorder.shift(of: index, from: drag.from, to: drag.to)) * stride
+    }
+
+    /// Where the dragged tab's leading edge is, kept inside the row of tabs.
+    private func leadingEdge(_ drag: Drag, count: Int) -> CGFloat {
+        min(max(0, drag.x - drag.grab), CGFloat(max(0, count - 1)) * stride)
+    }
+
+    private func dragChanged(_ value: DragGesture.Value, id: ObjectIdentifier, index: Int, count: Int) {
+        if drag?.id != id {
+            drag = Drag(id: id, from: index, grab: value.startLocation.x - CGFloat(index) * stride,
+                        x: value.location.x, to: index)
+        }
+        guard var current = drag else { return }
+        current.x = value.location.x
+        current.to = TabReorder.target(from: current.from, leadingEdge: Double(leadingEdge(current, count: count)),
+                                       stride: Double(stride), count: count)
+        drag = current
+    }
+
+    private func dragEnded(_ windows: [NSWindow]) {
+        guard let done = drag else { return }
+        // Moved and redrawn in one go, so the tabs don't jump back for a frame.
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            if done.to != done.from, windows.indices.contains(done.from) {
+                tabs.move(windows[done.from], to: done.to)
+            }
+            drag = nil
+        }
     }
 
 
@@ -369,7 +455,7 @@ struct RepoTabLabelReporter: NSViewRepresentable {
 private struct TabRowLayout: Layout {
     private static let tabMinWidth: CGFloat = 72
     private static let tabMaxWidth: CGFloat = 220
-    private static let spacing = Theme.Space.xs
+    static let spacing = Theme.Space.xs
     /// Kept free after "+" so the window can always be dragged by the strip.
     private static let dragMinWidth: CGFloat = 40
 
