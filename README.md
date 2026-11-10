@@ -141,10 +141,11 @@ also drop a folder onto any window.
 |---|---|
 | **Tabs** | Every repo or worktree is a tab in the row beside the traffic lights, always shown, like GitKraken. Click to switch, × or middle-click to close, + or ⌘T for a new one. They open again at the next launch. |
 | **Toolbar** | Repository, worktree and branch pickers (recent repos; switch or add worktrees, shown with more than one; checkout), History / Board / Reviews, Fetch (all remotes), Pull ▾ (fetch all, ff-only, rebase, merge), Push ▾ (sets upstream; force-with-lease asks first), Branch, Worktree, Stash, Pop, Terminal, Editor, Inbox. |
-| **Sidebar** | Local, remote, worktrees, tasks, reviews, stashes, tags and team, with counts. Branch folders (`claude/…`, `codex/…`) open by default. Filter with ⌥⌘F. |
+| **Sidebar** | Local, remote, worktrees, tasks, reviews, stashes, tags and team, with counts. Branch folders (`claude/…`, `codex/…`) open by default. Filter with ⌥⌘F. Click a stash to see its files and diffs. Right-click a remote to fetch, rename or remove it or change its URL; + adds another. |
 | **Graph** | Lane-colored rows, author initials in nodes, branch badges connected to their commit, commits outside the current branch dimmed. A `// WIP` row above HEAD, plus one for every other worktree with uncommitted changes. |
 | **Commit panel** | Message, author and co-authors, parents, refs, file list as path or tree. |
-| **Changes panel** | Unstaged / staged / conflicts, stage per file or all, discard, commit, amend. |
+| **Search** | ⌘F filters the loaded commits by message, author or SHA. `file:name` finds the commits that changed a file, and `change:text` the ones that added or removed that text, across every branch and the whole history. |
+| **Changes panel** | Unstaged / staged / conflicts, stage per file or all, discard, commit, amend. Right-click a new file to ignore it, its file type or its folder (adds to `.gitignore`). |
 | **Diff** | Hunk or split view, intra-line highlights, stage / unstage / discard single hunks. |
 | **Merge / rebase** | Banner with Continue / Skip / Abort, conflicted files, "use mine / theirs". |
 | **Hosts** | "Create pull/merge request" and "Open on …" for GitHub, GitLab, Gitea and Forgejo, including self-hosted. |

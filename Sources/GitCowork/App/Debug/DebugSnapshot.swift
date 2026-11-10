@@ -10,6 +10,9 @@ import SwiftUI
 /// GITCOWORK_SNAPSHOT=/tmp/shot.png renders the front window (or its open sheet) to a PNG after a few seconds.
 enum DebugSnapshot {
     /// GITCOWORK_DEBUG_SELECT = "commit:<n>" (nth commit) | "diff" (first changed file) | "commitdiff:<n>"
+    ///   | "stash:<n>" (nth stash) | "stashdiff:<n>" (and its last file's diff)
+    /// GITCOWORK_DEBUG_FILTER = text for the history's search field, e.g. "file:Login".
+    /// GITCOWORK_DEBUG_SHEET = "addRemote" | "editRemote".
     /// GITCOWORK_DEBUG_MODE = "board" | "reviews", optionally ":<n>" to select the nth task / review.
     /// GITCOWORK_DEBUG_LOG = "1" opens the command log.
     @MainActor
@@ -29,6 +32,14 @@ enum DebugSnapshot {
         }
         // GITCOWORK_DEBUG_PUSH = "1": the toolbar's Push.
         if ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_PUSH"] != nil { await model.push() }
+        // GITCOWORK_DEBUG_FILTER = "file:Login": what to put in the history's search field.
+        if let filter = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_FILTER"] { model.filterText = filter }
+        // GITCOWORK_DEBUG_SHEET = "addRemote" | "editRemote" (the first remote): open that sheet.
+        switch ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_SHEET"] {
+        case "addRemote": model.sheet = .addRemote(thenPush: nil)
+        case "editRemote": if let remote = model.remotes.first { model.sheet = .editRemote(remote.name) }
+        default: break
+        }
         guard let sel = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_SELECT"] else { return }
         let parts = sel.split(separator: ":")
         let n = parts.count > 1 ? Int(parts[1]) ?? 0 : 0
@@ -41,6 +52,14 @@ enum DebugSnapshot {
             guard n < model.commits.count, let d = await model.commitDetail(model.commits[n].id) else { return }
             model.reveal(d.id)
             if let f = await model.changedFiles(d).first { model.openDiff = .commit(d, f) }
+        case "stash", "stashdiff":
+            // The nth stash in the right panel; "stashdiff" also opens its last file.
+            guard n < model.stashes.count else { return }
+            let stash = model.stashes[n]
+            model.selection = .stash(stash.sha)
+            if parts.first == "stashdiff", let c = await model.stashContents(stash), let f = c.files.last {
+                model.openDiff = .commit(c.source(of: f), f)
+            }
         default: break
         }
     }

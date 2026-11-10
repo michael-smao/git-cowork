@@ -46,6 +46,11 @@ final class RepoModel {
     /// Bumped whenever history rows change, so the table knows to reload.
     private(set) var historyVersion = 0
     var commitLimit = 2000
+    /// What `git log` found for the search field's `file:` / `change:` terms,
+    /// over the whole history. Nil while the field has neither.
+    private(set) var historySearch: HistorySearch?
+    /// Bumped whenever the found commits change, so the table reloads.
+    private(set) var historySearchVersion = 0
 
     // UI state shared across views
     var selection: HistorySelection? = .workingCopy
@@ -282,6 +287,7 @@ final class RepoModel {
             remoteDefaults = list.remoteDefaults
             stashes = Parsers.parseStashes(st)
             await loadHistory()
+            leaveMissingStash()
         }
 
         let newWorktrees = Parsers.parseWorktrees(wt)
@@ -353,6 +359,48 @@ final class RepoModel {
         refsByCommit = byCommit
         hasMoreCommits = newCommits.count >= commitLimit
         historyVersion += 1
+    }
+
+    // MARK: History search
+
+    /// Most commits a `file:` / `change:` search shows (the newest ones).
+    static let historySearchLimit = 2000
+
+    /// Runs the search field's `file:` / `change:` terms through `git log`,
+    /// over every branch and the whole history, not just the loaded commits.
+    /// The history view calls this whenever the terms or the history change;
+    /// a call that is overtaken is cancelled, which also stops its git.
+    func searchHistory(_ query: CommitQuery) async {
+        guard let key = query.historyKey else {
+            // No reload needed: the changed search text already rebuilt the list.
+            if historySearch != nil { historySearch = nil }
+            return
+        }
+        // The last result stays on screen until the new one is there.
+        historySearch = HistorySearch(key: key, commits: historySearch?.commits ?? [], running: true)
+        // Still typing: wait for a pause before starting git.
+        try? await Task.sleep(for: .milliseconds(250))
+        guard !Task.isCancelled else { return }
+        var args = ["log", "--date-order", "-n", "\(Self.historySearchLimit)", Parsers.logFormat]
+        args += query.logOptions
+        args += ["--branches", "--remotes", "--tags"]
+        if status.headOID != nil { args.append("HEAD") }
+        args.append("--")
+        args += query.logPathspecs
+        let out = await git.tryRun(args, in: root, cancellable: true)
+        guard !Task.isCancelled else { return }
+        let found = await Task.detached(priority: .userInitiated) { Parsers.parseLog(out ?? "") }.value
+        guard !Task.isCancelled else { return }
+        historySearch = HistorySearch(key: key, commits: found, running: false)
+        historySearchVersion += 1
+    }
+
+    /// The stash on screen was popped or deleted: show the changes it left
+    /// behind, or the checked-out commit.
+    private func leaveMissingStash() {
+        guard case .stash(let sha) = selection, !stashes.contains(where: { $0.sha == sha }) else { return }
+        if case .commit = openDiff { openDiff = nil }   // a file of that stash
+        selection = status.isClean ? (headSHA ?? commits.first?.id).map { .commit($0) } : .workingCopy
     }
 
     func loadMoreCommits() {
@@ -454,8 +502,9 @@ final class RepoModel {
 
     // MARK: Lookups
 
+    /// A loaded commit, or one a `file:` / `change:` search found further back.
     func commit(_ sha: String) -> Commit? {
-        commitIndex[sha].map { commits[$0] }
+        commitIndex[sha].map { commits[$0] } ?? historySearch?.commits.first { $0.id == sha }
     }
 
     func reveal(_ sha: String) {

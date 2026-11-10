@@ -92,6 +92,30 @@ extension RepoModel {
         return result
     }
 
+    // MARK: Stash contents
+
+    /// What `stash` holds: its changes to tracked files and the untracked
+    /// files saved with it. Nil when its commit can't be read.
+    func stashContents(_ stash: Stash) async -> StashContents? {
+        guard let d = await commitDetail(stash.sha), let parts = StashParts(parents: d.parents) else { return nil }
+        func standIn(_ id: String, parents: [String]) -> CommitDetail {
+            CommitDetail(id: id, parents: parents, authorName: d.authorName, authorEmail: d.authorEmail, authorDate: d.authorDate,
+                         committerName: d.committerName, committerEmail: d.committerEmail, committerDate: d.committerDate,
+                         message: d.message)
+        }
+        let changes = standIn(d.id, parents: [parts.base])
+        let changed = await changedFiles(changes)
+        var untracked: CommitDetail?
+        var added: [FileChange] = []
+        if let sha = parts.untracked {
+            let commit = standIn(sha, parents: [])
+            untracked = commit
+            added = await changedFiles(commit)
+        }
+        return StashContents(changes: changes, untracked: untracked, files: changed + added,
+                             untrackedPaths: Set(added.map(\.path)))
+    }
+
     /// The pushed (remote-tracking) branch, unless the local one is at or ahead
     /// of it. A reviewer's stale local checkout must not decide what a review shows.
     private func resolvedTip(_ name: String) async -> String? {
@@ -112,6 +136,30 @@ enum RepoLocator {
     /// Top-level folder of the worktree containing `path`, or nil if it isn't in a git repo.
     static func resolve(_ path: String) async -> String? {
         await GitRunner.shared.tryLine(["rev-parse", "--show-toplevel"], in: URL(fileURLWithPath: path))
+    }
+}
+
+/// Result of `RepoModel.stashContents`: a stash as two stand-in commits the
+/// diff viewer can show.
+struct StashContents {
+    /// The stash against the commit it was made on.
+    let changes: CommitDetail
+    /// The commit holding the stashed untracked files. It has no parent, so
+    /// every file in it reads as added.
+    let untracked: CommitDetail?
+    /// Changed files first, then the untracked ones.
+    let files: [FileChange]
+    let untrackedPaths: Set<String>
+
+    /// The stand-in commit `file` is diffed in.
+    func source(of file: FileChange) -> CommitDetail {
+        if let untracked, untrackedPaths.contains(file.path) { return untracked }
+        return changes
+    }
+
+    /// True for one of this stash's two stand-in commits.
+    func holds(_ detail: CommitDetail) -> Bool {
+        detail.id == changes.id || detail.id == untracked?.id
     }
 }
 

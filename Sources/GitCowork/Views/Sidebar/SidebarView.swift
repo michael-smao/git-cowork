@@ -111,6 +111,7 @@ private struct SidebarContent: View, Equatable {
             SidebarGroupRow(name: name, symbol: "folder", expanded: expanded, depth: item.depth) { toggleFolder(item.id) }
         case .remote(let name, let expanded):
             SidebarGroupRow(name: name, symbol: "network", expanded: expanded, depth: item.depth) { toggleFolder(item.id) }
+                .contextMenu { SidebarMenu(model: model, id: item.id, openHere: openHere, openInNewTab: openInNewTab) }
         case .branch(let ref, let label):
             SidebarRefRow(ref: ref, label: label, depth: item.depth, ci: model.ciState(ref.target))
                 .tag(item.id)
@@ -142,6 +143,10 @@ private struct SidebarContent: View, Equatable {
     private func header(_ section: SidebarSection, count: Int, expanded: Bool?, highlight: Bool, first: Bool) -> some View {
         let toggle = { toggleSection(section) }
         switch section {
+        case .remote:
+            SidebarSectionHeader(section: section, count: count, expanded: expanded, showsDivider: !first, toggle: toggle) {
+                HeaderAddButton(help: "Add remote") { model.sheet = .addRemote(thenPush: nil) }
+            }
         case .worktrees:
             SidebarSectionHeader(section: section, count: count, expanded: expanded, showsDivider: !first, toggle: toggle) {
                 HeaderAddButton(help: "Add worktree") { model.sheet = .addWorktree(base: nil) }
@@ -227,6 +232,10 @@ private struct SidebarContent: View, Equatable {
                   model.commitIndex[pull.headSHA] != nil {
             model.centerMode = .history
             model.reveal(pull.headSHA)
+        } else if id.hasPrefix("stash:"), let stash = model.stashes.first(where: { "stash:" + $0.selector == id }) {
+            model.centerMode = .history
+            model.openDiff = nil
+            model.selection = .stash(stash.sha)
         } else if id.hasPrefix("task:") {
             openCoworkTarget("tasks/" + id.dropFirst(5), model: model)
         } else if id.hasPrefix("review:") {
@@ -298,6 +307,10 @@ private struct SidebarSelectionSync: View {
         if id.hasPrefix("pull:") {
             guard model.centerMode == .history, case .commit(let sha)? = model.selection else { return false }
             return model.hostStatus?.pulls.contains { "pull:\($0.number)" == id && $0.headSHA == sha } ?? false
+        }
+        if id.hasPrefix("stash:") {
+            guard model.centerMode == .history, case .stash(let sha)? = model.selection else { return false }
+            return model.stashes.contains { "stash:" + $0.selector == id && $0.sha == sha }
         }
         if id.hasPrefix("task:") {
             return model.centerMode == .board && model.coworkSelection == .task(String(id.dropFirst(5)))

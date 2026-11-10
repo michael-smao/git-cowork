@@ -81,7 +81,9 @@ GITCOWORK_SNAPSHOT=/tmp/shot.png GITCOWORK_SNAPSHOT_QUIT=1 .build/debug/GitCowor
 ```
 
 - `GITCOWORK_SNAPSHOT_DELAY=<seconds>`
-- `GITCOWORK_DEBUG_SELECT=commit:<n> | diff | commitdiff:<n>`
+- `GITCOWORK_DEBUG_SELECT=commit:<n> | diff | commitdiff:<n> | stash:<n> | stashdiff:<n>`
+- `GITCOWORK_DEBUG_FILTER=<text>` (the history's search field, e.g. `file:Login` or `change:timeout`)
+- `GITCOWORK_DEBUG_SHEET=addRemote | editRemote`
 - `GITCOWORK_DEBUG_MODE=board | reviews` (add `:<n>` to select the nth task or review)
 - `GITCOWORK_DEBUG_APPEARANCE=light | dark`
 - `GITCOWORK_DEBUG_UPDATE=check | install` with `GIT_COWORK_API_BASE=…` and

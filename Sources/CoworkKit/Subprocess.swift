@@ -7,17 +7,51 @@ import GitCoworkCore
 public enum Subprocess {
     /// `env` nil inherits this process's environment. `timeout` stops the
     /// program (SIGTERM) when it runs longer; the result then says so in stderr.
+    /// `cancellable` also stops it when the calling task is cancelled. Only
+    /// for reads whose result nobody waits for anymore (a search typed over):
+    /// a command that changes the repository must always run to its end.
     public static func run(_ executable: String, _ args: [String], input: Data? = nil, env: [String: String]? = nil,
-                           dir: URL? = nil, timeout: TimeInterval? = nil) async -> GitOutput {
-        await withCheckedContinuation { cont in
-            DispatchQueue.global(qos: .userInitiated).async {
-                cont.resume(returning: runBlocking(executable, args, input: input, env: env, dir: dir, timeout: timeout))
+                           dir: URL? = nil, timeout: TimeInterval? = nil, cancellable: Bool = false) async -> GitOutput {
+        let stopper = cancellable ? Stopper() : nil
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { cont in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    cont.resume(returning: runBlocking(executable, args, input: input, env: env, dir: dir,
+                                                       timeout: timeout, stopper: stopper))
+                }
             }
+        } onCancel: {
+            stopper?.stop()
+        }
+    }
+
+    /// Stops a program when its task is cancelled, also when the cancellation
+    /// comes before the program has started.
+    private final class Stopper: @unchecked Sendable {
+        private let lock = NSLock()
+        private var process: Process?
+        private var stopped = false
+
+        /// Called once the program runs.
+        func attach(_ p: Process) {
+            lock.lock()
+            process = p
+            let stopNow = stopped
+            lock.unlock()
+            if stopNow, p.isRunning { p.terminate() }
+        }
+
+        func stop() {
+            lock.lock()
+            stopped = true
+            let p = process
+            lock.unlock()
+            if let p, p.isRunning { p.terminate() }
         }
     }
 
     private static func runBlocking(_ executable: String, _ args: [String], input: Data?, env: [String: String]?,
-                                    dir: URL?, timeout: TimeInterval?) -> GitOutput {
+                                    dir: URL?, timeout: TimeInterval?, stopper: Stopper? = nil) -> GitOutput {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: executable)
         p.arguments = args
@@ -31,6 +65,7 @@ public enum Subprocess {
         do { try p.run() } catch {
             return GitOutput(stdout: Data(), stderr: Data(error.localizedDescription.utf8), exitCode: -1)
         }
+        stopper?.attach(p)
         if let inPipe, let input {
             // Write on another thread so a large input can't deadlock against the output.
             DispatchQueue.global(qos: .userInitiated).async {

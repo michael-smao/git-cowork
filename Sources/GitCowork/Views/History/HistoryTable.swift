@@ -9,6 +9,8 @@ struct HistoryTable: NSViewRepresentable {
     // Passed in explicitly so SwiftUI calls updateNSView when they change.
     let version: Int
     let filter: String
+    /// Changes when a `file:` / `change:` search found other commits.
+    let searchVersion: Int
     let wipCount: Int
     let selection: HistorySelection?
     let revealToken: Int
@@ -84,7 +86,7 @@ struct HistoryTable: NSViewRepresentable {
     private func sync(_ coordinator: HistoryTableCoordinator) {
         coordinator.openHere = openHere
         coordinator.openInNewTab = openInNewTab
-        coordinator.sync(version: version, filter: filter, wipCount: wipCount, selection: selection,
+        coordinator.sync(version: version, filter: filter, searchVersion: searchVersion, wipCount: wipCount, selection: selection,
                          revealToken: revealToken, worktreeInfoVersion: worktreeInfoVersion, draftSummary: draftSummary)
     }
 }
@@ -128,6 +130,9 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
 
     private var version = -1
     private var filter = ""
+    /// `filter`, read as words and `file:` / `change:` terms.
+    private var query = CommitQuery("")
+    private var searchVersion = -1
     private var wipCount = -1
     private var worktreeInfoVersion = -1
     private var revealToken = 0
@@ -155,7 +160,9 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     var reviewByBranch: [String: ReviewRequest] = [:]
     var coworkCache: [Int: HistoryCoworkInfo] = [:]
 
-    var isFiltering: Bool { !filter.isEmpty }
+    /// The list shows matches only, as a flat list without graph lines.
+    /// (A term still being typed, like "file:", doesn't filter yet.)
+    var isFiltering: Bool { !query.isEmpty }
 
     init(model: RepoModel) {
         self.model = model
@@ -163,17 +170,19 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         observeCowork()
     }
 
-    func sync(version: Int, filter: String, wipCount: Int, selection: HistorySelection?, revealToken: Int,
+    func sync(version: Int, filter: String, searchVersion: Int, wipCount: Int, selection: HistorySelection?, revealToken: Int,
               worktreeInfoVersion: Int, draftSummary: String) {
         guard let table else { return }
         let summaryChanged = draftSummary != self.draftSummary
         self.draftSummary = draftSummary
         refreshCoworkIfNeeded()
-        if version != self.version || filter != self.filter || wipCount != self.wipCount
-            || worktreeInfoVersion != self.worktreeInfoVersion {
+        if version != self.version || filter != self.filter || searchVersion != self.searchVersion
+            || wipCount != self.wipCount || worktreeInfoVersion != self.worktreeInfoVersion {
             let firstLoad = self.version == -1
             self.version = version
             self.filter = filter
+            self.query = CommitQuery(filter)
+            self.searchVersion = searchVersion
             self.wipCount = wipCount
             self.worktreeInfoVersion = worktreeInfoVersion
             wipCountsCache = nil
@@ -266,13 +275,10 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         var info: [Int: HistoryWIPInfo] = [:]
         r.reserveCapacity(commits.count + 1)
 
-        guard filter.isEmpty else {
-            let q = filter.lowercased()
-            for (i, c) in commits.enumerated() {
-                if c.subject.lowercased().contains(q) || c.authorName.lowercased().contains(q)
-                    || c.id.hasPrefix(q) || c.bodyPreview.lowercased().contains(q) {
-                    r.append(.commit(i))
-                }
+        if query.searchesHistory { showSearchResults() }
+        guard query.isEmpty else {
+            for (i, c) in commits.enumerated() where query.matches(c) {
+                r.append(.commit(i))
             }
             rows = r
             wipInfo = [:]
@@ -328,6 +334,32 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         }
         rows = r
         wipInfo = info
+    }
+
+    /// A `file:` / `change:` search: the list is what git found in the whole
+    /// history instead of the loaded commits. A found commit that is also
+    /// loaded keeps its lane color and its dimming.
+    private func showSearchResults() {
+        let found = model.historySearch?.commits ?? []
+        let loaded = commitIndex, loadedGraph = graph, loadedAncestry = ancestry
+        var index: [String: Int] = [:]
+        index.reserveCapacity(found.count)
+        var rowsGraph: [GraphRow] = []
+        rowsGraph.reserveCapacity(found.count)
+        var onHead: [Bool] = []
+        onHead.reserveCapacity(found.count)
+        for (i, c) in found.enumerated() {
+            index[c.id] = i
+            let j = loaded[c.id]
+            rowsGraph.append(GraphRow(lane: 0, color: j.flatMap { $0 < loadedGraph.count ? loadedGraph[$0].color : nil } ?? 0))
+            onHead.append(j.map { $0 < loadedAncestry.count ? loadedAncestry[$0] : true } ?? true)
+        }
+        commits = found
+        commitIndex = index
+        graph = rowsGraph
+        ancestry = onHead
+        // maxLanes stays that of the loaded graph, so the column keeps its
+        // width, as it does while filtering by words.
     }
 
     private func wipRowInfo(target: Int?) -> HistoryWIPInfo {
@@ -394,7 +426,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         case .commit(let sha):
             guard let i = commitIndex[sha] else { return nil }
             return rows.firstIndex(of: .commit(i))
-        case nil: return nil
+        case .stash, nil: return nil   // a stash has no row
         }
     }
 

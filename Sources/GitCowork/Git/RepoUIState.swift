@@ -6,6 +6,19 @@ import GitCoworkCore
 enum HistorySelection: Hashable {
     case workingCopy
     case commit(String)
+    /// A stash picked in the sidebar, by its commit (selectors like
+    /// stash@{0} move whenever a stash is added or removed).
+    case stash(String)
+}
+
+/// Commits found by the search field's `file:` / `change:` terms (RepoModel.searchHistory).
+struct HistorySearch {
+    /// `CommitQuery.historyKey` of the terms `commits` belong to, or, while
+    /// `running`, of the terms git is looking for now.
+    let key: String
+    /// Newest first. While `running`, still those of the search before.
+    let commits: [Commit]
+    let running: Bool
 }
 
 struct WorktreeInfo: Hashable {
@@ -105,8 +118,10 @@ enum SheetKind: Identifiable {
     case team
     /// Push a branch that has no upstream yet: pick the remote and the name there.
     case pushTarget(branch: String)
-    /// The repository has no remote: add one, then push `branch` if given.
+    /// Add a remote (the first one, or another), then push `branch` if given.
     case addRemote(thenPush: String?)
+    /// Rename a remote or change its URL.
+    case editRemote(String)
     /// git doesn't know the user's name and email yet.
     case identity
 
@@ -123,6 +138,7 @@ enum SheetKind: Identifiable {
         case .team: "team"
         case .pushTarget(let b): "pushTarget:\(b)"
         case .addRemote(let b): "addRemote:\(b ?? "")"
+        case .editRemote(let r): "editRemote:\(r)"
         case .identity: "identity"
         }
     }

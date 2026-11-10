@@ -211,17 +211,78 @@ private struct HistoryCenter: View {
     let openInNewTab: (String) -> Void
 
     var body: some View {
-        HistoryTable(
-            model: model,
-            version: model.historyVersion,
-            filter: model.filterText,
-            wipCount: model.status.changeCount,
-            selection: model.selection,
-            revealToken: model.revealToken,
-            worktreeInfoVersion: model.worktreeInfoVersion,
-            draftSummary: model.draftSummary,
-            openHere: openHere,
-            openInNewTab: openInNewTab)
+        let query = CommitQuery(model.filterText)
+        ZStack {
+            HistoryTable(
+                model: model,
+                version: model.historyVersion,
+                filter: model.filterText,
+                searchVersion: model.historySearchVersion,
+                wipCount: model.status.changeCount,
+                selection: model.selection,
+                revealToken: model.revealToken,
+                worktreeInfoVersion: model.worktreeInfoVersion,
+                draftSummary: model.draftSummary,
+                openHere: openHere,
+                openInNewTab: openInNewTab)
+            if let note = SearchNote(query, in: model) {
+                EmptyState(symbol: "magnifyingglass", title: note.title, message: note.message, messageWidth: 420)
+                    .background(Color(nsColor: .controlBackgroundColor))
+            }
+        }
+        // `file:` and `change:` ask git; again when the history itself changed.
+        .task(id: SearchRun(terms: query.historyKey, history: model.historyVersion)) {
+            await model.searchHistory(query)
+        }
+    }
+
+    private struct SearchRun: Hashable {
+        let terms: String?
+        let history: Int
+    }
+}
+
+/// What to say in place of the commit list when a search shows no rows:
+/// still looking, or nothing found (and what else to try).
+private struct SearchNote {
+    let title: String
+    let message: String?
+
+    @MainActor
+    init?(_ query: CommitQuery, in model: RepoModel) {
+        guard !query.isEmpty else { return nil }
+        if query.searchesHistory {
+            let search = model.historySearch
+            let found = search?.commits ?? []
+            if found.contains(where: query.matches) { return nil }
+            if search?.running ?? true {
+                guard found.isEmpty else { return nil }   // the last result is still showing
+                title = L("Searching the whole history…")
+                message = nil
+            } else {
+                title = L("No commits found")
+                message = Self.nothingFound(query)
+            }
+        } else {
+            guard !model.commits.contains(where: query.matches) else { return nil }
+            title = L("No commits match")
+            let n = model.commits.count
+            let scope = model.hasMoreCommits
+                ? String(localized: "Words look at the message, author and SHA of the newest \(n) commits; scroll down in the list to load older ones.")
+                : L("Words look at the message, author and SHA of every commit.")
+            message = scope + "\n\n" + L("Type file:name to find commits that changed a file, or change:text to find commits that added or removed that text, anywhere in the history.")
+        }
+    }
+
+    private static func nothingFound(_ query: CommitQuery) -> String {
+        switch (query.file, query.change, query.text.isEmpty) {
+        case (let file?, nil, true):
+            String(localized: "No commit on any branch changed a file with “\(file)” in its path.")
+        case (nil, let change?, true):
+            String(localized: "No commit on any branch added or removed “\(change)”.")
+        default:
+            L("No commit on any branch matches every part of the search.")
+        }
     }
 }
 
@@ -238,6 +299,8 @@ private struct InspectorColumn: View {
                 ChangesPanel(model: model)
             case .commit(let sha):
                 CommitPanel(model: model, sha: sha)
+            case .stash(let sha):
+                StashPanel(model: model, sha: sha)
             case nil:
                 EmptyState(symbol: "point.3.connected.trianglepath.dotted", title: "Select a commit")
             }

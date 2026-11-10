@@ -10,8 +10,9 @@ import GitCoworkCore
 ///     GITCOWORK_ACTIONS_SELFTEST=/tmp/some-empty-dir .build/debug/GitCowork
 /// Pull with uncommitted changes (fast-forward, merge, rebase, a conflicting
 /// autostash), merge, rejected and force pushes, deleting branches here and on
-/// the remote, removing worktrees, and checking out a branch another worktree
-/// holds. A second clone plays the teammate who pushes in between.
+/// the remote, removing worktrees, checking out a branch another worktree
+/// holds, what a stash holds, Ignore, a second remote, and the `file:` /
+/// `change:` search. A second clone plays the teammate who pushes in between.
 @MainActor
 enum GitActionsSelfTest {
     static func runIfRequested() {
@@ -323,6 +324,104 @@ enum GitActionsSelfTest {
             check(false, "w3 is listed")
         }
         model.openWorktree = nil
+
+        print("13. a stash shows its changes and its new files, and Pop brings them back")
+        await sh(["reset", "-q", "--hard"], in: repo)
+        await sh(["clean", "-qfd"], in: repo)
+        write("one, stashed\n", "a.txt", in: repo)
+        write("brand new\n", "new.txt", in: repo)
+        await model.refresh()
+        await model.stash(message: "half done")
+        check(model.status.isClean, "the working copy is clean after stashing")
+        if let stash = model.stashes.first, let contents = await model.stashContents(stash) {
+            check(stash.title == "half done" && stash.branch == "main", "the stash knows its message and branch")
+            check(contents.files.map(\.path) == ["a.txt", "new.txt"], "lists the changed file, then the new one")
+            let changed = contents.files[0], added = contents.files[1]
+            check(contents.source(of: changed).id == stash.sha, "the changed file is diffed against the commit the stash was made on")
+            check(contents.source(of: added).id != stash.sha && contents.source(of: added).parents.isEmpty,
+                  "the new file comes from the stash's commit of untracked files")
+            let diff = String(decoding: await DiffLoader.commit(contents.source(of: changed), file: changed, root: repo), as: UTF8.self)
+            check(diff.contains("+one, stashed"), "the changed file's diff shows the stashed line")
+            let newDiff = String(decoding: await DiffLoader.commit(contents.source(of: added), file: added, root: repo), as: UTF8.self)
+            check(newDiff.contains("+brand new"), "the new file's diff shows its content")
+            model.selection = .stash(stash.sha)
+            await model.popStash(stash)
+            check(model.stashes.isEmpty, "Pop removed the stash")
+            check(model.selection == .workingCopy, "and the panel moved on to the changes it brought back")
+            check(read("a.txt", in: repo) == "one, stashed\n" && read("new.txt", in: repo) == "brand new\n", "both files are back")
+        } else {
+            check(false, "the stash is listed and readable")
+        }
+        await sh(["reset", "-q", "--hard"], in: repo)
+        await sh(["clean", "-qfd"], in: repo)
+
+        print("14. Ignore adds to .gitignore and the files leave Changes")
+        try? fm.createDirectory(at: repo.appendingPathComponent("tmp"), withIntermediateDirectories: true)
+        write("noise\n", "junk.log", in: repo)
+        write("x\n", "tmp/cache.bin", in: repo)
+        await model.refresh()
+        check(Set(model.status.untracked.map(\.path)) == ["junk.log", "tmp/cache.bin"], "both new files are listed")
+        await model.ignore([GitIgnore.pattern(forFile: "junk.log")])
+        check(model.status.untracked.map(\.path).sorted() == [".gitignore", "tmp/cache.bin"], "junk.log is gone, .gitignore is new")
+        await model.ignore([GitIgnore.pattern(forFolder: "tmp")])
+        check(model.status.untracked.map(\.path) == [".gitignore"], "the folder's file is gone too")
+        await model.ignore([GitIgnore.pattern(forFile: "junk.log"), GitIgnore.pattern(forFolder: "tmp")])
+        check(read(".gitignore", in: repo) == "/junk.log\n/tmp/\n", "each pattern is in the file once")
+        check(fm.fileExists(atPath: repo.appendingPathComponent("junk.log").path), "the ignored file itself is untouched")
+        await sh(["clean", "-qfdx"], in: repo)
+        await model.refresh()
+
+        print("15. add, fetch, rename, edit and remove a second remote")
+        let fork = dir.appendingPathComponent("fork.git")
+        await sh(["clone", "-q", "--bare", remote.path, fork.path], in: dir)
+        check(await model.addRemote(name: "fork", url: fork.path), "added")
+        check(model.remoteNames == ["fork", "origin"] || model.remoteNames == ["origin", "fork"], "both remotes are listed")
+        await model.fetch(remote: "fork")
+        check(model.remoteBranch(fullName: "fork/main") != nil, "its branches are here after the fetch")
+        await sh(["config", "cowork.remote", "fork"], in: repo)
+        check(await model.editRemote("fork", name: "mine", url: fork.path), "renamed")
+        check(model.remoteNames.contains("mine") && !model.remoteNames.contains("fork"), "listed under the new name")
+        check(model.remoteBranch(fullName: "mine/main") != nil, "its branches follow")
+        check(await sh(["config", "--get", "cowork.remote"], in: repo) == "mine", "tasks keep syncing with it under the new name")
+        check(await model.editRemote("mine", name: "mine", url: mate.path), "URL changed")
+        check(model.remotes.first { $0.name == "mine" }?.url == mate.path, "the new URL is listed")
+        check(await !model.addRemote(name: "mine", url: fork.path, quiet: true), "a second remote of the same name is refused")
+        model.problem = nil
+        await sh(["config", "--unset", "cowork.remote"], in: repo)
+        await sh(["branch", "-q", "--track", "follows-mine", "mine/main"], in: repo)
+        await model.refresh()
+        model.removeRemote("mine")
+        let removal = model.confirmation
+        check(removal?.title == "Remove remote mine?" && removal?.destructive == true, "removing asks first, as destructive")
+        check(removal?.message.contains("1 local branch pushes to and pulls from it") == true, "and says a local branch follows it")
+        model.confirmation = nil
+        await removal?.action()
+        check(model.remoteNames == ["origin"], "only origin is left")
+        check(model.remoteBranch(fullName: "mine/main") == nil, "its branches are gone")
+        check(model.localBranch(named: "follows-mine") != nil, "the local branch stays")
+        check(await head() == sh(["rev-parse", "origin/main"], in: repo), "origin and main are untouched")
+
+        print("16. file: and change: search the whole history")
+        write("let zebraStripe = 1\n", "zoo.swift", in: repo)
+        await sh(["add", "--", "zoo.swift"], in: repo)
+        await sh(["commit", "-qm", "Add the zoo"], in: repo)
+        await model.refresh()
+        await model.searchHistory(CommitQuery("file:ZOO"))
+        check(model.historySearch?.commits.map(\.subject) == ["Add the zoo"], "file: finds the commit by a part of the path, whatever the case")
+        check(model.historySearch?.running == false, "and says it's done")
+        await model.searchHistory(CommitQuery("change:ZEBRAstripe"))
+        check(model.historySearch?.commits.map(\.subject) == ["Add the zoo"], "change: finds the commit that added the text")
+        await model.searchHistory(CommitQuery("change:\"no such text anywhere\""))
+        check(model.historySearch?.commits.isEmpty == true, "nothing found is an empty result")
+        await model.searchHistory(CommitQuery("file:g.txt change:g"))
+        check(model.historySearch?.commits.map(\.subject) == ["me: g.txt"], "both terms together narrow it down")
+        await model.searchHistory(CommitQuery("zoo"))
+        check(model.historySearch == nil, "plain words clear the search")
+        check(model.commit(await head())?.subject == "Add the zoo", "loaded commits are still found by sha")
+        let slow = Task { await model.searchHistory(CommitQuery("change:zebra")) }
+        slow.cancel()
+        await slow.value
+        check(model.historySearch?.commits.isEmpty == true, "a search that was typed over leaves no result behind")
 
         model.stopWatching()
         return failures == 0
