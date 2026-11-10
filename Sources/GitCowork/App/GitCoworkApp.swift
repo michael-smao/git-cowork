@@ -103,6 +103,36 @@ enum LaunchFolders {
         return pending
     }
 
+    /// Which of `pending` comes to the front: the tab that was in front at
+    /// the last quit, or the last folder from the command line.
+    static var front: String?
+    /// Repositories opening as background tabs at launch. Their windows load
+    /// the repository only when first selected, so a launch with many tabs
+    /// loads one, not all of them at once.
+    private static var background: Set<String> = []
+
+    static func opensInBackground(_ path: String) -> Bool { background.contains(path) }
+    static func markBackground(_ path: String) { background.insert(path) }
+
+    /// All tabs are there: from now on tabs load right away, and the session is saved again.
+    static func finishRestore() {
+        background = []
+        OpenSession.finishLaunching()
+    }
+
+    /// Name and folder for a tab whose repository hasn't loaded yet, read
+    /// from the files alone: the folder name, or for a linked worktree the
+    /// main repository's name plus the worktree's folder.
+    static func tabLabel(for path: String) -> RepoTabLabel {
+        let folder = (path as NSString).lastPathComponent
+        let gitFile = (path as NSString).appendingPathComponent(".git")
+        if let contents = try? String(contentsOfFile: gitFile, encoding: .utf8),
+           let main = WorktreeLink.mainWorktree(gitFile: contents, worktree: path) {
+            return RepoTabLabel(name: (main as NSString).lastPathComponent, worktree: folder)
+        }
+        return RepoTabLabel(name: folder, worktree: nil)
+    }
+
     /// At launch: the repositories open at the last quit (Settings › Reopen
     /// repositories), then folders from the command line, as tabs.
     static func openFromCommandLine() {
@@ -119,7 +149,8 @@ enum LaunchFolders {
                 return
             }
             pending = plan.open
-            // The first, empty window takes them: the first here, the rest as tabs.
+            front = plan.select
+            // The first, empty window takes them: the front one here, the rest as background tabs.
             NotificationCenter.default.post(name: .launchFoldersPending, object: nil)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 if !pending.isEmpty {
@@ -127,11 +158,9 @@ enum LaunchFolders {
                     WindowAccessor.setPendingParent(NSApp.orderedWindows.first { $0.isVisible && $0.tabbingIdentifier == WindowChrome.tabbingIdentifier })
                     newWindow()
                 }
-                // Tabs open one after another; then the one that was in front comes back to the front.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    if let select = plan.select { OpenSession.window(for: select)?.makeKeyAndOrderFront(nil) }
-                    OpenSession.finishLaunching()
-                }
+                // The window that takes them calls finishRestore once all tabs are
+                // there. Should none take them, saving must not stay off.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 30) { finishRestore() }
             }
         }
     }

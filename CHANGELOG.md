@@ -14,6 +14,29 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 ### Changed
 - Dragging a tab no longer moves the window; drag the empty space next to the
   tabs for that. A tab in a window in the background reacts to the first click.
+- At launch the tab that was in front opens first and right away; the other
+  repositories join as tabs behind it, in their order, without windows
+  popping up one after another. A background tab loads its repository when you
+  first select it, so a launch with many tabs no longer loads all of them at
+  once and the app stays responsive.
+- A worktree's tab shows the repository name in full and cuts the worktree
+  folder first.
+
+### Fixed
+- The app no longer stops running git commands after a while. With many
+  commands at once (many repositories loading at launch), every worker thread
+  ended up waiting for another one, so from then on actions never finished,
+  deleting a remote branch waited forever and quitting hung. Each command now
+  waits on a thread of its own.
+- Commands that talk to a server can't hang forever: an HTTPS transfer that
+  stalls for a minute fails, and fetch, pull and push stop after 10 minutes
+  (ls-remote after 1). Clone has no limit.
+- Push on a branch that follows a remote branch with another name (git
+  refused with "The upstream branch of your current branch does not match")
+  asks where to push: to that remote branch, or to a new one of the same name
+  that the branch follows from now on.
+- The list that expands from a row's branch badges covers the row's "+N", so
+  it no longer peeks out next to it.
 
 ## [0.5.2] - 2026-11-10
 

@@ -24,3 +24,19 @@ import Testing
         #expect(SessionRestore.plan(saved: [], selected: nil, commandLine: [], alreadyOpen: [], exists: all) == .init(open: [], select: nil))
     }
 }
+
+@Suite struct WorktreeLinkTests {
+    @Test func readsTheMainRepository() {
+        #expect(WorktreeLink.mainWorktree(gitFile: "gitdir: /Users/me/git/app/.git/worktrees/fix-1\n", worktree: "/Users/me/git/app/.claude/worktrees/fix-1")
+                == "/Users/me/git/app")
+    }
+
+    @Test func resolvesRelativePaths() {
+        #expect(WorktreeLink.mainWorktree(gitFile: "gitdir: ../../app/.git/worktrees/x", worktree: "/w/wt/x") == "/w/app")
+    }
+
+    @Test func ignoresOtherFiles() {
+        #expect(WorktreeLink.mainWorktree(gitFile: "gitdir: /x/modules/sub", worktree: "/y") == nil)
+        #expect(WorktreeLink.mainWorktree(gitFile: "", worktree: "/y") == nil)
+    }
+}

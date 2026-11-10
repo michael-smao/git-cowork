@@ -51,13 +51,15 @@ public struct BadgeListLayout: Equatable, Sendable {
     ///   - widths: full width of each badge.
     ///   - anchor: top-left of the first badge as drawn in the row.
     ///   - container: visible area the panel must stay inside.
+    ///   - covering: width the row's badges and "+N" take; the panel is at
+    ///     least that wide, so none of them peek out next to it.
     public static func make(widths: [CGFloat], badgeHeight: CGFloat, spacing: CGFloat, padding: CGFloat,
-                            anchor: CGPoint, container: CGRect) -> BadgeListLayout {
+                            anchor: CGPoint, container: CGRect, covering: CGFloat = 0) -> BadgeListLayout {
         let n = widths.count
         guard n > 0 else { return BadgeListLayout(frame: .zero, tops: [], widths: []) }
         let maxInner = max(container.width - padding * 2, 0)
         let fitted = widths.map { min($0, maxInner) }
-        let width = (fitted.max() ?? 0) + padding * 2
+        let width = min(max(fitted.max() ?? 0, covering), maxInner) + padding * 2
         let height = CGFloat(n) * badgeHeight + CGFloat(n - 1) * spacing + padding * 2
 
         var x = anchor.x - padding

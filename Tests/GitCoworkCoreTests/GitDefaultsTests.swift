@@ -5,6 +5,16 @@ import Testing
 /// A repository whose own config sets core.fsmonitor to a script must not get
 /// that script run when the app calls `git status`.
 @Suite struct GitDefaultsTests {
+    @Test func onlyServerCommandsTimeOut() {
+        #expect(GitDefaults.timeout(for: ["fetch", "--prune", "origin"]) == 600)
+        #expect(GitDefaults.timeout(for: ["push", "-u", "origin", "main"]) == 600)
+        #expect(GitDefaults.timeout(for: ["ls-remote", "origin"]) == 60)
+        #expect(GitDefaults.timeout(for: ["clone", "url", "dir"]) == nil)
+        #expect(GitDefaults.timeout(for: ["status", "--porcelain"]) == nil)
+        // A branch named "push" isn't a push.
+        #expect(GitDefaults.timeout(for: ["switch", "push"]) == nil)
+    }
+
     @discardableResult
     private func git(_ args: [String], in dir: URL) throws -> Int32 {
         let p = Process()

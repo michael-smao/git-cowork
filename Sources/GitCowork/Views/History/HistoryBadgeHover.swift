@@ -112,6 +112,11 @@ final class HistoryBadgeHover: NSResponder {
         return x >= BadgePainter.lead - GraphStyle.Badge.gap && x <= layout.extent + GraphStyle.Badge.gap ? row : nil
     }
 
+    /// Right edge of what the row draws (badges and "+N"), so the list covers it.
+    private func rowExtent(_ badges: [GraphBadge], width: CGFloat) -> CGFloat {
+        BadgePainter.layout(badges, width: width)?.extent ?? BadgePainter.lead
+    }
+
     private func show(_ row: Int) {
         guard let table, let scroll, let coordinator, row >= 0, row < coordinator.rows.count, case .commit(let i) = coordinator.rows[row],
               let refs = coordinator.column(.refs) else { return }
@@ -124,7 +129,8 @@ final class HistoryBadgeHover: NSResponder {
         let anchor = CGPoint(x: cell.minX + BadgePainter.lead, y: cell.midY - style.height / 2)
         let layout = BadgeListLayout.make(widths: badges.map(BadgePainter.fullWidth), badgeHeight: style.height,
                                           spacing: style.listSpacing, padding: style.listPadding,
-                                          anchor: anchor, container: table.visibleRect.insetBy(dx: 2, dy: 2))
+                                          anchor: anchor, container: table.visibleRect.insetBy(dx: 2, dy: 2),
+                                          covering: rowExtent(badges, width: cell.width) - BadgePainter.lead)
         let lane = Theme.lane(i < coordinator.graph.count ? coordinator.graph[i].color : 0)
 
         let view = list ?? HistoryBadgeListView()

@@ -175,9 +175,36 @@ extension RepoModel {
             sheet = remoteNames.isEmpty ? .addRemote(thenPush: branch) : .pushTarget(branch: branch)
             return
         }
+        // git refuses a plain push when the upstream has another name (push.default
+        // simple). Pushing there could even be main: ask where it should go.
+        if let upstream = status.upstream, let branch = currentBranch,
+           let target = RefName.splitRemote(upstream, remotes: remoteNames), target.branch != branch {
+            askPushTarget(branch: branch, upstream: upstream, remote: target.remote, upstreamBranch: target.branch, force: force)
+            return
+        }
         if await perform(force ? "Force push" : "Push", args) {
             noteRemoteAction(fetched: false, succeeded: true)
         }
+    }
+
+    /// The branch follows a remote branch with another name: push there, or
+    /// to a new remote branch of the same name that it follows from now on.
+    private func askPushTarget(branch: String, upstream: String, remote: String, upstreamBranch: String, force: Bool) {
+        confirmation = Confirmation(
+            title: String(localized: "Where should \(branch) go?"),
+            message: String(localized: "\(branch) follows \(upstream), a branch with another name. Push your commits there, or to a new branch \(remote)/\(branch) that it follows from now on."),
+            confirmTitle: String(localized: "Push to \(upstream)"),
+            destructive: false,
+            action: { [weak self] in
+                guard let self else { return }
+                var args = ["push"]
+                if force { args.append("--force-with-lease") }
+                args += ["--end-of-options", remote, "refs/heads/\(branch):refs/heads/\(upstreamBranch)"]
+                if await perform(force ? "Force push" : "Push", args) { noteRemoteAction(fetched: false, succeeded: true) }
+            },
+            alternativeTitle: String(localized: "Push as \(remote)/\(branch)"),
+            alternative: { [weak self] in await self?.push(branch: branch, to: remote, as: branch) }
+        )
     }
 
     /// Pushes `branch` to `remoteBranch` on `remote` and tracks it from now on.

@@ -802,3 +802,8 @@
 "Type file:name to find commits that changed a file, or change:text to find commits that added or removed that text, anywhere in the history." = "Mit file:name findest du Commits, die eine Datei geändert haben, und mit change:text Commits, die diesen Text hinzugefügt oder entfernt haben – im gesamten Verlauf.";
 "Words look at the message, author and SHA of every commit." = "Wörter durchsuchen Nachricht, Autor und SHA aller Commits.";
 "Words look at the message, author and SHA of the newest %lld commits; scroll down in the list to load older ones." = "Wörter durchsuchen Nachricht, Autor und SHA der neuesten %lld Commits; scroll in der Liste nach unten, um ältere zu laden.";
+
+/* Push when the upstream has another name */
+"Where should %@ go?" = "Wohin soll %@?";
+"%@ follows %@, a branch with another name. Push your commits there, or to a new branch %@/%@ that it follows from now on." = "%1$@ folgt %2$@, einem Branch mit anderem Namen. Pushe deine Commits dorthin oder in einen neuen Branch %3$@/%4$@, dem er ab jetzt folgt.";
+"Push as %@/%@" = "Als %1$@/%2$@ pushen";
