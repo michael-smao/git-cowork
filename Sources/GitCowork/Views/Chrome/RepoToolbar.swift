@@ -210,7 +210,7 @@ private struct WorktreePicker: View {
     let openInNewTab: (String) -> Void
 
     var body: some View {
-        StackedPicker(caption: "worktree", title: title, help: model.root.path) {
+        StackedPicker(caption: "worktree", title: title, help: model.root.path, close: leave) {
             ForEach(model.worktrees) { wt in
                 Toggle(isOn: Binding(get: { wt.path == model.root.path },
                                      set: { _ in if wt.path != model.root.path { openHere(wt.path) } })) {
@@ -232,6 +232,12 @@ private struct WorktreePicker: View {
 
     private var title: String {
         model.worktrees.first(where: { $0.path == model.root.path }).map(name) ?? model.root.lastPathComponent
+    }
+
+    /// ✕ in a linked worktree: back to the main one, in this tab (like GitKraken).
+    private var leave: PickerClose? {
+        guard let main = model.mainWorktreePath, main != model.root.path else { return nil }
+        return .init(help: L("Leave worktree, back to the main worktree")) { openHere(main) }
     }
 
     private var others: [Worktree] { model.worktrees.filter { $0.path != model.root.path } }
