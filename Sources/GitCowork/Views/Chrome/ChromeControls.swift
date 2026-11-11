@@ -13,6 +13,9 @@ enum ChromeStyle {
     static let buttonMinWidth: CGFloat = 40
     static let chevronPadding: CGFloat = 2
     static let dividerHeight: CGFloat = 28
+    /// The ✕ before a picker's value (leave worktree).
+    static let closeSize: CGFloat = 14
+    static let closeLift: CGFloat = 1
 
     // Center mode switch (History | Board | Reviews)
     static let segment = Font.system(size: 11, weight: .medium)
@@ -97,14 +100,42 @@ struct ChromeSplitButton<Items: View>: View {
     }
 }
 
+/// The ✕ before a picker's value and what it does.
+struct PickerClose {
+    let help: String
+    let action: () -> Void
+}
+
 /// GitKraken-style picker: small grey caption above a bold value with ▾.
+/// With `close`, a small ✕ sits before the value (leave the worktree).
 struct StackedPicker<Items: View>: View {
     let caption: String
     let title: String
     var help: String?
+    var close: PickerClose?
     @ViewBuilder var items: Items
 
     var body: some View {
+        HStack(alignment: .bottom, spacing: 0) {
+            if let close {
+                Button(action: close.action) {
+                    Image(systemName: "xmark")
+                        .font(Theme.Glyph.chevron)
+                        .foregroundStyle(.secondary)
+                        .frame(width: ChromeStyle.closeSize, height: ChromeStyle.closeSize)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(HoverFillStyle.chrome(horizontalPadding: ChromeStyle.chevronPadding))
+                .help(Text(ui: close.help))
+                // Lines the ✕ up with the value, not the caption.
+                .padding(.bottom, ChromeStyle.closeLift)
+            }
+            menu
+        }
+        .fixedSize()
+    }
+
+    private var menu: some View {
         Menu { items } label: {
             VStack(alignment: .leading, spacing: 0) {
                 Text(ui: caption)
