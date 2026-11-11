@@ -101,12 +101,16 @@ struct GraphBadge {
     var isHead = false
     var isLocal = false
     var isRemote = false
+    /// Checked out in a linked worktree (not the main one).
+    var inWorktree = false
     var refNames: [String]
 
-    static func make(_ refs: [Ref], remoteNames: [String]) -> [GraphBadge] {
+    /// `worktreeBranches`: branches checked out in linked worktrees.
+    static func make(_ refs: [Ref], remoteNames: [String], worktreeBranches: Set<String> = []) -> [GraphBadge] {
         var badges: [GraphBadge] = []
         for ref in refs where ref.kind == .localBranch {
-            badges.append(GraphBadge(name: ref.name, kind: .branch, isHead: ref.isHead, isLocal: true, refNames: [ref.name]))
+            badges.append(GraphBadge(name: ref.name, kind: .branch, isHead: ref.isHead, isLocal: true,
+                                     inWorktree: worktreeBranches.contains(ref.name), refNames: [ref.name]))
         }
         for ref in refs where ref.kind == .remoteBranch {
             let short = shortRemoteName(ref.name, remoteNames: remoteNames)
@@ -132,15 +136,19 @@ struct GraphBadge {
         RefName.splitRemote(name, remotes: remoteNames)?.branch ?? name
     }
 
-    /// Trailing icons: checked out, local, remote. Tags get a leading tag icon instead.
+    /// Trailing icons: checked out, worktree, local, remote. Tags get a leading tag icon instead.
     var trailingIcons: [String] {
         guard kind == .branch else { return [] }
         var icons: [String] = []
         if isHead { icons.append("checkmark") }
+        if inWorktree { icons.append(Self.worktreeIcon) }
         if isLocal { icons.append("laptopcomputer") }
         if isRemote { icons.append("cloud.fill") }
         return icons
     }
+
+    /// Same symbol as the sidebar's Worktrees section.
+    static let worktreeIcon = "square.stack.3d.up"
 
     var leadingIcon: String? { kind == .tag ? "tag.fill" : nil }
 }
