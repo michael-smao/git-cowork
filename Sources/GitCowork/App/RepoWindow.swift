@@ -21,7 +21,7 @@ struct RepoWindow: View {
             if let path, waitsUntilSelected {
                 UnloadedTab(path: path)
             } else if let path {
-                RepoContainer(path: path, openHere: openHere, openInNewTab: openTab, close: { self.path = nil })
+                RepoContainer(path: path, host: host, openHere: openHere, openInNewTab: openTab, close: { self.path = nil })
                     .id(path)
             } else {
                 WelcomeView(open: { open($0) }, clone: { showClone = true })
@@ -176,16 +176,26 @@ enum OpenRepos {
 }
 
 /// Creates the model for a worktree and keeps it for the window's lifetime.
+///
+/// A tab that stays behind another one for a while goes to sleep: its views
+/// are taken down (they are most of a tab's memory), the model stays. So
+/// fetching, watching and notifications go on, and nothing typed or selected
+/// is lost; selecting the tab builds the views again from the loaded model.
 private struct RepoContainer: View {
     @State private var model: RepoModel
+    @State private var asleep = false
+    @State private var idle: Task<Void, Never>?
+    let host: HostWindow
     let openHere: (String) -> Void
     let openInNewTab: (String) -> Void
     let close: () -> Void
 
     private let path: String
 
-    init(path: String, openHere: @escaping (String) -> Void, openInNewTab: @escaping (String) -> Void, close: @escaping () -> Void) {
+    init(path: String, host: HostWindow, openHere: @escaping (String) -> Void, openInNewTab: @escaping (String) -> Void,
+         close: @escaping () -> Void) {
         self.path = path
+        self.host = host
         _model = State(initialValue: RepoModel(root: URL(fileURLWithPath: path)))
         self.openHere = openHere
         self.openInNewTab = openInNewTab
@@ -199,9 +209,17 @@ private struct RepoContainer: View {
                     EmptyState(symbol: "exclamationmark.triangle", title: "Can't open this repository", message: error)
                     Button("Choose Another…", action: close).padding(.bottom, Theme.Space.xxl)
                 }
+            } else if asleep {
+                SleepingTab(model: model)
             } else {
                 RepoView(model: model, openHere: openHere, openInNewTab: openInNewTab)
             }
+        }
+        // Bumped whenever a tab is selected, added or closed.
+        .onChange(of: RepoTabs.shared.version) { updateSleep() }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
+            // Right away when selected, before the tab strip catches up.
+            if asleep, let window = host.window, note.object as? NSWindow === window { updateSleep() }
         }
         .task {
             await model.load()
@@ -218,7 +236,84 @@ private struct RepoContainer: View {
             OpenRepos.remove(path)
             model.openWorktree = nil
             model.stopWatching()
+            idle?.cancel()
         }
+    }
+
+    /// Wakes the tab when it is in front; otherwise starts the wait to sleep.
+    private func updateSleep() {
+        guard let window = host.window, TabSleep.isBehindAnotherTab(window) else {
+            idle?.cancel()
+            idle = nil
+            if asleep { asleep = false }
+            return
+        }
+        guard idle == nil, !asleep else { return }
+        idle = Task {
+            var wait = TabSleep.after
+            while true {
+                try? await Task.sleep(for: .seconds(wait))
+                if Task.isCancelled { return }
+                if canSleep { break }
+                // Busy or showing a dialog: look again in a while.
+                wait = TabSleep.retry
+            }
+            idle = nil
+            asleep = true
+            TabSleep.releaseFreedMemory()
+        }
+    }
+
+    /// Not in the middle of something only the views hold.
+    private var canSleep: Bool {
+        guard let window = host.window, TabSleep.isBehindAnotherTab(window) else { return false }
+        return model.isLoaded && model.busy == nil && model.sheet == nil && model.confirmation == nil
+            && model.alert == nil && model.problem == nil && window.attachedSheet == nil
+    }
+}
+
+/// When a background tab's views are taken down.
+@MainActor
+enum TabSleep {
+    /// How long a tab stays behind another one before it sleeps.
+    static let after: TimeInterval = {
+        #if DEBUG
+        // GITCOWORK_TAB_SLEEP=<seconds>: sleep sooner, for measuring.
+        if let s = ProcessInfo.processInfo.environment["GITCOWORK_TAB_SLEEP"].flatMap(Double.init) { return s }
+        #endif
+        return 5 * 60
+    }()
+    static var retry: TimeInterval { min(after, 60) }
+
+    private static var release: Task<Void, Never>?
+
+    /// The allocator keeps the pages of freed views for reuse, so the app's
+    /// memory wouldn't go down. Once the views are gone (a moment after the
+    /// last tab went to sleep), hands the empty pages back to the system.
+    static func releaseFreedMemory() {
+        release?.cancel()
+        release = Task {
+            try? await Task.sleep(for: .seconds(2))
+            if Task.isCancelled { return }
+            malloc_zone_pressure_relief(nil, 0)
+        }
+    }
+
+    /// In a tab group with another tab in front (not just covered or minimized).
+    static func isBehindAnotherTab(_ window: NSWindow) -> Bool {
+        guard let group = window.tabGroup, group.windows.count > 1, let selected = group.selectedWindow else { return false }
+        return selected !== window
+    }
+}
+
+/// A sleeping tab: its name in the tab strip, no views. The model is alive.
+private struct SleepingTab: View {
+    let model: RepoModel
+
+    var body: some View {
+        Color.clear
+            .navigationTitle(model.windowTitle)
+            .background(RepoTabLabelReporter(label: model.tabLabel))
     }
 }
 

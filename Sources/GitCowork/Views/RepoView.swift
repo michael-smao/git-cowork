@@ -42,9 +42,9 @@ struct RepoView: View {
         }
         // One search field, for whatever the center shows.
         .searchable(text: searchText, placement: .toolbar, prompt: Text(searchPrompt))
-        .navigationTitle(title)
+        .navigationTitle(model.windowTitle)
         .modifier(HideToolbarTitle())
-        .background(RepoTabLabelReporter(label: tabLabel))
+        .background(RepoTabLabelReporter(label: model.tabLabel))
         .modifier(RepoDialogs(model: model, openInNewTab: openInNewTab))
         .focusedSceneValue(\.repoModel, model)
     }
@@ -77,15 +77,18 @@ struct RepoView: View {
         static let inspectorMax: CGFloat = 680
     }
 
+}
+
+extension RepoModel {
     /// Window title: "repo", or "repo · folder" for a linked worktree.
-    private var title: String {
-        tabLabel.worktree.map { "\(model.name) · \($0)" } ?? model.name
+    var windowTitle: String {
+        tabLabel.worktree.map { "\(name) · \($0)" } ?? name
     }
 
     /// The tab shows the same, with the folder in a quieter style.
-    private var tabLabel: RepoTabLabel {
-        let isMain = model.mainWorktreePath == nil || model.mainWorktreePath == model.root.path
-        return RepoTabLabel(name: model.name, worktree: isMain ? nil : model.root.lastPathComponent)
+    var tabLabel: RepoTabLabel {
+        let isMain = mainWorktreePath == nil || mainWorktreePath == root.path
+        return RepoTabLabel(name: name, worktree: isMain ? nil : root.lastPathComponent)
     }
 }
 

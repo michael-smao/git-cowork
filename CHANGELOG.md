@@ -10,6 +10,13 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - In a linked worktree, a small ✕ before the worktree name in the toolbar
   leaves it and switches the tab back to the main worktree (like GitKraken).
 
+### Changed
+- A tab that stays behind another tab for five minutes takes down its views,
+  which are most of a tab's memory. The repository stays loaded, so fetching,
+  watching and notifications go on, and a commit message you were writing, the
+  selection and the filter are kept. Selecting the tab shows it again at once.
+  With ten tabs open the app needs about a third less memory when idle.
+
 ## [0.5.3] - 2026-11-10
 
 ### Added
