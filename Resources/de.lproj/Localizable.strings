@@ -269,7 +269,7 @@
 "Handles may only use letters, digits, . _ and -." = "Handles dürfen nur Buchstaben, Ziffern, . _ und - enthalten.";
 "Handles must be unique." = "Handles müssen eindeutig sein.";
 "Hard reset %@ to %@?" = "%1$@ hart auf %2$@ zurücksetzen?";
-"Hard – discard changes…" = "Hart – Änderungen verwerfen …";
+"Hard – discard all changes…" = "Hart – alle Änderungen verwerfen …";
 "Hide Command Log" = "Befehlsprotokoll ausblenden";
 "Hide command log (⌘J)" = "Befehlsprotokoll ausblenden (⌘J)";
 "History" = "Verlauf";
@@ -307,7 +307,7 @@
 "Message (optional)" = "Nachricht (optional)";
 "Message (optional, makes an annotated tag)" = "Nachricht (optional, erstellt einen annotierten Tag)";
 "Mine" = "Meine";
-"Mixed – keep changes unstaged" = "Gemischt – Änderungen unvorgemerkt behalten";
+"Mixed – keep working copy but reset index" = "Gemischt – Arbeitskopie behalten, Index zurücksetzen";
 "Modified" = "Geändert";
 "modified" = "geändert";
 "More" = "Mehr";
@@ -450,7 +450,7 @@
 "Request Review…" = "Review anfragen …";
 "Requested by %@ · %@" = "Angefragt von %1$@ · %2$@";
 "Reset" = "Zurücksetzen";
-"Reset %@ to %@" = "%1$@ auf %2$@ zurücksetzen";
+"Reset %@ to this commit" = "%@ auf diesen Commit zurücksetzen";
 "Restart for %@" = "Neu starten für %@";
 "Restart git-cowork to use it. Your open repositories reopen." = "Starte git-cowork neu, um sie zu nutzen. Deine offenen Repositories öffnen sich wieder.";
 "Restart Now" = "Jetzt neu starten";
@@ -500,7 +500,7 @@
 "Sign-in was declined in the browser." = "Die Anmeldung wurde im Browser abgelehnt.";
 "since %@" = "seit %@";
 "Skip" = "Überspringen";
-"Soft – keep changes staged" = "Weich – Änderungen vorgemerkt behalten";
+"Soft – keep all changes" = "Weich – alle Änderungen behalten";
 "Sort by" = "Sortieren nach";
 "Sort files" = "Dateien sortieren";
 "Split" = "Nebeneinander";

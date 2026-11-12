@@ -6,6 +6,11 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Changed
+- The reset entry in a commit's menu reads like GitKraken's: "Reset <branch>
+  to this commit", with Soft (keep all changes), Mixed (keep working copy but
+  reset index) and Hard (discard all changes).
+
 ### Fixed
 - The count on Pull, Push and the inbox bell showed "…" from 10 on. It now
   shows "9+"; the exact number is in the tooltip.

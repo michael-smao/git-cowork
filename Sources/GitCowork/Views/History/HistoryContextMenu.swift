@@ -115,11 +115,11 @@ extension HistoryTableCoordinator {
         menu.addItem(ActionItem("Cherry-pick into \(current)") { Task { await model.cherryPick(sha) } })
         menu.addItem(ActionItem("Revert Commit") { Task { await model.revert(sha) } })
 
-        let reset = NSMenuItem(title: String(localized: "Reset \(current) to \(short)"), action: nil, keyEquivalent: "")
+        let reset = NSMenuItem(title: String(localized: "Reset \(current) to this commit"), action: nil, keyEquivalent: "")
         let sub = NSMenu()
-        sub.addItem(ActionItem("Soft – keep changes staged") { model.reset(to: sha, mode: .soft) })
-        sub.addItem(ActionItem("Mixed – keep changes unstaged") { model.reset(to: sha, mode: .mixed) })
-        sub.addItem(ActionItem("Hard – discard changes…") { model.reset(to: sha, mode: .hard) })
+        sub.addItem(ActionItem("Soft – keep all changes") { model.reset(to: sha, mode: .soft) })
+        sub.addItem(ActionItem("Mixed – keep working copy but reset index") { model.reset(to: sha, mode: .mixed) })
+        sub.addItem(ActionItem("Hard – discard all changes…") { model.reset(to: sha, mode: .hard) })
         reset.submenu = sub
         menu.addItem(reset)
 
