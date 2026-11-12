@@ -1,52 +1,91 @@
 import AppKit
+import GitCoworkCore
 import SwiftUI
 
-/// One window (tab). Shows the welcome screen until a repo is chosen.
+/// One window (tab). Shows the welcome screen until a repo is chosen. A tab
+/// showing a workspace has the workspace's tree on the left; picking a
+/// repository there shows it in the same tab.
 struct RepoWindow: View {
-    @Binding var path: String?
+    @Binding var target: TabTarget?
     @State private var showClone = false
+    /// Scan Folder: the folder picked, while its sheet is up.
+    @State private var scanFolder: String?
     @State private var dropTargeted = false
     @State private var host = HostWindow()
+    /// The repositories this window has shown, so it can retire them itself.
+    @State private var shown = ShownRepos()
     /// A background tab from the launch: loads its repository once selected.
     @State private var waitsUntilSelected: Bool
+    @AppStorage(Prefs.Key.workspaceVisible) private var workspaceVisible = true
+    @AppStorage(Prefs.Key.workspaceWidth) private var workspaceWidth = Double(Layout.workspaceIdeal)
     @Environment(\.openWindow) private var openWindow
 
-    init(path: Binding<String?>) {
-        _path = path
-        _waitsUntilSelected = State(initialValue: path.wrappedValue.map(LaunchFolders.opensInBackground) ?? false)
+    private enum Layout {
+        static let workspaceMin: CGFloat = 200
+        static let workspaceIdeal: CGFloat = 260
+        static let workspaceMax: CGFloat = 420
     }
+
+    init(target: Binding<TabTarget?>) {
+        _target = target
+        _waitsUntilSelected = State(initialValue: target.wrappedValue.map(LaunchFolders.opensInBackground) ?? false)
+    }
+
+    private var path: String? { target?.path }
+    private var workspace: Workspace? { WorkspaceStore.shared.workspace(target?.workspace) }
 
     var body: some View {
         Group {
-            if let path, waitsUntilSelected {
-                UnloadedTab(path: path)
+            if let target, waitsUntilSelected {
+                UnloadedTab(target: target)
+            } else if let workspace {
+                workspaceSplit(workspace)
             } else if let path {
-                RepoContainer(path: path, openHere: openHere, openInNewTab: openTab, close: { self.path = nil })
-                    .id(path)
+                repo(path)
             } else {
-                WelcomeView(open: { open($0) }, clone: { showClone = true })
+                WelcomeView(open: { open($0) }, clone: { showClone = true }, scan: chooseScanFolder,
+                            openWorkspace: openWorkspace)
             }
         }
         .environment(\.windowActions, actions)
         .frame(minWidth: 900, minHeight: 500)
         .background(WindowAccessor(host: host))
         // Remembered for the next launch (OpenSession).
-        .onAppear { OpenSession.track(host, path: path) }
-        .onChange(of: path) { _, new in OpenSession.track(host, path: new) }
+        .onAppear { OpenSession.track(host, target: target) }
+        .onChange(of: target) { _, new in OpenSession.track(host, target: new) }
         .onDisappear { OpenSession.untrack(host) }
+        // SwiftUI doesn't always end the view when its window closes (a
+        // workspace tab's split view stayed), so the closed tab would come
+        // back at the next launch. The window closing is certain.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
+            guard let window = host.window, note.object as? NSWindow === window else { return }
+            OpenSession.untrack(host)
+            shown.retire(except: nil)
+        }
+        // The same for the repository this tab showed before: it stops being
+        // watched and fetched, and no longer counts as open in a tab.
+        .onChange(of: target?.path) { _, new in shown.retire(except: new) }
         // Only an empty (welcome) window takes `open -a git-cowork <dir>`;
         // windows showing a repo decline, so SwiftUI opens a new tab instead.
-        .handlesExternalEvents(preferring: path == nil ? ["*"] : [], allowing: path == nil ? ["*"] : [])
+        .handlesExternalEvents(preferring: target == nil ? ["*"] : [], allowing: target == nil ? ["*"] : [])
         .onAppear {
-            if path == nil { openLaunchFolders() }
+            if target == nil { openLaunchFolders() }
             if LaunchFolders.pendingClone {
                 LaunchFolders.pendingClone = false
                 showClone = true
             }
+            if let folder = LaunchFolders.pendingScan {
+                LaunchFolders.pendingScan = nil
+                startScan(folder)
+            }
+            if let id = LaunchFolders.pendingWorkspace {
+                LaunchFolders.pendingWorkspace = nil
+                openWorkspace(id)
+            }
         }
         // The first window can appear before the command line is read.
         .onReceive(NotificationCenter.default.publisher(for: .launchFoldersPending)) { _ in
-            if path == nil { openLaunchFolders() }
+            if target == nil { openLaunchFolders() }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
             // Selected for real: placed in its tab group (visible again) and in front there.
@@ -74,48 +113,144 @@ struct RepoWindow: View {
         .sheet(isPresented: $showClone) {
             CloneSheet { open($0) }
         }
+        .sheet(isPresented: Binding(get: { scanFolder != nil }, set: { if !$0 { scanFolder = nil } })) {
+            if let scanFolder {
+                ScanFolderSheet(folder: scanFolder) { openWorkspace($0) }
+            }
+        }
         .focusedSceneValue(\.windowActions, actions)
     }
 
+    private func repo(_ path: String) -> some View {
+        RepoContainer(path: path, shown: shown, openHere: openHere, openInNewTab: openTab, close: { setPath(nil) })
+            .id(path)
+    }
+
+    /// Tree | repository. The tree stays while the repository beside it changes.
+    /// Not an HSplitView: that hands out the width again whenever the
+    /// repository or the window size changes. The tree keeps the width it is
+    /// dragged to, in every tab.
+    private func workspaceSplit(_ workspace: Workspace) -> some View {
+        HStack(spacing: 0) {
+            if workspaceVisible {
+                WorkspaceColumn(workspace: workspace, current: path, select: showInWorkspace, openInNewTab: openTab)
+                    .frame(width: CGFloat(clampedWorkspaceWidth))
+                    .frame(maxHeight: .infinity)
+                    // Not under the tab bar: only the panel itself is tinted.
+                    .background(Theme.sidebarBackground, ignoresSafeAreaEdges: [])
+                ResizeDivider(width: $workspaceWidth, range: Double(Layout.workspaceMin)...Double(Layout.workspaceMax))
+            }
+            Group {
+                if let path {
+                    repo(path)
+                } else {
+                    EmptyState(symbol: WorkspaceStyle.symbol, title: "Choose a repository",
+                               message: "Pick one in the workspace on the left.") {
+                        if !workspaceVisible {
+                            Button("Show Workspace") { workspaceVisible = true }
+                        }
+                    }
+                    .navigationTitle(workspace.name)
+                    .background(RepoTabLabelReporter(label: RepoTabLabel(name: "", worktree: nil, workspace: workspace.name)))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .environment(\.toggleWorkspace) {
+            withAnimation(.easeOut(duration: 0.15)) { workspaceVisible.toggle() }
+        }
+        .environment(\.workspaceName, workspace.name)
+    }
+
+    private var clampedWorkspaceWidth: Double {
+        min(max(workspaceWidth, Double(Layout.workspaceMin)), Double(Layout.workspaceMax))
+    }
+
     private var actions: WindowActions {
-        WindowActions(open: { open($0) }, showClone: { showClone = true })
+        WindowActions(open: { open($0) }, showClone: { showClone = true }, scanFolder: chooseScanFolder,
+                      openWorkspace: openWorkspace, workspace: workspace?.id)
+    }
+
+    /// The tab's repository; a workspace tab keeps its workspace without one.
+    private func setPath(_ new: String?) {
+        if target?.workspace != nil {
+            target?.path = new
+        } else {
+            target = new.map { TabTarget(path: $0) }
+        }
+    }
+
+    /// Picked in the workspace's tree: shown here, and opened first next time.
+    private func showInWorkspace(_ p: String) {
+        setPath(p)
+        if let id = workspace?.id {
+            WorkspaceStore.shared.update(id) { ws in
+                if ws.repos.contains(p) { ws.lastRepo = p }
+            }
+        }
+    }
+
+    private func chooseScanFolder() {
+        if let folder = FolderPicker.choose(message: L("Choose a folder to look for repositories in")) { startScan(folder) }
+    }
+
+    /// A folder that already has a workspace opens that one instead of making a second.
+    private func startScan(_ folder: String) {
+        if let existing = WorkspaceStore.shared.workspace(scanRoot: folder) {
+            openWorkspace(existing.id)
+        } else {
+            scanFolder = folder
+        }
+    }
+
+    /// Opens a workspace here if this window is empty, else in a new tab. A
+    /// tab already showing it comes to the front instead.
+    private func openWorkspace(_ id: String) {
+        guard let ws = WorkspaceStore.shared.workspace(id) else { return }
+        if target?.workspace == id { return }
+        if let window = OpenSession.window(showingWorkspace: id) {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
+        let start = TabTarget(path: ws.startRepo.flatMap { WorkspaceDisk.exists($0) ? $0 : nil }, workspace: id)
+        if target == nil { target = start } else { openTab(start) }
     }
 
     /// At launch (last session, command line): the front repository opens
     /// here right away; the others join as background tabs in their order,
     /// one after another, without coming to the front or loading yet.
     private func openLaunchFolders() {
-        let folders = LaunchFolders.takeAll()
-        guard !folders.isEmpty else { return }
-        let wanted = LaunchFolders.front.flatMap(folders.firstIndex(of:)) ?? 0
+        let tabs = LaunchFolders.takeAll()
+        guard !tabs.isEmpty else { return }
+        let wanted = LaunchFolders.front.flatMap(tabs.firstIndex(of:)) ?? 0
         Task {
-            var resolved: [String?] = []
-            for folder in folders { resolved.append(await RepoLocator.resolve(folder)) }
-            // The front one, or the first that is still a repository.
+            var resolved: [TabTarget?] = []
+            for tab in tabs { resolved.append(await LaunchFolders.resolve(tab)) }
+            // The front one, or the first that is still a repository or workspace.
             let order = [wanted] + resolved.indices.filter { $0 != wanted }
             guard let frontIndex = order.first(where: { resolved[$0] != nil }), let front = resolved[frontIndex] else {
                 LaunchFolders.finishRestore()
                 return
             }
-            if path == nil { path = front } else { openTab(front) }
+            if target == nil { target = front } else { openTab(front) }
             // Where each tab goes: before the ones that come later in the saved order.
             var placed: [Int] = [frontIndex]
             for index in resolved.indices where index != frontIndex {
-                guard let folder = resolved[index], !OpenRepos.isOpen(folder) else { continue }
-                if await openBackgroundTab(folder, at: placed.filter { $0 < index }.count) { placed.append(index) }
+                guard let tab = resolved[index], !LaunchFolders.isOpen(tab) else { continue }
+                if await openBackgroundTab(tab, at: placed.filter { $0 < index }.count) { placed.append(index) }
             }
             LaunchFolders.finishRestore()
         }
     }
 
-    /// Opens `p` as a tab at `index` of this window's group, behind this one.
+    /// Opens `tab` at `index` of this window's group, behind this one.
     /// Returns once it is there (false if no window came within 2 seconds).
-    private func openBackgroundTab(_ p: String, at index: Int) async -> Bool {
+    private func openBackgroundTab(_ tab: TabTarget, at index: Int) async -> Bool {
         guard let parent = host.window else { return false }
         return await withCheckedContinuation { continuation in
             WindowAccessor.setPendingBackground(parent: parent, index: index) { continuation.resume(returning: $0) }
-            LaunchFolders.markBackground(p)
-            openWindow(id: "repo", value: p)
+            LaunchFolders.markBackground(tab)
+            openWindow(id: "repo", value: tab)
         }
     }
 
@@ -129,7 +264,7 @@ struct RepoWindow: View {
                 alert.runModal()
                 return
             }
-            if path == nil { path = resolved } else { openTab(resolved) }
+            if target == nil { target = TabTarget(path: resolved) } else { openTab(resolved) }
         }
     }
 
@@ -137,10 +272,17 @@ struct RepoWindow: View {
     /// already open in another tab: then that tab comes to the front.
     /// If the folder this window shows is gone or being removed, the window
     /// closes once the other tab is in front, rather than staying on a
-    /// deleted folder.
+    /// deleted folder. A workspace tab always switches itself, like a click
+    /// in its tree.
     private func openHere(_ p: String) {
-        guard OpenRepos.isOpen(p) else { path = p; return }
-        openTab(p)
+        // Asks OpenSession, which follows what each tab shows right now; the
+        // OpenRepos counts lagged one switch behind in workspace tabs.
+        guard target?.workspace == nil, let other = OpenSession.window(showing: p, except: host.window) else {
+            setPath(p)
+            return
+        }
+        other.tabGroup?.selectedWindow = other
+        other.makeKeyAndOrderFront(nil)
         if let current = path,
            WorktreeRemovals.shared.contains(current) || !FileManager.default.fileExists(atPath: current) {
             let window = host.window
@@ -148,12 +290,42 @@ struct RepoWindow: View {
         }
     }
 
-    /// New tab next to this window. SwiftUI brings an existing window to the
-    /// front when one already shows `p`.
-    private func openTab(_ p: String) {
+    /// New tab next to this window, showing just the repository.
+    private func openTab(_ p: String) { openTab(TabTarget(path: p)) }
+
+    /// SwiftUI brings an existing window to the front when one already shows
+    /// `tab`. For just a repository that would miss a workspace tab showing
+    /// it (another value), so look for that first, as before workspaces.
+    private func openTab(_ tab: TabTarget) {
+        if tab.workspace == nil, let p = tab.path, let window = OpenSession.window(showing: p, except: host.window) {
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
         WindowAccessor.setPendingParent(NSApp.keyWindow ?? NSApp.mainWindow
             ?? NSApp.orderedWindows.first { $0.isVisible && $0.tabbingIdentifier == WindowChrome.tabbingIdentifier })
-        openWindow(id: "repo", value: p)
+        openWindow(id: "repo", value: tab)
+    }
+}
+
+/// Shows or hides the workspace tree of this tab; nil in tabs without one.
+private struct ToggleWorkspaceKey: EnvironmentKey {
+    static let defaultValue: (() -> Void)? = nil
+}
+
+/// The name of the workspace this tab shows, for the tab label.
+private struct WorkspaceNameKey: EnvironmentKey {
+    static let defaultValue: String? = nil
+}
+
+extension EnvironmentValues {
+    var toggleWorkspace: (() -> Void)? {
+        get { self[ToggleWorkspaceKey.self] }
+        set { self[ToggleWorkspaceKey.self] = newValue }
+    }
+
+    var workspaceName: String? {
+        get { self[WorkspaceNameKey.self] }
+        set { self[WorkspaceNameKey.self] = newValue }
     }
 }
 
@@ -178,15 +350,18 @@ enum OpenRepos {
 /// Creates the model for a worktree and keeps it for the window's lifetime.
 private struct RepoContainer: View {
     @State private var model: RepoModel
+    @State private var presence: RepoPresence
+    let shown: ShownRepos
     let openHere: (String) -> Void
     let openInNewTab: (String) -> Void
     let close: () -> Void
 
-    private let path: String
-
-    init(path: String, openHere: @escaping (String) -> Void, openInNewTab: @escaping (String) -> Void, close: @escaping () -> Void) {
-        self.path = path
-        _model = State(initialValue: RepoModel(root: URL(fileURLWithPath: path)))
+    init(path: String, shown: ShownRepos, openHere: @escaping (String) -> Void, openInNewTab: @escaping (String) -> Void,
+         close: @escaping () -> Void) {
+        let model = RepoModel(root: URL(fileURLWithPath: path))
+        _model = State(initialValue: model)
+        _presence = State(initialValue: RepoPresence(path: path, model: model))
+        self.shown = shown
         self.openHere = openHere
         self.openInNewTab = openInNewTab
         self.close = close
@@ -211,30 +386,73 @@ private struct RepoContainer: View {
             #endif
         }
         .onAppear {
-            OpenRepos.add(path)
-            model.openWorktree = openHere
+            shown.add(presence)
+            presence.begin(openHere: openHere)
         }
-        .onDisappear {
-            OpenRepos.remove(path)
-            model.openWorktree = nil
-            model.stopWatching()
-        }
+        // The window retires it too (ShownRepos): SwiftUI doesn't always get here.
+        .onDisappear { presence.end() }
+    }
+}
+
+/// One repository shown in a window: counts as open in a tab, and its model
+/// watches and fetches, until `end`. Ends once, from whichever side gets there first.
+@MainActor
+final class RepoPresence {
+    let path: String
+    private let model: RepoModel
+    private var active = false
+
+    init(path: String, model: RepoModel) {
+        self.path = path
+        self.model = model
+    }
+
+    func begin(openHere: @escaping (String) -> Void) {
+        guard !active else { return }
+        active = true
+        OpenRepos.add(path)
+        model.openWorktree = openHere
+    }
+
+    func end() {
+        guard active else { return }
+        active = false
+        OpenRepos.remove(path)
+        model.openWorktree = nil
+        model.stopWatching()
+    }
+}
+
+/// The repositories a window has shown. When it shows another one or
+/// closes, it ends the ones it no longer shows.
+@MainActor
+final class ShownRepos {
+    private var all: [RepoPresence] = []
+
+    func add(_ presence: RepoPresence) {
+        if !all.contains(where: { $0 === presence }) { all.append(presence) }
+    }
+
+    /// Ends all but the one showing `path`.
+    func retire(except path: String?) {
+        for presence in all where presence.path != path { presence.end() }
+        all.removeAll { $0.path != path }
     }
 }
 
 /// A background tab from the launch before it's selected: just its name in
 /// the tab strip, no repository loaded, nothing watched or fetched.
 private struct UnloadedTab: View {
-    let path: String
+    let target: TabTarget
 
     var body: some View {
-        let label = LaunchFolders.tabLabel(for: path)
+        let label = LaunchFolders.tabLabel(for: target)
         Color.clear
-            .navigationTitle(label.worktree.map { "\(label.name) · \($0)" } ?? label.name)
+            .navigationTitle(label.title)
             .background(RepoTabLabelReporter(label: label))
             // Counts as open, so opening it again selects this tab.
-            .onAppear { OpenRepos.add(path) }
-            .onDisappear { OpenRepos.remove(path) }
+            .onAppear { if let path = target.path { OpenRepos.add(path) } }
+            .onDisappear { if let path = target.path { OpenRepos.remove(path) } }
     }
 }
 

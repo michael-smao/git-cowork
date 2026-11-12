@@ -140,6 +140,7 @@ also drop a folder onto any window.
 | Area | |
 |---|---|
 | **Tabs** | Every repo or worktree is a tab in the row beside the traffic lights, always shown, like GitKraken. Click to switch, drag sideways to move, × or middle-click to close, + or ⌘T for a new one. They open again at the next launch. |
+| **Workspaces** | Several repositories as one tree (folders › repositories › worktrees) on the left of a tab, like a solution in an IDE. Click one to show it in the same tab; each tab can hold its own workspace. Scan Folder (⌥⌘O) finds the repositories in a folder, one level deep by default (Settings › Workspaces); add more by hand or scan again later. Reopened at the next launch. |
 | **Toolbar** | Repository, worktree and branch pickers (recent repos; switch or add worktrees, shown with more than one; checkout), History / Board / Reviews, Fetch (all remotes), Pull ▾ (fetch all, ff-only, rebase, merge), Push ▾ (sets upstream; force-with-lease asks first), Branch, Worktree, Stash, Pop, Terminal, Editor, Inbox. |
 | **Sidebar** | Local, remote, worktrees, tasks, reviews, stashes, tags and team, with counts. Branch folders (`claude/…`, `codex/…`) open by default. Filter with ⌥⌘F. Click a stash to see its files and diffs. Right-click a remote to fetch, rename or remove it or change its URL; + adds another. |
 | **Graph** | Lane-colored rows, author initials in nodes, branch badges connected to their commit, commits outside the current branch dimmed. A `// WIP` row above HEAD, plus one for every other worktree with uncommitted changes. |
@@ -223,6 +224,8 @@ tasks, else `origin`; the app saves that choice in the repository's config.
 | | |
 |---|---|
 | ⌘O / ⇧⌘O | Open / clone repository |
+| ⌥⌘O | Scan a folder into a workspace |
+| ⌃⌘P | Show or hide the workspace |
 | ⌘T | New tab |
 | ⌘1 / ⌘2 / ⌘3 | History / Board / Reviews |
 | ⇧⌘T | New task |

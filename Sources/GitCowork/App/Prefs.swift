@@ -1,4 +1,5 @@
 import Foundation
+import GitCoworkCore
 
 /// User settings, stored in UserDefaults. Views bind to the same keys with @AppStorage.
 enum Prefs {
@@ -16,6 +17,14 @@ enum Prefs {
         /// Repositories open at the last quit, in tab order, and the front one.
         static let openRepos = "session.openRepos"
         static let openReposSelected = "session.selected"
+        /// The same with each tab's workspace (JSON `[TabTarget]`). `openRepos`
+        /// is still written, for going back to an older version.
+        static let openTabs = "session.openTabs"
+        static let openTabsSelected = "session.selectedTab"
+        /// Saved workspaces (JSON `[Workspace]`).
+        static let workspaces = "workspaces"
+        /// Folder levels Scan Folder looks below the chosen folder (RepoScan).
+        static let scanDepth = "workspaces.scanDepth"
         /// Fetch/push refs/cowork/main about once a minute while the app is in front.
         /// (Which remote is `git config cowork.remote` in each repo; see CoworkRemote.)
         static let coworkAutoSync = "cowork.autoSync"
@@ -36,6 +45,12 @@ enum Prefs {
 
         // View state: remembered by the views, not shown in Settings.
         static let sidebarVisible = "layout.sidebarVisible"
+        static let workspaceVisible = "layout.workspaceVisible"
+        static let workspaceWidth = "layout.workspaceWidth"
+        static let sidebarWidth = "layout.sidebarWidth"
+        static let inspectorWidth = "layout.inspectorWidth"
+        /// Closed folders and repositories in workspace trees, per workspace.
+        static func workspaceCollapsed(_ id: String) -> String { "workspace.collapsed.\(id)" }
         /// Open or closed sidebar section, e.g. "sidebar.local".
         static func sidebarSection(_ section: SidebarSection) -> String { "sidebar." + section.rawValue }
         /// Collapsed branch folders and remotes, per repository.
@@ -55,6 +70,10 @@ enum Prefs {
     static var coworkAutoSync: Bool { UserDefaults.standard.object(forKey: Key.coworkAutoSync) as? Bool ?? true }
     static var autoFetch: Bool { UserDefaults.standard.object(forKey: Key.autoFetch) as? Bool ?? true }
     static var reopenRepos: Bool { UserDefaults.standard.object(forKey: Key.reopenRepos) as? Bool ?? true }
+    static var scanDepth: Int {
+        let saved = UserDefaults.standard.object(forKey: Key.scanDepth) as? Int ?? RepoScan.defaultDepth
+        return min(max(saved, RepoScan.depthRange.lowerBound), RepoScan.depthRange.upperBound)
+    }
     static var checkForUpdates: Bool { UserDefaults.standard.object(forKey: Key.checkForUpdates) as? Bool ?? true }
 
     static var recentRepos: [String] {

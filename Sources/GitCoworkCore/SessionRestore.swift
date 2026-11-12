@@ -4,24 +4,49 @@ import Foundation
 /// quit (in tab order), then folders from the command line, without the ones
 /// macOS already restored or that are gone from disk.
 public enum SessionRestore {
-    public struct Plan: Equatable, Sendable {
-        /// Paths to open, in tab order.
-        public var open: [String]
+    public struct Plan<Tab: Hashable & Sendable>: Equatable, Sendable {
+        /// Tabs to open, in tab order.
+        public var open: [Tab]
         /// The tab to bring to the front afterwards, if it's open.
-        public var select: String?
+        public var select: Tab?
+
+        public init(open: [Tab], select: Tab?) {
+            self.open = open
+            self.select = select
+        }
     }
 
-    public static func plan(saved: [String], selected: String?, commandLine: [String],
-                            alreadyOpen: Set<String>, exists: (String) -> Bool) -> Plan {
+    /// Works on paths, or on `TabTarget`s for tabs that also show a workspace.
+    public static func plan<Tab: Hashable & Sendable>(saved: [Tab], selected: Tab?, commandLine: [Tab],
+                                                      alreadyOpen: Set<Tab>, exists: (Tab) -> Bool) -> Plan<Tab> {
         var seen = alreadyOpen
-        var open: [String] = []
-        for path in saved + commandLine where !seen.contains(path) && exists(path) {
-            seen.insert(path)
-            open.append(path)
+        var open: [Tab] = []
+        for tab in saved + commandLine where !seen.contains(tab) && exists(tab) {
+            seen.insert(tab)
+            open.append(tab)
         }
         // A folder named on the command line is what the user wants in front.
         let front = commandLine.last(where: { seen.contains($0) }) ?? selected.flatMap { seen.contains($0) ? $0 : nil }
         return Plan(open: open, select: front)
+    }
+
+    /// The tabs saved at the last quit. The app saves them twice: `tabs` with
+    /// each tab's workspace, and `paths` (the tabs' paths, each once) for older
+    /// versions, which read and write only `paths`. When the two no longer
+    /// match, an older version ran in between and its `paths` are newer.
+    public static func savedTabs(tabs: [TabTarget]?, selectedTab: TabTarget?,
+                                 paths: [String], selectedPath: String?) -> (tabs: [TabTarget], selected: TabTarget?) {
+        if let tabs, uniquePaths(tabs) == paths {
+            return (tabs, selectedTab)
+        }
+        return (paths.map { TabTarget(path: $0) }, selectedPath.map { TabTarget(path: $0) })
+    }
+
+    /// The tabs' paths in order, each once: what goes into `paths`.
+    public static func uniquePaths(_ tabs: [TabTarget]) -> [String] {
+        var paths: [String] = []
+        for path in tabs.compactMap(\.path) where !paths.contains(path) { paths.append(path) }
+        return paths
     }
 }
 

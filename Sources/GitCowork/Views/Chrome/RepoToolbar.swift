@@ -10,12 +10,24 @@ struct RepoToolbar: ToolbarContent {
     let model: RepoModel
     let openHere: (String) -> Void
     let openInNewTab: (String) -> Void
+    /// Only in a tab showing a workspace.
+    let toggleWorkspace: (() -> Void)?
     let toggleSidebar: () -> Void
 
     var body: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             HStack(spacing: Theme.Space.xs) {
                 // Leading edge, next to the window buttons (like Finder / Xcode).
+                if let toggleWorkspace {
+                    Button(action: toggleWorkspace) {
+                        Image(systemName: WorkspaceStyle.symbol)
+                            .font(ChromeStyle.icon)
+                            .frame(height: ChromeStyle.iconHeight)
+                            .padding(.vertical, Theme.Space.xs)
+                    }
+                    .buttonStyle(HoverFillStyle.chrome())
+                    .help("Show or hide the workspace (⌃⌘P)")
+                }
                 Button(action: toggleSidebar) {
                     Image(systemName: "sidebar.leading")
                         .font(ChromeStyle.icon)
