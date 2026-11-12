@@ -6,6 +6,10 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Fixed
+- The count on Pull, Push and the inbox bell showed "…" from 10 on. It now
+  shows "9+"; the exact number is in the tooltip.
+
 ## [0.5.4] - 2026-11-12
 
 ### Added
