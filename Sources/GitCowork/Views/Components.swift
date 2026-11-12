@@ -66,8 +66,10 @@ struct CountBadge: View {
                 .background(Theme.Status.warning.opacity(Theme.Tint.chip), in: Capsule())
                 .foregroundStyle(Theme.Status.warning)
         case .toolbar:
-            Text(count > 99 ? "99+" : "\(count)")
+            // One digit fits over a toolbar icon; more would be cut to "…".
+            Text(verbatim: count > 9 ? "9+" : "\(count)")
                 .font(.system(size: 9, weight: .semibold).monospacedDigit())
+                .fixedSize()
                 .foregroundStyle(.white)
                 .padding(.horizontal, 3)
                 .frame(minWidth: 13, minHeight: 13)

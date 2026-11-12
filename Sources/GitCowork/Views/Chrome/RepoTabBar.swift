@@ -26,6 +26,13 @@ struct RepoTabLabel: Equatable {
 
     /// Everything in one line, for the window title.
     var title: String { ([tabName] + [tabDetail].compactMap { $0 }).joined(separator: " · ") }
+
+    /// The same label in a tab that shows the workspace `name` (nil: none).
+    func inWorkspace(_ name: String?) -> RepoTabLabel {
+        var label = self
+        label.workspace = name
+        return label
+    }
 }
 
 /// Repo tabs, GitKraken style. Every repo window is still one tab of a native

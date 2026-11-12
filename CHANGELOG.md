@@ -7,8 +7,6 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 ## [Unreleased]
 
 ### Added
-- In a linked worktree, a small ✕ before the worktree name in the toolbar
-  leaves it and switches the tab back to the main worktree (like GitKraken).
 - Workspaces: keep a set of repositories together and see them as a tree
   (folders › repositories › worktrees) on the left of a tab. Clicking a
   repository or worktree shows it in that same tab, so one tab can hold a
@@ -25,6 +23,28 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - The sidebar, the inspector and the workspace tree keep the widths you drag
   them to: in every tab, at the next launch, and when a workspace tab shows
   another repository.
+- The reset entry in a commit's menu reads like GitKraken's: "Reset <branch>
+  to this commit", with Soft (keep all changes), Mixed (keep working copy but
+  reset index) and Hard (discard all changes).
+
+### Fixed
+- The count on Pull, Push and the inbox bell showed "…" from 10 on. It now
+  shows "9+"; the exact number is in the tooltip.
+
+## [0.5.4] - 2026-11-12
+
+### Added
+- In a linked worktree, a small ✕ before the worktree name in the toolbar
+  leaves it and switches the tab back to the main worktree (like GitKraken).
+- A branch checked out in a linked worktree shows a worktree icon in its
+  history badge, next to the checked-out, local and remote icons.
+
+### Changed
+- A tab that stays behind another tab for five minutes takes down its views,
+  which are most of a tab's memory. The repository stays loaded, so fetching,
+  watching and notifications go on, and a commit message you were writing, the
+  selection and the filter are kept. Selecting the tab shows it again at once.
+  With ten tabs open the app needs about a third less memory when idle.
 
 ## [0.5.3] - 2026-11-10
 
