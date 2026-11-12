@@ -9,6 +9,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 ### Added
 - In a linked worktree, a small ✕ before the worktree name in the toolbar
   leaves it and switches the tab back to the main worktree (like GitKraken).
+- A branch checked out in a linked worktree shows a worktree icon in its
+  history badge, next to the checked-out, local and remote icons.
 
 ## [0.5.3] - 2026-11-10
 

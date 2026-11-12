@@ -145,6 +145,8 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     /// rows.count when "load more" was last requested; asks once per history size.
     private var loadMoreRequestedAt = -1
     private let drawCache = HistoryDrawCache()
+    /// Branches checked out in linked worktrees, for the badges' worktree icon.
+    private var worktreeBranches: Set<String> = []
     lazy var badgeHover = HistoryBadgeHover(coordinator: self)
     private var wipCountsCache: [WIPCount]?
     lazy var headerMenuDelegate = HistoryHeaderMenu(coordinator: self)
@@ -266,6 +268,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         ancestry = model.headAncestry
         commitIndex = model.commitIndex
         refsByCommit = model.refsByCommit
+        worktreeBranches = Set(model.worktrees.filter { !$0.isMain && !$0.isBare }.compactMap(\.branch))
         headSHA = model.headSHA
         headLoaded = headSHA.map { commitIndex[$0] != nil } ?? false
         wipJoins = [:]
@@ -378,7 +381,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         if let hit = drawCache.badges(i) { return hit }
         guard i < commits.count else { return [] }
         let refs = refsByCommit[commits[i].id] ?? []
-        let b = refs.isEmpty ? [] : GraphBadge.make(refs, remoteNames: model.remotes.map(\.name))
+        let b = refs.isEmpty ? [] : GraphBadge.make(refs, remoteNames: model.remotes.map(\.name), worktreeBranches: worktreeBranches)
         drawCache.setBadges(b, for: i)
         return b
     }
