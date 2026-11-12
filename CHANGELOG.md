@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-12
+
 ### Added
 - In a linked worktree, a small ✕ before the worktree name in the toolbar
   leaves it and switches the tab back to the main worktree (like GitKraken).
