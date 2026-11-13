@@ -14,6 +14,9 @@ struct WorkspaceColumn: View {
 
     @State private var worktrees: [String: [String]] = [:]
     @State private var missing: Set<String> = []
+    /// Changes and commits to push of repositories and worktrees no tab
+    /// shows, as of the last reload. Open ones come live from LiveRepos.
+    @State private var status: [String: WorktreeInfo] = [:]
     /// Nodes whose open/closed state differs from the default (folders open, repositories closed).
     @State private var toggled: Set<String> = []
     @State private var selection: String?
@@ -92,8 +95,19 @@ struct WorkspaceColumn: View {
 
     private func reload() async {
         let repos = workspace.repos
-        worktrees = await WorkspaceDisk.worktrees(of: repos)
+        let found = await WorkspaceDisk.worktrees(of: repos)
+        worktrees = found
         missing = Set(repos.filter { !WorkspaceDisk.exists($0) })
+        // Open repositories keep their own status current; only the others run git here.
+        // Their live values are kept too, for when their tab moves on or closes.
+        let checkouts = (repos + repos.flatMap { found[$0] ?? [] }).filter { !missing.contains($0) }
+        var known = status.filter { checkouts.contains($0.key) }
+        var toRead: [String] = []
+        for path in checkouts {
+            if let info = LiveRepos.shared.info(path) { known[path] = info } else { toRead.append(path) }
+        }
+        let read = await WorkspaceDisk.status(of: toRead)
+        status = known.merging(read) { _, new in new }
     }
 
     // MARK: Open and closed
@@ -144,6 +158,9 @@ struct WorkspaceColumn: View {
                 .truncationMode(.middle)
                 .foregroundStyle(gone ? .tertiary : .primary)
             Spacer(minLength: 0)
+            if node.kind != .folder, !gone, let info = LiveRepos.shared.info(node.id) ?? status[node.id] {
+                WorktreeBadges(info: info)
+            }
         }
         .modifier(CurrentBand(active: isCurrent))
         .help(gone ? String(localized: "\(node.id) is gone") : (node.id as NSString).abbreviatingWithTildeInPath)

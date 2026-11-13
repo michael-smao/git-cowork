@@ -3,6 +3,14 @@ import Testing
 @testable import GitCoworkCore
 
 @Suite struct WorkspaceTests {
+    /// The tree's badges: files not committed (each once) and commits to push and pull.
+    @Test func worktreeInfoFromStatus() {
+        let out = ["# branch.oid abc", "# branch.head main", "# branch.upstream origin/main", "# branch.ab +2 -1",
+                   "1 MM N... 100644 100644 100644 h1 h2 a.swift", "? new.txt", ""].joined(separator: "\0")
+        #expect(WorktreeInfo(Parsers.parseStatus(out)) == WorktreeInfo(changes: 2, ahead: 2, behind: 1))
+        #expect(WorktreeInfo(Parsers.parseStatus("# branch.oid abc\0# branch.head main\0")) == WorktreeInfo())
+    }
+
     @Test func addsEachRepositoryOnce() {
         var ws = Workspace(name: "Acme", repos: ["/a", "/b", "/a"])
         #expect(ws.repos == ["/a", "/b"])

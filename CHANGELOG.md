@@ -24,6 +24,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   checkout, so your working copy isn't touched. When both have new commits it
   offers to check the branch out, where you pick merge or rebase. The same
   "Pull" is in the sidebar's branch menu.
+- The workspace tree shows, next to each repository and worktree, its
+  uncommitted changes and commits to push (↑) and pull (↓), like the
+  worktrees in the sidebar.
 
 ### Changed
 - The sidebar, the inspector and the workspace tree keep the widths you drag

@@ -173,6 +173,24 @@ public struct WorkingStatus: Hashable, Sendable {
     public var isClean: Bool { changeCount == 0 }
 }
 
+/// Uncommitted changes and commits ahead/behind the upstream of one
+/// worktree: the badges next to it in the sidebar and the workspace tree.
+public struct WorktreeInfo: Hashable, Sendable {
+    public var changes = 0
+    public var ahead = 0
+    public var behind = 0
+
+    public init(changes: Int = 0, ahead: Int = 0, behind: Int = 0) {
+        self.changes = changes
+        self.ahead = ahead
+        self.behind = behind
+    }
+
+    public init(_ status: WorkingStatus) {
+        self.init(changes: status.changeCount, ahead: status.ahead, behind: status.behind)
+    }
+}
+
 public struct Stash: Identifiable, Hashable, Sendable {
     public var id: String { selector }
     public let sha: String
