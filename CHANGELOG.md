@@ -18,15 +18,15 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   Scan Folder Again adds repositories that appeared since.
 - File › Open Workspace, a Workspaces list on the welcome screen, and
   View › Show/Hide Workspace (⌃⌘P).
+- The workspace tree shows, next to each repository and worktree, its
+  uncommitted changes and commits to push (↑) and pull (↓), like the
+  worktrees in the sidebar.
 - Pull a branch from its menu in the graph, also one that isn't checked out:
   right-click its badge (or the remote branch's badge further up) and choose
   "Pull <branch>". The branch moves up to its remote branch without a
   checkout, so your working copy isn't touched. When both have new commits it
   offers to check the branch out, where you pick merge or rebase. The same
   "Pull" is in the sidebar's branch menu.
-- The workspace tree shows, next to each repository and worktree, its
-  uncommitted changes and commits to push (↑) and pull (↓), like the
-  worktrees in the sidebar.
 
 ### Changed
 - The sidebar, the inspector and the workspace tree keep the widths you drag
