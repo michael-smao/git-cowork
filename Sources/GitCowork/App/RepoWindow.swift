@@ -48,7 +48,10 @@ struct RepoWindow: View {
             }
         }
         .environment(\.windowActions, actions)
-        .frame(minWidth: 900, minHeight: 500)
+        // Wider than 900 when what the tab shows needs it: a repository's
+        // panels, and a workspace's tree beside them.
+        .atLeast(width: 900)
+        .frame(minHeight: 500)
         .background(WindowAccessor(host: host))
         // Remembered for the next launch (OpenSession).
         .onAppear { OpenSession.track(host, target: target) }
@@ -129,15 +132,17 @@ struct RepoWindow: View {
     /// Tree | repository. The tree stays while the repository beside it changes.
     /// Not an HSplitView: that hands out the width again whenever the
     /// repository or the window size changes. The tree keeps the width it is
-    /// dragged to, in every tab.
+    /// dragged to, in every tab. In a window too narrow for that it gives way,
+    /// down to its minimum, so the repository's panels keep theirs.
     private func workspaceSplit(_ workspace: Workspace) -> some View {
         HStack(spacing: 0) {
             if workspaceVisible {
                 WorkspaceColumn(workspace: workspace, current: path, select: showInWorkspace, openInNewTab: openTab)
-                    .frame(width: CGFloat(clampedWorkspaceWidth))
-                    .frame(maxHeight: .infinity)
+                    .frame(minWidth: Layout.workspaceMin, maxWidth: CGFloat(clampedWorkspaceWidth), maxHeight: .infinity)
                     // Not under the tab bar: only the panel itself is tinted.
                     .background(Theme.sidebarBackground, ignoresSafeAreaEdges: [])
+                    // Offered what the repository's minimum leaves, before the repository takes the rest.
+                    .layoutPriority(1)
                 ResizeDivider(width: $workspaceWidth, range: Double(Layout.workspaceMin)...Double(Layout.workspaceMax))
             }
             Group {
@@ -304,6 +309,19 @@ struct RepoWindow: View {
         WindowAccessor.setPendingParent(NSApp.keyWindow ?? NSApp.mainWindow
             ?? NSApp.orderedWindows.first { $0.isVisible && $0.tabbingIdentifier == WindowChrome.tabbingIdentifier })
         openWindow(id: "repo", value: tab)
+    }
+}
+
+private extension View {
+    /// At least `width` wide, and as wide as the view itself needs. A
+    /// `frame(minWidth:)` settles for that width when offered less, whatever
+    /// is inside, so the window could get narrower than a repository's
+    /// panels need and cut them off on both sides.
+    func atLeast(width: CGFloat) -> some View {
+        ZStack {
+            Color.clear.frame(minWidth: width)
+            self
+        }
     }
 }
 

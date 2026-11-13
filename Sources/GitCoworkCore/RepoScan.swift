@@ -49,6 +49,20 @@ public enum RepoScan {
         visit(root.count > 1 && root.hasSuffix("/") ? String(root.dropLast()) : root, level: 0)
         return found
     }
+
+    /// `found` without the linked worktrees whose repository is in it too, or
+    /// in `known` (a workspace's repositories): the tree shows those below
+    /// their repository, so one of their own would list them twice. A linked
+    /// worktree whose repository is somewhere else stays.
+    /// `mainWorktree` returns a linked worktree's main worktree, nil for any other folder.
+    public static func withoutLinkedWorktrees(_ found: [String], besides known: [String] = [],
+                                              mainWorktree: (String) -> String?) -> [String] {
+        let repositories = Set(found).union(known)
+        return found.filter { folder in
+            guard let main = mainWorktree(folder), main != folder else { return true }
+            return !repositories.contains(main)
+        }
+    }
 }
 
 extension WorktreeLink {

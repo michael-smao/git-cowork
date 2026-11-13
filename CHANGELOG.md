@@ -32,6 +32,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - The sidebar, the inspector and the workspace tree keep the widths you drag
   them to: in every tab, at the next launch, and when a workspace tab shows
   another repository.
+- A window showing a repository is at least as wide as its panels need
+  together, so the commit list in the middle always keeps its room. In a
+  narrow window a workspace's tree gives way first.
 - The reset entry in a commit's menu reads like GitKraken's: "Reset <branch>
   to this commit", with Soft (keep all changes), Mixed (keep working copy but
   reset index) and Hard (discard all changes).

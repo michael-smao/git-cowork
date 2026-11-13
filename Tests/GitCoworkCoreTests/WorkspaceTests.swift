@@ -158,6 +158,20 @@ import Testing
         #expect(RepoScan.find(in: "/nope", depth: 3, list: disk(layout)).isEmpty)
     }
 
+    /// git-cowork puts a new worktree next to its repository ("app-fix" beside
+    /// "app"), so a scan finds both. The tree shows the worktree below the
+    /// repository; it gets no entry of its own.
+    @Test func leavesOutWorktreesOfFoundRepositories() {
+        let mains = ["/w/app-fix": "/w/app", "/w/lone": "/elsewhere/main"]
+        let found = ["/w/app", "/w/app-fix", "/w/lib", "/w/lone"]
+        #expect(RepoScan.withoutLinkedWorktrees(found) { mains[$0] } == ["/w/app", "/w/lib", "/w/lone"])
+        // The worktree's repository is somewhere else, but already in the workspace.
+        #expect(RepoScan.withoutLinkedWorktrees(found, besides: ["/elsewhere/main"]) { mains[$0] } == ["/w/app", "/w/lib"])
+        // Found before its repository: the order of the rest stays.
+        #expect(RepoScan.withoutLinkedWorktrees(["/w/a-fix", "/w/b", "/w/a"]) { $0 == "/w/a-fix" ? "/w/a" : nil } == ["/w/b", "/w/a"])
+        #expect(RepoScan.withoutLinkedWorktrees(found) { _ in nil } == found)
+    }
+
     /// The real disk, the way the app lists folders.
     @Test func findsRepositoriesOnDisk() throws {
         let fm = FileManager.default
@@ -210,6 +224,20 @@ import Testing
         #expect(tree[0].children.map(\.name) == ["fix-2", "fix-10"])
         #expect(tree[0].children.map(\.kind) == [.worktree, .worktree])
         #expect(tree[1].children.isEmpty)
+    }
+
+    /// In the workspace as a repository and a linked worktree of another one
+    /// in it: one row, below its repository, so no two rows share an id.
+    @Test func aWorktreeThatIsAlsoARepositoryShowsOnce() {
+        let tree = WorkspaceTree.build(repos: ["/w/app", "/w/app-fix", "/w/lib"], worktrees: ["/w/app": ["/w/app-fix"]])
+        #expect(tree.map(\.id) == ["/w/app", "/w/lib"])
+        #expect(tree[0].children.map(\.id) == ["/w/app-fix"])
+        #expect(tree[0].children.map(\.kind) == [.worktree])
+        let ids = WorkspaceTree.rows(tree, collapsed: []).map(\.id)
+        #expect(ids == ["/w/app", "/w/app-fix", "/w/lib"])
+        #expect(Set(ids).count == ids.count)
+        // Without its repository in the workspace it stays a row of its own.
+        #expect(WorkspaceTree.build(repos: ["/w/app-fix", "/w/lib"]).map(\.id) == ["/w/app-fix", "/w/lib"])
     }
 
     @Test func aRepositoryInsideAnotherKeepsBoth() {
