@@ -134,7 +134,8 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     private var query = CommitQuery("")
     private var searchVersion = -1
     private var wipCount = -1
-    private var worktreeInfoVersion = -1
+    /// Other worktrees' "// WIP" rows as last built (otherWIPRows).
+    private var otherWIP: [String]?
     private var revealToken = 0
     /// HEAD the list last scrolled to (scrollToHeadIfMoved).
     private var scrolledToHead: String?
@@ -178,15 +179,21 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         let summaryChanged = draftSummary != self.draftSummary
         self.draftSummary = draftSummary
         refreshCoworkIfNeeded()
+        // The rows only change when a "// WIP" row comes or goes, or another
+        // worktree's row shows something else. A count that merely changes
+        // (every file an agent touches) redraws its row, not the whole table.
+        let countsChanged = wipCount != self.wipCount
+        let wipRowChanged = (wipCount > 0) != (self.wipCount > 0)
+        self.wipCount = wipCount
+        let otherWIP = otherWIPRows()
         if version != self.version || filter != self.filter || searchVersion != self.searchVersion
-            || wipCount != self.wipCount || worktreeInfoVersion != self.worktreeInfoVersion {
+            || wipRowChanged || otherWIP != self.otherWIP {
             let firstLoad = self.version == -1
             self.version = version
             self.filter = filter
             self.query = CommitQuery(filter)
             self.searchVersion = searchVersion
-            self.wipCount = wipCount
-            self.worktreeInfoVersion = worktreeInfoVersion
+            self.otherWIP = otherWIP
             wipCountsCache = nil
             badgeHover.close()
             rebuildRows()
@@ -196,7 +203,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
                 applySelection(selection, scroll: true)
                 DispatchQueue.main.async { self.fitMessageColumn() }
             }
-        } else if summaryChanged {
+        } else if summaryChanged, !countsChanged {
             // Typing in the commit summary: only the WIP message changes.
             redrawWIPRow(onlyMessage: true)
         } else {
@@ -238,6 +245,16 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         let maxY = max(0, table.bounds.height - clip.bounds.height)
         let y = min(maxY, max(0, rect.midY - clip.bounds.height / 2))
         table.scroll(NSPoint(x: clip.bounds.minX, y: y))
+    }
+
+    /// What the other worktrees' "// WIP" rows show, one entry per row:
+    /// everything rebuildRows reads for them.
+    private func otherWIPRows() -> [String] {
+        model.worktrees.compactMap { wt in
+            guard wt.path != model.root.path, !wt.isBare, let head = wt.head,
+                  let changes = model.worktreeInfo[wt.path]?.changes, changes > 0 else { return nil }
+            return "\(wt.path)\u{1f}\(head)\u{1f}\(wt.branch ?? wt.displayName)\u{1f}\(changes)"
+        }
     }
 
     private func redrawWIPRow(onlyMessage: Bool) {

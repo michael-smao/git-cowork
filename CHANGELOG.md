@@ -32,10 +32,25 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - The reset entry in a commit's menu reads like GitKraken's: "Reset <branch>
   to this commit", with Soft (keep all changes), Mixed (keep working copy but
   reset index) and Hard (discard all changes).
+- Much less work while files keep changing. Files git ignores (build output,
+  dependencies, logs) no longer make the app read the repository: a build used
+  to start git several times a second for as long as it ran, now it starts it
+  once. While an agent or a script keeps editing tracked files, changes show
+  about once a second instead of after every write, and less often when the
+  app or the tab is in the background. A single save still shows right away.
+- The history no longer reloads all its rows each time the number of changed
+  files changes, only the "// WIP" row is redrawn. A branch list you were
+  hovering over stays open while files change.
 
 ### Fixed
 - The count on Pull, Push and the inbox bell showed "…" from 10 on. It now
   shows "9+"; the exact number is in the tooltip.
+- A window on a worktree that lives inside the main repository's folder (such
+  as `.claude/worktrees/…`) didn't notice changes to its own files until you
+  switched back to the app.
+- The app's background `git status` could make a commit or `git add` running
+  at the same moment (in a terminal, by an agent) fail with "Unable to create
+  index.lock". It no longer takes that lock.
 
 ## [0.5.4] - 2026-11-12
 
