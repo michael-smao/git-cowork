@@ -45,6 +45,11 @@ public enum WorkspaceTree {
 
     /// `worktrees` maps a repository to its linked worktrees' folders.
     public static func build(repos: [String], worktrees: [String: [String]] = [:]) -> [Node] {
+        // A folder that is in the workspace and also a linked worktree of a
+        // repository in it shows once, below that repository. Twice would
+        // give two rows the same id.
+        let linked = Set(repos.flatMap { repo in (worktrees[repo] ?? []).filter { $0 != repo } })
+        let repos = repos.filter { !linked.contains($0) }
         let base = base(of: repos)
         let root = Trie()
         for repo in repos {

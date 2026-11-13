@@ -237,8 +237,9 @@ enum WorkspaceActions {
                     found += await WorkspaceDisk.scan(folder, depth: Prefs.scanDepth)
                 }
             }
+            let new = withoutShownWorktrees(found, in: id)
             var added = 0
-            WorkspaceStore.shared.update(id) { added = $0.add(found) }
+            WorkspaceStore.shared.update(id) { added = $0.add(new) }
             if found.isEmpty {
                 inform(L("No git repositories found"), chosen.joined(separator: "\n"))
             } else if added == 0 {
@@ -252,13 +253,21 @@ enum WorkspaceActions {
     static func rescan(_ id: String) {
         guard let ws = WorkspaceStore.shared.workspace(id), let root = ws.scanRoot else { return }
         Task {
-            let found = await WorkspaceDisk.scan(root, depth: ws.scanDepth ?? Prefs.scanDepth)
+            let scanned = await WorkspaceDisk.scan(root, depth: ws.scanDepth ?? Prefs.scanDepth)
+            let found = withoutShownWorktrees(scanned, in: id)
             var added = 0
             WorkspaceStore.shared.update(id) { added = $0.addScanned(found) }
             inform(added == 0 ? L("No new repositories found") : added == 1 ? L("Added 1 repository")
                    : String(localized: "Added \(added) repositories"),
                    (root as NSString).abbreviatingWithTildeInPath)
         }
+    }
+
+    /// `found` without the linked worktrees the workspace's tree shows anyway,
+    /// below a repository that is in the workspace or in `found`.
+    private static func withoutShownWorktrees(_ found: [String], in id: String) -> [String] {
+        RepoScan.withoutLinkedWorktrees(found, besides: WorkspaceStore.shared.workspace(id)?.repos ?? [],
+                                        mainWorktree: WorkspaceDisk.mainWorktree(of:))
     }
 
     static func confirmDelete(_ id: String) {

@@ -45,6 +45,10 @@ struct RepoView: View {
                         .frame(maxHeight: .infinity)
                 }
             }
+            // A GeometryReader has no minimum of its own, so the window could
+            // get narrower than the panels' minimums together and squeeze the
+            // center. This keeps the window at least that wide.
+            .frame(minWidth: minimumWidth)
             CommandLogArea(model: model)
             Divider()
             StatusBar(model: model)
@@ -79,13 +83,20 @@ struct RepoView: View {
         }
     }
 
+    /// One point for each divider in the row.
+    private var dividers: CGFloat { sidebarVisible ? 2 : 1 }
+
+    /// The narrowest row that still gives every panel in it its minimum.
+    private var minimumWidth: CGFloat {
+        (sidebarVisible ? Layout.sidebarMin : 0) + Layout.centerMin + Layout.inspectorMin + dividers
+    }
+
     /// Panel widths for a row `total` wide: the saved ones, unless the center
     /// would get narrower than its minimum. Then sidebar and inspector give
     /// up room in proportion, down to their own minimums. The ranges are how
     /// far each divider may go now.
     private func fitted(total: CGFloat) -> (sidebar: CGFloat, inspector: CGFloat,
                                             sidebarRange: ClosedRange<Double>, inspectorRange: ClosedRange<Double>) {
-        let dividers: CGFloat = sidebarVisible ? 2 : 1
         let room = max(0, total - Layout.centerMin - dividers)
         var sidebar = sidebarVisible ? min(max(CGFloat(sidebarWidth), Layout.sidebarMin), Layout.sidebarMax) : 0
         var inspector = min(max(CGFloat(inspectorWidth), Layout.inspectorMin), Layout.inspectorMax)

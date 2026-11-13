@@ -64,11 +64,24 @@ final class WorkspaceStore {
 
 /// Reading workspaces' folders from disk, off the main thread.
 enum WorkspaceDisk {
-    /// The repositories under `root` (RepoScan), as real paths.
+    /// The repositories under `root` (RepoScan), as real paths. A linked
+    /// worktree found next to its repository is left out: the tree shows it
+    /// below the repository.
     static func scan(_ root: String, depth: Int) async -> [String] {
         await Task.detached(priority: .userInitiated) {
-            RepoScan.find(in: realPath(root), depth: depth, list: list).map(realPath)
+            let found = RepoScan.find(in: realPath(root), depth: depth, list: list).map(realPath)
+            return RepoScan.withoutLinkedWorktrees(found, mainWorktree: mainWorktree(of:))
         }.value
+    }
+
+    /// The main worktree of the linked worktree in `folder`, read from its
+    /// `.git` file without running git. Nil for a main worktree, whose `.git`
+    /// is a folder.
+    static func mainWorktree(of folder: String) -> String? {
+        let gitFile = (folder as NSString).appendingPathComponent(".git")
+        guard let contents = try? String(contentsOfFile: gitFile, encoding: .utf8),
+              let main = WorktreeLink.mainWorktree(gitFile: contents, worktree: folder) else { return nil }
+        return realPath(main)
     }
 
     /// Each repository's linked worktrees that still exist, read from
