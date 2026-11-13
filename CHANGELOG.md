@@ -14,6 +14,10 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 ### Fixed
 - The count on Pull, Push and the inbox bell showed "…" from 10 on. It now
   shows "9+"; the exact number is in the tooltip.
+- A push the server declined for another reason than branch protection (a
+  GitLab push rule such as signed commits, a GitHub ruleset, a pre-receive
+  hook) was reported as "<branch> is protected on the server". It now says
+  the server refused the push and shows the server's own reason.
 
 ## [0.5.4] - 2026-11-12
 
