@@ -393,7 +393,7 @@ private struct RepoContainer: View {
         .onChange(of: RepoTabs.shared.version) { updateSleep() }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
             // Right away when selected, before the tab strip catches up.
-            if asleep, let window = host.window, note.object as? NSWindow === window { updateSleep() }
+            if asleep || !model.isShowing, let window = host.window, note.object as? NSWindow === window { updateSleep() }
         }
         .task {
             await model.load()
@@ -419,8 +419,10 @@ private struct RepoContainer: View {
             idle?.cancel()
             idle = nil
             if asleep { asleep = false }
+            model.setShowing(true)
             return
         }
+        model.setShowing(false)
         guard idle == nil, !asleep else { return }
         idle = Task {
             var wait = TabSleep.after

@@ -101,7 +101,26 @@ final class RepoModel {
     private var watchedPaths: [String] = []
     private var refreshTask: Task<Void, Never>?
     private var refreshPending = false
-    private var debounce: Task<Void, Never>?
+    /// When the last pass of `refresh` started reading the repository.
+    private var lastPassStart: Date?
+
+    // File changes (see "File watching" below).
+    /// The refresh a file change asked for, while it waits its turn.
+    private var dueRefresh: Task<Void, Never>?
+    /// When the last file change that needs a refresh arrived.
+    private var changedAt = Date.distantPast
+    /// When the last refresh for a file change started, and how long it took.
+    private var lastWatchedRefresh: Date?
+    private var lastWatchedDuration: TimeInterval = 0
+    /// Paths git ignores, as `git check-ignore` said. `ignoredEpoch` counts
+    /// how often they were forgotten, so a late answer isn't kept.
+    private var ignoredPaths = IgnoredPaths()
+    private var ignoredEpoch = 0
+    /// Other worktrees whose change counts are due, and the task reading them.
+    private var dueWorktrees: Set<String> = []
+    private var worktreeInfoTask: Task<Void, Never>?
+    /// False while this window's tab is behind another one (set by the window).
+    private(set) var isShowing = true
 
     init(root: URL) {
         // Resolve symlinks (/tmp -> /private/tmp) so paths match what git reports.
@@ -141,7 +160,7 @@ final class RepoModel {
         guard !isStopped else { return }
         activationObserver = NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
-                await self?.refresh()
+                await self?.refreshNow()
                 if let self, Prefs.coworkAutoSync, (self.cowork.lastSync.map { Date().timeIntervalSince($0) > 30 } ?? true) { await self.syncCowork() }
                 await self?.updateHostStatus()
             }
@@ -164,8 +183,10 @@ final class RepoModel {
         coworkTimer?.cancel()
         coworkTimer = nil
         autoFetcher.stop()
-        debounce?.cancel()
-        debounce = nil
+        dueRefresh?.cancel()
+        dueRefresh = nil
+        worktreeInfoTask?.cancel()
+        worktreeInfoTask = nil
         if let activationObserver { NotificationCenter.default.removeObserver(activationObserver) }
         activationObserver = nil
     }
@@ -264,7 +285,12 @@ final class RepoModel {
 
     private func refreshOnce() async {
         defer { refreshCount += 1 }
-        async let statusOut = git.tryRun(["status", "--porcelain=v2", "-z", "--branch", "-uall"], in: root)
+        lastPassStart = Date()
+        // --no-optional-locks: this status runs by itself in the background. Without
+        // it git rewrites .git/index when it can, which makes a commit or `git add`
+        // running at that moment (in a terminal, by an agent) fail on index.lock,
+        // and the write comes back here as a change to refresh for.
+        async let statusOut = git.tryRun(["--no-optional-locks", "status", "--porcelain=v2", "-z", "--branch", "-uall"], in: root)
         async let refsOut = git.tryRun(["for-each-ref", Parsers.refFormat, "refs/heads", "refs/remotes", "refs/tags"], in: root)
         async let stashOut = git.tryRun(["stash", "list", Parsers.stashFormat], in: root)
         async let worktreeOut = git.tryRun(["worktree", "list", "--porcelain"], in: root)
@@ -274,7 +300,8 @@ final class RepoModel {
 
         let newStatus = Parsers.parseStatus(s)
         if newStatus != status { status = newStatus }
-        operation = detectOperation()
+        let newOperation = detectOperation()
+        if newOperation != operation { operation = newOperation }
 
         let newRemotes = Parsers.parseRemotes(rem)
         if newRemotes != remotes { remotes = newRemotes }
@@ -430,7 +457,7 @@ final class RepoModel {
         await withTaskGroup(of: (String, WorktreeInfo?).self) { group in
             for path in paths {
                 group.addTask { [git] in
-                    guard let out = await git.tryRun(["status", "--porcelain=v2", "-z", "--branch"], in: URL(fileURLWithPath: path)) else {
+                    guard let out = await git.tryRun(["--no-optional-locks", "status", "--porcelain=v2", "-z", "--branch"], in: URL(fileURLWithPath: path)) else {
                         return (path, nil)
                     }
                     let st = Parsers.parseStatus(out)
@@ -460,43 +487,144 @@ final class RepoModel {
         let roots = unique.filter { p in !unique.contains { $0 != p && p.hasPrefix($0 + "/") } }
         guard roots != watchedPaths else { return }
         watchedPaths = roots
+        forgetIgnoredPaths()
         watcher?.stop()
         watcher = FileWatcher(paths: roots) { [weak self] changed in
             MainActor.assumeIsolated { self?.handleFileEvents(changed) }
         }
     }
 
+    /// Sorts a batch of changed paths. git's own files mean a refresh. Files
+    /// in a worktree do only when git doesn't ignore them: a build writing
+    /// thousands of files into an ignored folder then costs nothing.
     private func handleFileEvents(_ paths: [String]) {
-        let others = worktrees.map(\.path).filter { $0 != root.path }.sorted { $0.count > $1.count }
-        var otherChanged = Set<String>()
-        var needsFull = false
+        // Deepest first: a worktree can sit inside another one's folder
+        // (.claude/worktrees/…), and its files are its own.
+        let roots = Set(worktrees.map(\.path).filter { !$0.isEmpty } + [root.path]).sorted { $0.count > $1.count }
+        var gitChanged = false
+        var rulesChanged = false
         var coworkChanged = false
+        var files: [String: [String]] = [:]   // by worktree
         for p in paths {
             if p.contains("/.git/objects/") || p.hasSuffix(".lock") || p.contains("/.git/logs/") { continue }
             // Written by every fetch; nothing we show depends on it.
             if p.hasSuffix("/FETCH_HEAD") { continue }
             // Tasks and reviews (moved by this or another window): no graph refresh needed.
             if p.contains("/refs/cowork/") { coworkChanged = true; continue }
-            let inGitDir = commonDir.map { p.hasPrefix($0.path) } ?? false
-            if !inGitDir, let wt = others.first(where: { p == $0 || p.hasPrefix($0 + "/") }) {
-                otherChanged.insert(wt)
-                continue
-            }
-            needsFull = true
+            if let git = commonDir?.path, p == git || p.hasPrefix(git + "/") { gitChanged = true; continue }
+            guard let wt = roots.first(where: { p == $0 || p.hasPrefix($0 + "/") }) else { gitChanged = true; continue }
+            if p.hasSuffix("/.gitignore") { rulesChanged = true }
+            files[wt, default: []].append(p)
         }
-        if !otherChanged.isEmpty {
-            Task { await refreshWorktreeInfo(paths: Array(otherChanged)) }
-        }
+        // The index or the ignore rules moved: what git said under the old ones is void.
+        if gitChanged || rulesChanged { forgetIgnoredPaths() }
         if coworkChanged, cowork.loaded {
             Task { await cowork.reload() }
         }
-        if needsFull {
-            debounce?.cancel()
-            debounce = Task {
-                try? await Task.sleep(for: .milliseconds(150))
-                guard !Task.isCancelled else { return }
-                await refresh()
+        if gitChanged {
+            files[root.path] = nil   // the refresh reads this worktree's files anyway
+            scheduleRefresh()
+        }
+        if !files.isEmpty {
+            Task { await sortOut(files) }
+        }
+    }
+
+    /// Changed files per worktree: a refresh for this one, new counts for the
+    /// "// WIP" row of another one, nothing when git ignores them all.
+    private func sortOut(_ files: [String: [String]]) async {
+        for (wt, paths) in files {
+            guard await hasRelevantChange(paths, in: wt), !isStopped else { continue }
+            if wt == root.path { scheduleRefresh() } else { scheduleWorktreeInfo(wt) }
+        }
+    }
+
+    /// False when git ignores every one of `paths`. Asks `git check-ignore`
+    /// about paths it hasn't seen yet and remembers the answer.
+    private func hasRelevantChange(_ paths: [String], in wt: String) async -> Bool {
+        var unknown: [String] = []
+        for p in paths {
+            switch p == wt ? .relevant : ignoredPaths.answer(for: p) {
+            case .relevant: return true
+            case .ignored: continue
+            case .unknown: unknown.append(p)
             }
+        }
+        guard !unknown.isEmpty else { return false }
+        // A sample is enough: the folders above it are asked about too, and
+        // what is still unknown afterwards counts as a change.
+        let asked = IgnoredPaths.questions(for: Array(unknown.prefix(200)), under: wt)
+        let epoch = ignoredEpoch
+        let reply = await git.executeData(["check-ignore", "-z", "--stdin"], in: URL(fileURLWithPath: wt),
+                                          input: Data((asked.joined(separator: "\0") + "\0").utf8))
+        // 0: some are ignored, 1: none is. Anything else: can't tell, so refresh.
+        guard reply.exitCode == 0 || reply.exitCode == 1 else { return true }
+        var learned = ignoredPaths
+        learned.learn(asked: asked, ignored: reply.text.split(separator: "\0").map(String.init))
+        if epoch == ignoredEpoch { ignoredPaths = learned }   // else the rules changed meanwhile
+        return unknown.contains { learned.answer(for: $0) != .ignored }
+    }
+
+    private func forgetIgnoredPaths() {
+        ignoredEpoch += 1
+        if !ignoredPaths.isEmpty { ignoredPaths.forget() }
+    }
+
+    /// A file change asks for a refresh. One change shows after a short
+    /// settle time; while changes keep coming, RefreshPacing spaces the
+    /// refreshes out. The one that is waiting covers every change until it runs.
+    private func scheduleRefresh() {
+        changedAt = Date()
+        guard dueRefresh == nil, !isStopped else { return }
+        let wait = RefreshPacing.wait(sinceLast: lastWatchedRefresh.map { Date().timeIntervalSince($0) },
+                                      lastDuration: lastWatchedDuration, watched: isShowing && NSApp.isActive)
+        dueRefresh = Task {
+            try? await Task.sleep(for: .seconds(wait))
+            guard !Task.isCancelled else { return }
+            dueRefresh = nil   // a change from here on asks for the next one
+            // An action's own refresh has read the repository since: nothing new to see.
+            if let lastPassStart, lastPassStart >= changedAt { return }
+            let start = Date()
+            lastWatchedRefresh = start
+            await refresh()
+            lastWatchedDuration = Date().timeIntervalSince(start)
+        }
+    }
+
+    /// Refreshes right away, also for changes that were waiting their turn,
+    /// and looks at the ignore rules again. For when the user comes back.
+    func refreshNow() async {
+        dueRefresh?.cancel()
+        dueRefresh = nil
+        forgetIgnoredPaths()
+        await refresh()
+    }
+
+    /// The window's tab came to the front or went behind another one. Behind,
+    /// changes that keep coming are read less often; in front again, what
+    /// was waiting shows at once.
+    func setShowing(_ showing: Bool) {
+        guard showing != isShowing else { return }
+        isShowing = showing
+        if showing, dueRefresh != nil { Task { await refreshNow() } }
+    }
+
+    /// Another worktree's files changed: read its counts, once for all the
+    /// changes that arrive while it waits. Nobody acts on these counts, so
+    /// there is no hurry.
+    private func scheduleWorktreeInfo(_ path: String) {
+        dueWorktrees.insert(path)
+        guard worktreeInfoTask == nil, !isStopped else { return }
+        worktreeInfoTask = Task {
+            while !Task.isCancelled, !dueWorktrees.isEmpty {
+                let watched = isShowing && NSApp.isActive
+                try? await Task.sleep(for: .seconds(watched ? RefreshPacing.watchedGap : RefreshPacing.unwatchedGap))
+                guard !Task.isCancelled else { break }
+                let paths = Array(dueWorktrees)
+                dueWorktrees = []
+                await refreshWorktreeInfo(paths: paths)
+            }
+            worktreeInfoTask = nil
         }
     }
 

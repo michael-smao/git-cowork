@@ -162,6 +162,49 @@ extension RepoModel {
         await catchUp(with: remote.name, named: remote.name)
     }
 
+    /// The remote branch "Pull" brings `local` up to: the one it follows, else
+    /// the branch of the same name on a remote. Nil when there is none (never
+    /// pushed, or deleted on the server).
+    func pullSource(for local: Ref) -> Ref? {
+        if let upstream = local.upstream { return local.upstreamGone ? nil : remoteBranch(fullName: upstream) }
+        return remoteBranch(named: local.name)
+    }
+
+    /// Pull for any local branch, from the graph or the sidebar. The
+    /// checked-out one pulls as the toolbar does. Another one is fetched and
+    /// moved up to `source` without touching the working copy, which only a
+    /// fast-forward can do; when both have new commits it offers to check the
+    /// branch out, where merge or rebase can run.
+    func pull(branch local: Ref, from source: Ref) async {
+        guard let (remote, branch) = split(source) else { return }
+        if local.isHead {
+            if source.name == status.upstream { await pull() } else { await checkoutAndPull(source) }
+            return
+        }
+        // git refuses to move a branch that another worktree has checked out.
+        if refuseIfCheckedOutElsewhere(local.name) { return }
+        let ok = await perform("Pull", ["fetch", "--end-of-options", remote, "refs/heads/\(branch):refs/heads/\(local.name)"], quiet: true)
+        noteRemoteAction(fetched: false, succeeded: ok)
+        guard !ok else { return }
+        let counts = await git.tryRun(["rev-list", "--left-right", "--count", "\(local.fullName)...\(source.fullName)"], in: root)
+        guard case .diverged(let ahead, let behind)? = counts.flatMap(CatchUp.init(revListCounts:)) else {
+            problem = lastProblem   // offline, sign-in, …: as any failed action
+            return
+        }
+        confirmation = Confirmation(
+            title: String(localized: "\(local.name) and \(source.name) both have new commits"),
+            message: String(localized: "\(local.name) has \(ahead) commits that \(source.name) doesn't, and \(source.name) has \(behind) new ones. That needs a merge or a rebase, which only works on the checked-out branch. Check out \(local.name) to choose one."),
+            confirmTitle: String(localized: "Checkout \(local.name)"),
+            destructive: false,
+            action: { [weak self] in
+                guard let self else { return }
+                await checkout(local)
+                guard currentBranch == local.name else { return }   // refused or failed: it said why
+                await catchUp(with: source.name, named: source.name)
+            }
+        )
+    }
+
     /// A branch without an upstream asks where to push first (like
     /// GitKraken); without any remote, it asks to add one.
     func push(force: Bool = false) async {
