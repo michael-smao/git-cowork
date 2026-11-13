@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-13
+
 ### Added
 - Workspaces: keep a set of repositories together and see them as a tree
   (folders › repositories › worktrees) on the left of a tab. Clicking a
