@@ -16,6 +16,31 @@ import Testing
         #expect(GitFailure.classify("remote: Permission to o/r.git denied to anna.\nfatal: unable to access 'https://github.com/o/r.git/': The requested URL returned error: 403") == .noWriteAccess)
     }
 
+    /// GitLab ends every server-side refusal with "pre-receive hook declined";
+    /// only the remote: line says whether it's branch protection.
+    @Test func serverRejected() {
+        let rejected = " ! [remote rejected] development -> development (pre-receive hook declined)\nerror: failed to push some refs to 'gitlab.com:o/r.git'"
+        #expect(GitFailure.classify("remote: GitLab: You are not allowed to push code to protected branches on this project.\n" + rejected)
+                == .protectedBranch)
+        // git pads remote lines with spaces when it writes to a pipe.
+        #expect(GitFailure.classify("remote: GitLab: Commit must be signed with a GPG key        \nTo gitlab.com:o/r.git\n" + rejected)
+                == .serverRejected(reason: "GitLab: Commit must be signed with a GPG key"))
+        #expect(GitFailure.classify(rejected) == .serverRejected(reason: ""))
+        #expect(GitFailure.classify("""
+        remote: error: GH013: Repository rule violations found for refs/heads/main.
+        remote: Review all repository rules at https://github.com/o/r/rules
+        remote:
+        remote: - Commits must have verified signatures.
+        To github.com:o/r.git
+         ! [remote rejected] main -> main (push declined due to repository rule violations)
+        error: failed to push some refs to 'github.com:o/r.git'
+        """) == .serverRejected(reason: """
+        GH013: Repository rule violations found for refs/heads/main.
+        Review all repository rules at https://github.com/o/r/rules
+        - Commits must have verified signatures.
+        """))
+    }
+
     @Test func pull() {
         #expect(GitFailure.classify("There is no tracking information for the current branch.\nPlease specify which branch you want to merge with.") == .noUpstream)
         #expect(GitFailure.classify("Your configuration specifies to merge with the ref 'refs/heads/x'\nfrom the remote, but no such ref was fetched.") == .upstreamGone)

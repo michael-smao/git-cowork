@@ -669,6 +669,8 @@
 "%lld commits exist only on this branch and go away with it." = "%lld Commits gibt es nur auf diesem Branch, sie verschwinden mit ihm.";
 "1 commit exists only on this branch and goes away with it." = "1 Commit gibt es nur auf diesem Branch, er verschwindet mit ihm.";
 "A branch named %@ already exists." = "Einen Branch namens %@ gibt es schon.";
+"A rule or hook on the server declined the push and gave no reason. Git's output is under Details." = "Eine Regel oder ein Hook auf dem Server hat den Push abgelehnt, ohne einen Grund zu nennen. Die Ausgabe von git steht unter Details.";
+"A rule or hook on the server declined the push. The server says:\n\n%@" = "Eine Regel oder ein Hook auf dem Server hat den Push abgelehnt. Der Server meldet:\n\n%@";
 "A tag named %@ already exists." = "Einen Tag namens %@ gibt es schon.";
 "Add Remote" = "Remote hinzufügen";
 "Add your account under Settings > Accounts (for SSH remotes, also Create SSH Key there), or set up an SSH key or credential helper for git." = "Füge deinen Account unter Einstellungen > Accounts hinzu (für SSH-Remotes dort auch „SSH-Schlüssel erstellen“) oder richte für git einen SSH-Schlüssel oder Credential-Helper ein.";
@@ -728,7 +730,8 @@
 "That worktree already exists" = "Diesen Worktree gibt es schon";
 "The branch doesn't exist on the server anymore (often deleted after its pull request was merged). The leftover entry here is cleaned up." = "Den Branch gibt es auf dem Server nicht mehr (oft gelöscht, nachdem sein Pull Request gemergt wurde). Der übrig gebliebene Eintrag hier wird aufgeräumt.";
 "The remote has commits you don't have yet" = "Auf dem Remote sind Commits, die du noch nicht hast";
-"The server doesn't allow pushing to this branch directly (branch protection or a server hook). Push your work to a new branch and open a pull request instead." = "Der Server erlaubt keinen direkten Push auf diesen Branch (Branch-Schutz oder ein Server-Hook). Push deine Arbeit auf einen neuen Branch und öffne stattdessen einen Pull Request.";
+"The server doesn't allow pushing to this branch directly. Push your work to a new branch and open a pull request instead." = "Der Server erlaubt keinen direkten Push auf diesen Branch. Push deine Arbeit auf einen neuen Branch und öffne stattdessen einen Pull Request.";
+"The server refused the push" = "Der Server hat den Push abgelehnt";
 "The server wants you to sign in" = "Der Server möchte, dass du dich anmeldest";
 "The stash was applied with conflicts" = "Der Stash wurde mit Konflikten angewendet";
 "There are conflicts to resolve" = "Es gibt Konflikte zu lösen";

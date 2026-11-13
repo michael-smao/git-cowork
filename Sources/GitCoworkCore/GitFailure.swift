@@ -6,8 +6,12 @@ import Foundation
 public enum GitFailure: Equatable, Sendable {
     /// Push refused: the remote branch has commits this one doesn't.
     case pushRejected
-    /// Push refused by the server's branch protection or a hook.
+    /// Push refused by the server's branch protection.
     case protectedBranch
+    /// Push refused by another rule or hook on the server (a GitLab push rule
+    /// such as signed commits, a GitHub ruleset, a pre-receive hook). `reason`
+    /// is what the server said, empty when it said nothing.
+    case serverRejected(reason: String)
     /// `--force-with-lease` refused: someone pushed since the last fetch.
     case staleLease
     /// Deleting a remote branch that is already gone there.
@@ -46,10 +50,12 @@ public enum GitFailure: Equatable, Sendable {
 
         // Order matters: the more specific wording first.
         if has("stale info") { return .staleLease }
-        if has("protected branch", "gh006", "pre-receive hook declined", "you are not allowed to push code to protected branches",
-               "you are not allowed to force push") {
+        // Only wording that names branch protection. "pre-receive hook declined"
+        // alone doesn't: GitLab prints it for every refusal, push rules included.
+        if has("protected branch", "gh006", "you are not allowed to force push") {
             return .protectedBranch
         }
+        if has("[remote rejected]", "hook declined") { return .serverRejected(reason: remoteMessage(in: output)) }
         if has("[rejected]", "updates were rejected", "failed to push some refs") && has("fetch first", "non-fast-forward", "behind its remote") {
             return .pushRejected
         }
@@ -82,6 +88,23 @@ public enum GitFailure: Equatable, Sendable {
         if has("already exists") { return .alreadyExists }
         if has("not a git repository", "dubious ownership") { return .notARepository }
         return .other
+    }
+
+    /// What the server printed during a push (git shows those lines after
+    /// "remote:"), without that prefix. The first few lines; all of it is in
+    /// git's output anyway.
+    static func remoteMessage(in output: String) -> String {
+        let lines = output.split(separator: "\n").compactMap { line -> String? in
+            // git pads these lines with spaces when it isn't writing to a terminal.
+            var text = line.trimmingCharacters(in: .whitespaces)
+            guard text.lowercased().hasPrefix("remote:") else { return nil }
+            text = text.dropFirst("remote:".count).trimmingCharacters(in: .whitespaces)
+            if text.lowercased().hasPrefix("error:") {
+                text = text.dropFirst("error:".count).trimmingCharacters(in: .whitespaces)
+            }
+            return text.isEmpty ? nil : text
+        }
+        return lines.prefix(4).joined(separator: "\n")
     }
 
     /// The tab-indented file list git prints under "…would be overwritten by checkout:".

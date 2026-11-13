@@ -24,11 +24,16 @@ extension RepoModel {
             ]
         case .protectedBranch:
             p.title = String(localized: "\(branch) is protected on the server")
-            p.message = L("The server doesn't allow pushing to this branch directly (branch protection or a server hook). Push your work to a new branch and open a pull request instead.")
+            p.message = L("The server doesn't allow pushing to this branch directly. Push your work to a new branch and open a pull request instead.")
             p.actions = [.init(title: L("New Branch…"), role: .primary) { [weak self] in
                 guard let self else { return }
                 sheet = .newBranch(from: currentBranch ?? "HEAD", label: currentBranch ?? "HEAD")
             }]
+        case .serverRejected(let reason):
+            p.title = L("The server refused the push")
+            p.message = reason.isEmpty
+                ? L("A rule or hook on the server declined the push and gave no reason. Git's output is under Details.")
+                : String(localized: "A rule or hook on the server declined the push. The server says:\n\n\(reason)")
         case .staleLease:
             p.title = L("Someone pushed in the meantime")
             p.message = L("Force push with lease only overwrites the server's branch if nobody pushed since your last fetch, and somebody did. Fetch, look at their commits, then decide again.")
