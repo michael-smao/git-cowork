@@ -6,6 +6,11 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Right-clicking a branch badge in the history offers "Delete <branch>…", as
+  the sidebar does. It always asks first, and for a local branch it offers to
+  delete the remote branch as well.
+
 ## [0.6.0] - 2026-11-13
 
 ### Added

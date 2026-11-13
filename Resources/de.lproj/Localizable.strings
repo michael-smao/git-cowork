@@ -209,6 +209,7 @@
 "Delete" = "Löschen";
 "Delete %@ on %@?" = "%1$@ auf %2$@ löschen?";
 "Delete %@?" = "%@ löschen?";
+"Delete %@…" = "%@ löschen …";
 "Delete on %@…" = "Auf %@ löschen …";
 "Delete Remote Branch" = "Remote-Branch löschen";
 "Delete tag %@?" = "Tag %@ löschen?";

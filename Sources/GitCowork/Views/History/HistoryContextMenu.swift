@@ -112,6 +112,15 @@ extension HistoryTableCoordinator {
                     model.coworkSelection = .task(id)
                 })
             }
+            // Last in the group. Always asks first; for a local branch the
+            // question also offers its remote branch. Not for the checked-out
+            // branch, one in another worktree (that one has Remove Worktree),
+            // or the remote's default branch.
+            if let local, !local.isHead, model.sidebarOtherWorktree(for: local.name) == nil {
+                menu.addItem(ActionItem("Delete \(local.name)…") { model.deleteBranch(local) })
+            } else if let remote, let name = remote.remoteName, model.remoteDefaults[name] != remote.branchNameWithoutRemote {
+                menu.addItem(ActionItem("Delete \(remote.name)…") { model.deleteBranch(remote) })
+            }
             menu.addItem(.separator())
         }
 
