@@ -7,9 +7,10 @@ struct GitCoworkApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        // One window per worktree. Windows open as tabs of each other.
-        WindowGroup("git-cowork", id: "repo", for: String.self) { $path in
-            RepoWindow(path: $path)
+        // One window per worktree (and workspace, if the tab shows one).
+        // Windows open as tabs of each other.
+        WindowGroup("git-cowork", id: "repo", for: TabTarget.self) { $target in
+            RepoWindow(target: $target)
         }
         // Folders from `open -a git-cowork <dir>`, the command line, or the Dock icon.
         .handlesExternalEvents(matching: ["*"])
@@ -59,6 +60,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct WindowActions {
     let open: (String) -> Void
     let showClone: () -> Void
+    /// File › Scan Folder…: pick a folder, then make a workspace of its repositories.
+    let scanFolder: () -> Void
+    let openWorkspace: (String) -> Void
+    /// The workspace this tab shows, if any.
+    let workspace: String?
 }
 
 extension FocusedValues {
@@ -92,27 +98,46 @@ extension EnvironmentValues {
 /// arguments and then SwiftUI opens no window, so open one ourselves.
 @MainActor
 enum LaunchFolders {
-    static var pending: [String] = []
+    static var pending: [TabTarget] = []
     /// Clone was chosen with no window open; the next empty window shows the clone sheet.
     static var pendingClone = false
+    /// The same for Scan Folder: the folder that was picked.
+    static var pendingScan: String?
+    /// The same for opening a workspace.
+    static var pendingWorkspace: String?
 
     /// All folders from the command line. The first window to appear takes them
     /// all, so later ⌘T / New Window never pick up leftovers.
-    static func takeAll() -> [String] {
+    static func takeAll() -> [TabTarget] {
         defer { pending = [] }
         return pending
     }
 
     /// Which of `pending` comes to the front: the tab that was in front at
     /// the last quit, or the last folder from the command line.
-    static var front: String?
+    static var front: TabTarget?
     /// Repositories opening as background tabs at launch. Their windows load
     /// the repository only when first selected, so a launch with many tabs
     /// loads one, not all of them at once.
-    private static var background: Set<String> = []
+    private static var background: Set<TabTarget> = []
 
-    static func opensInBackground(_ path: String) -> Bool { background.contains(path) }
-    static func markBackground(_ path: String) { background.insert(path) }
+    static func opensInBackground(_ target: TabTarget) -> Bool { background.contains(target) }
+    static func markBackground(_ target: TabTarget) { background.insert(target) }
+
+    /// What a saved or command-line tab shows now: the folder's worktree top
+    /// level, and its workspace if that still exists. Nil when nothing is left.
+    static func resolve(_ target: TabTarget) async -> TabTarget? {
+        var result = TabTarget(workspace: WorkspaceStore.shared.workspace(target.workspace)?.id)
+        if let path = target.path { result.path = await RepoLocator.resolve(path) }
+        return result.isEmpty ? nil : result
+    }
+
+    /// Already shown in a tab: the same repository for a plain tab, the same
+    /// workspace and repository for a workspace tab.
+    static func isOpen(_ target: TabTarget) -> Bool {
+        if target.workspace == nil, let path = target.path { return OpenRepos.isOpen(path) }
+        return OpenSession.isOpen(target)
+    }
 
     /// All tabs are there: from now on tabs load right away, and the session is saved again.
     static func finishRestore() {
@@ -123,6 +148,13 @@ enum LaunchFolders {
     /// Name and folder for a tab whose repository hasn't loaded yet, read
     /// from the files alone: the folder name, or for a linked worktree the
     /// main repository's name plus the worktree's folder.
+    static func tabLabel(for target: TabTarget) -> RepoTabLabel {
+        var label = target.path.map(tabLabel(for:)) ?? RepoTabLabel(name: "", worktree: nil)
+        label.workspace = WorkspaceStore.shared.workspace(target.workspace)?.name
+        if label.name.isEmpty && label.workspace == nil { label.name = "git-cowork" }
+        return label
+    }
+
     static func tabLabel(for path: String) -> RepoTabLabel {
         let folder = (path as NSString).lastPathComponent
         let gitFile = (path as NSString).appendingPathComponent(".git")
@@ -138,12 +170,17 @@ enum LaunchFolders {
     static func openFromCommandLine() {
         let commandLine = CommandLine.arguments.dropFirst().filter { arg in
             !arg.hasPrefix("-") && isDirectory(arg)
-        }.map { realPath($0) }
-        let saved: (paths: [String], selected: String?) = Prefs.reopenRepos ? OpenSession.saved : ([], nil)
+        }.map { TabTarget(path: realPath($0)) }
+        let saved: (tabs: [TabTarget], selected: TabTarget?) = Prefs.reopenRepos ? OpenSession.saved : ([], nil)
+        let real = { (t: TabTarget) in TabTarget(path: t.path.map(realPath), workspace: t.workspace) }
         // A moment for SwiftUI's first window and anything macOS restores itself.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            let plan = SessionRestore.plan(saved: saved.paths.map { realPath($0) }, selected: saved.selected.map { realPath($0) },
-                                           commandLine: commandLine, alreadyOpen: OpenRepos.paths, exists: isDirectory)
+            let alreadyOpen = OpenSession.openTargets.union(OpenRepos.paths.map { TabTarget(path: $0) })
+            let plan = SessionRestore.plan(saved: saved.tabs.map(real), selected: saved.selected.map(real),
+                                           commandLine: commandLine, alreadyOpen: alreadyOpen) { tab in
+                // A workspace tab whose repository is gone still shows the workspace.
+                tab.path.map(isDirectory) == true || WorkspaceStore.shared.workspace(tab.workspace) != nil
+            }
             guard !plan.open.isEmpty else {
                 OpenSession.finishLaunching()
                 return

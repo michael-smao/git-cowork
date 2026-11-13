@@ -6,7 +6,23 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Workspaces: keep a set of repositories together and see them as a tree
+  (folders › repositories › worktrees) on the left of a tab. Clicking a
+  repository or worktree shows it in that same tab, so one tab can hold a
+  whole project. Each tab can show its own workspace, and the next launch
+  reopens it with the repository that was shown.
+- File › Scan Folder… (⌥⌘O) finds the git repositories in a folder and makes a
+  workspace of them. It looks one folder level deep by default; change the
+  default in Settings › Workspaces, or the depth for one scan in its sheet.
+  Scan Folder Again adds repositories that appeared since.
+- File › Open Workspace, a Workspaces list on the welcome screen, and
+  View › Show/Hide Workspace (⌃⌘P).
+
 ### Changed
+- The sidebar, the inspector and the workspace tree keep the widths you drag
+  them to: in every tab, at the next launch, and when a workspace tab shows
+  another repository.
 - The reset entry in a commit's menu reads like GitKraken's: "Reset <branch>
   to this commit", with Soft (keep all changes), Mixed (keep working copy but
   reset index) and Hard (discard all changes).

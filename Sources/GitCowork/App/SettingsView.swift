@@ -1,3 +1,4 @@
+import GitCoworkCore
 import SwiftUI
 
 struct SettingsView: View {
@@ -10,6 +11,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.autoFetch) private var autoFetch = true
     @AppStorage(Prefs.Key.checkForUpdates) private var checkForUpdates = true
     @AppStorage(Prefs.Key.reopenRepos) private var reopenRepos = true
+    @AppStorage(Prefs.Key.scanDepth) private var scanDepth = RepoScan.defaultDepth
 
     var body: some View {
         Form {
@@ -45,6 +47,13 @@ struct SettingsView: View {
                     .font(Theme.Font.mono)
                     .frame(height: 80)
                 Text("One per line: host = github | gitlab | gitea | forgejo. Used for \"Open on…\" and \"Create Pull/Merge Request\" links. github.com, and hosts with gitlab, gitea or forgejo in their name, are detected automatically.")
+                    .font(Theme.Font.small).foregroundStyle(.secondary)
+            }
+            Section("Workspaces") {
+                Stepper(value: $scanDepth, in: RepoScan.depthRange) {
+                    LabeledContent("Scan depth", value: scanDepth == 1 ? L("1 folder level") : String(localized: "\(scanDepth) folder levels"))
+                }
+                Text("How deep Scan Folder looks for repositories below the folder you pick. 1 finds the folder itself and its direct subfolders. Each scan can still choose its own depth.")
                     .font(Theme.Font.small).foregroundStyle(.secondary)
             }
             Section("Cowork") {

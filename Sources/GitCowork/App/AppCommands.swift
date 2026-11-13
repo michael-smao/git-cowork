@@ -1,4 +1,5 @@
 import AppKit
+import GitCoworkCore
 import SwiftUI
 
 /// Menu bar commands with keyboard shortcuts. They act on the focused window.
@@ -6,6 +7,8 @@ struct AppCommands: Commands {
     @FocusedValue(\.repoModel) private var model
     @FocusedValue(\.windowActions) private var window
     @Environment(\.openWindow) private var openWindow
+    @AppStorage(Prefs.Key.workspaceVisible) private var workspaceVisible = true
+    private var workspaces: WorkspaceStore { WorkspaceStore.shared }
 
     /// A repo window is focused and no git command is running, so a new one
     /// can't overlap it (same rule as the toolbar buttons).
@@ -39,6 +42,29 @@ struct AppCommands: Commands {
                 }
             }
             .keyboardShortcut("o", modifiers: [.command, .shift])
+            Divider()
+            Button("Scan Folder…") {
+                if let window {
+                    window.scanFolder()
+                } else if let folder = FolderPicker.choose(message: L("Choose a folder to look for repositories in")) {
+                    LaunchFolders.pendingScan = folder
+                    LaunchFolders.newWindow()
+                }
+            }
+            .keyboardShortcut("o", modifiers: [.command, .option])
+            Menu("Open Workspace") {
+                ForEach(workspaces.sorted) { ws in
+                    Button(ws.name) {
+                        if let window {
+                            window.openWorkspace(ws.id)
+                        } else {
+                            LaunchFolders.pendingWorkspace = ws.id
+                            LaunchFolders.newWindow()
+                        }
+                    }
+                }
+            }
+            .disabled(workspaces.all.isEmpty)
         }
 
         // While text is being edited, Undo / Redo act on the text as usual;
@@ -66,6 +92,12 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(before: .sidebar) {
+            Button(workspaceVisible ? "Hide Workspace" : "Show Workspace") {
+                withAnimation(.easeOut(duration: 0.15)) { workspaceVisible.toggle() }
+            }
+            .keyboardShortcut("p", modifiers: [.command, .control])
+            .disabled(window?.workspace == nil)
+            Divider()
             ForEach(Array(CenterMode.allCases.enumerated()), id: \.element) { i, mode in
                 Button(mode.title) {
                     model?.openDiff = nil
@@ -169,7 +201,7 @@ struct AppCommands: Commands {
     private func openInNewWindow(_ path: String) {
         Task { @MainActor in
             if let resolved = await RepoLocator.resolve(path) {
-                openWindow(id: "repo", value: resolved)
+                openWindow(id: "repo", value: TabTarget(path: resolved))
             } else {
                 let alert = NSAlert()
                 alert.messageText = L("Not a git repository")

@@ -3,11 +3,36 @@ import GitCoworkCore
 import SwiftUI
 
 /// What a tab shows: the repo name, plus the folder for a linked worktree.
+/// In a workspace tab the workspace's name comes first: "Acme · api · fix-2".
 struct RepoTabLabel: Equatable {
+    /// The repository; empty in a workspace tab that shows none yet.
     var name: String
     var worktree: String?
+    var workspace: String?
 
-    var symbol: String { worktree == nil ? "folder" : "arrow.triangle.branch" }
+    var symbol: String {
+        if workspace != nil { return WorkspaceStyle.symbol }
+        return worktree == nil ? "folder" : "arrow.triangle.branch"
+    }
+
+    /// The tab's main text, which keeps its room the longest.
+    var tabName: String { workspace ?? name }
+
+    /// The quieter text after it.
+    var tabDetail: String? {
+        let parts = (workspace == nil ? [worktree] : [name, worktree]).compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Everything in one line, for the window title.
+    var title: String { ([tabName] + [tabDetail].compactMap { $0 }).joined(separator: " · ") }
+
+    /// The same label in a tab that shows the workspace `name` (nil: none).
+    func inWorkspace(_ name: String?) -> RepoTabLabel {
+        var label = self
+        label.workspace = name
+        return label
+    }
 }
 
 /// Repo tabs, GitKraken style. Every repo window is still one tab of a native
@@ -99,6 +124,13 @@ final class RepoTabs {
         if let selected, group.selectedWindow !== selected { group.selectedWindow = selected }
         OpenSession.save()
         setNeedsUpdate()
+    }
+
+    /// Clears `label` when it is still the tab's: a view leaving the window
+    /// must not clear the label the view replacing it has already set.
+    func clearLabel(_ label: RepoTabLabel?, for window: NSWindow) {
+        guard labels[ObjectIdentifier(window)] == label else { return }
+        setLabel(nil, for: window)
     }
 
     func setLabel(_ label: RepoTabLabel?, for window: NSWindow) {
@@ -228,8 +260,8 @@ struct RepoTabStrip: View {
         let selected = window.window?.tabGroup?.selectedWindow ?? window.window
         let items = windows.map { w in
             let label = tabs.label(for: w)
-            return Item(window: w, name: label?.name ?? (w.title.isEmpty ? L("New Tab") : w.title),
-                        detail: label?.worktree, symbol: label?.symbol ?? "plus.square.dashed", selected: w === selected)
+            return Item(window: w, name: label?.tabName ?? (w.title.isEmpty ? L("New Tab") : w.title),
+                        detail: label?.tabDetail, symbol: label?.symbol ?? "plus.square.dashed", selected: w === selected)
         }
         TabRowLayout {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -440,7 +472,7 @@ struct RepoTabLabelReporter: NSViewRepresentable {
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            if window == nil, let reported { RepoTabs.shared.setLabel(nil, for: reported) }
+            if window == nil, let reported { RepoTabs.shared.clearLabel(label, for: reported) }
             report()
         }
 

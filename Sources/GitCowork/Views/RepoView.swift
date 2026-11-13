@@ -12,39 +12,53 @@ struct RepoView: View {
     let openInNewTab: (String) -> Void
 
     @AppStorage(Prefs.Key.sidebarVisible) private var sidebarVisible = true
+    @Environment(\.toggleWorkspace) private var toggleWorkspace
+    @Environment(\.workspaceName) private var workspaceName
+    @AppStorage(Prefs.Key.sidebarWidth) private var sidebarWidth = Double(Layout.sidebarIdeal)
+    @AppStorage(Prefs.Key.inspectorWidth) private var inspectorWidth = Double(Layout.inspectorIdeal)
 
     var body: some View {
-        // A plain split (not NavigationSplitView): the toolbar and the tab bar
-        // then span the whole window, and all three panel headers start on the
-        // same line, like GitKraken.
+        // A plain row of panels (not NavigationSplitView): the toolbar and the
+        // tab bar then span the whole window, and all three panel headers start
+        // on the same line, like GitKraken. Not an HSplitView either: it lays
+        // out at its own widths first and only then takes saved ones, so the
+        // panels jumped whenever a repository opened. Sidebar and inspector
+        // have the widths they are dragged to; the center takes the rest.
         VStack(spacing: 0) {
-            HSplitView {
-                if sidebarVisible {
-                    SidebarColumn(model: model, openHere: openHere, openInNewTab: openInNewTab)
-                        .equatable()
-                        .frame(minWidth: Layout.sidebarMin, idealWidth: Layout.sidebarIdeal, maxWidth: Layout.sidebarMax, maxHeight: .infinity)
-                        // Not under the tab bar: only the panel itself is tinted.
-                        .background(Theme.sidebarBackground, ignoresSafeAreaEdges: [])
+            GeometryReader { geo in
+                let fit = fitted(total: geo.size.width)
+                HStack(spacing: 0) {
+                    if sidebarVisible {
+                        SidebarColumn(model: model, openHere: openHere, openInNewTab: openInNewTab)
+                            .equatable()
+                            .frame(width: fit.sidebar)
+                            .frame(maxHeight: .infinity)
+                            // Not under the tab bar: only the panel itself is tinted.
+                            .background(Theme.sidebarBackground, ignoresSafeAreaEdges: [])
+                        ResizeDivider(width: $sidebarWidth, range: fit.sidebarRange)
+                    }
+                    CenterColumn(model: model, openHere: openHere, openInNewTab: openInNewTab)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ResizeDivider(width: $inspectorWidth, range: fit.inspectorRange, panelOnLeft: false)
+                    InspectorColumn(model: model)
+                        .frame(width: fit.inspector)
+                        .frame(maxHeight: .infinity)
                 }
-                CenterColumn(model: model, openHere: openHere, openInNewTab: openInNewTab)
-                    .frame(minWidth: Layout.centerMin, idealWidth: Layout.centerIdeal, maxWidth: .infinity, maxHeight: .infinity)
-                InspectorColumn(model: model)
-                    .frame(minWidth: Layout.inspectorMin, idealWidth: Layout.inspectorIdeal, maxWidth: Layout.inspectorMax, maxHeight: .infinity)
             }
             CommandLogArea(model: model)
             Divider()
             StatusBar(model: model)
         }
         .toolbar {
-            RepoToolbar(model: model, openHere: openHere, openInNewTab: openInNewTab) {
+            RepoToolbar(model: model, openHere: openHere, openInNewTab: openInNewTab, toggleWorkspace: toggleWorkspace) {
                 withAnimation(.easeOut(duration: 0.15)) { sidebarVisible.toggle() }
             }
         }
         // One search field, for whatever the center shows.
         .searchable(text: searchText, placement: .toolbar, prompt: Text(searchPrompt))
-        .navigationTitle(model.windowTitle)
+        .navigationTitle(model.tabLabel.inWorkspace(workspaceName).title)
         .modifier(HideToolbarTitle())
-        .background(RepoTabLabelReporter(label: model.tabLabel))
+        .background(RepoTabLabelReporter(label: model.tabLabel.inWorkspace(workspaceName)))
         .modifier(RepoDialogs(model: model, openInNewTab: openInNewTab))
         .focusedSceneValue(\.repoModel, model)
     }
@@ -65,13 +79,38 @@ struct RepoView: View {
         }
     }
 
+    /// Panel widths for a row `total` wide: the saved ones, unless the center
+    /// would get narrower than its minimum. Then sidebar and inspector give
+    /// up room in proportion, down to their own minimums. The ranges are how
+    /// far each divider may go now.
+    private func fitted(total: CGFloat) -> (sidebar: CGFloat, inspector: CGFloat,
+                                            sidebarRange: ClosedRange<Double>, inspectorRange: ClosedRange<Double>) {
+        let dividers: CGFloat = sidebarVisible ? 2 : 1
+        let room = max(0, total - Layout.centerMin - dividers)
+        var sidebar = sidebarVisible ? min(max(CGFloat(sidebarWidth), Layout.sidebarMin), Layout.sidebarMax) : 0
+        var inspector = min(max(CGFloat(inspectorWidth), Layout.inspectorMin), Layout.inspectorMax)
+        let excess = sidebar + inspector - room
+        let give = (sidebarVisible ? sidebar - Layout.sidebarMin : 0) + (inspector - Layout.inspectorMin)
+        if excess > 0, give > 0 {
+            let share = min(1, excess / give)
+            if sidebarVisible { sidebar -= (sidebar - Layout.sidebarMin) * share }
+            inspector -= (inspector - Layout.inspectorMin) * share
+        }
+        func range(_ minimum: CGFloat, _ maximum: CGFloat, other: CGFloat) -> ClosedRange<Double> {
+            let upper = max(minimum, min(maximum, room - other))
+            return Double(minimum)...Double(upper)
+        }
+        return (sidebar, inspector,
+                range(Layout.sidebarMin, Layout.sidebarMax, other: inspector),
+                range(Layout.inspectorMin, Layout.inspectorMax, other: sidebar))
+    }
+
     /// Column widths, close to GitKraken's defaults.
     private enum Layout {
         static let sidebarMin: CGFloat = 220
         static let sidebarIdeal: CGFloat = 300
         static let sidebarMax: CGFloat = 440
         static let centerMin: CGFloat = 480
-        static let centerIdeal: CGFloat = 760
         static let inspectorMin: CGFloat = 320
         static let inspectorIdeal: CGFloat = 440
         static let inspectorMax: CGFloat = 680

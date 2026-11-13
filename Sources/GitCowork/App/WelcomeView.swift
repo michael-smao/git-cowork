@@ -1,11 +1,15 @@
 import AppKit
+import GitCoworkCore
 import SwiftUI
 
 /// Shown in an empty tab: open, clone, or pick a recent repository.
 struct WelcomeView: View {
     let open: (String) -> Void
     let clone: () -> Void
+    let scan: () -> Void
+    let openWorkspace: (String) -> Void
     @State private var recents = Prefs.visibleRecents
+    private var workspaces: WorkspaceStore { WorkspaceStore.shared }
 
     private enum Layout {
         static let contentWidth: CGFloat = 640
@@ -27,6 +31,33 @@ struct WelcomeView: View {
                                 symbol: "folder", shortcut: "⌘O", action: chooseFolder)
                     WelcomeTile(title: "Clone Repository…", subtitle: "From a URL into a new folder",
                                 symbol: "arrow.down.circle", shortcut: "⇧⌘O", action: clone)
+                    WelcomeTile(title: "Scan Folder…", subtitle: "Keeps its repositories as a workspace",
+                                symbol: WorkspaceStyle.symbol, shortcut: "⌥⌘O", action: scan)
+                }
+                // All tiles as tall as the tallest: a subtitle may wrap onto a second line.
+                .fixedSize(horizontal: false, vertical: true)
+
+                if !workspaces.all.isEmpty {
+                    VStack(alignment: .leading, spacing: Theme.Space.s) {
+                        HStack(spacing: Theme.Space.m) {
+                            Text("Workspaces").font(Theme.Font.caption).foregroundStyle(.secondary)
+                            CountBadge(count: workspaces.all.count)
+                        }
+                        .padding(.horizontal, Theme.Space.m)
+                        VStack(spacing: 0) {
+                            ForEach(workspaces.sorted) { ws in
+                                WorkspaceRow(workspace: ws) { openWorkspace(ws.id) }
+                                    .contextMenu {
+                                        Button("Open") { openWorkspace(ws.id) }
+                                        if let root = ws.scanRoot {
+                                            Button("Reveal in Finder") { External.reveal(root) }
+                                        }
+                                        Divider()
+                                        Button("Delete Workspace…") { WorkspaceActions.confirmDelete(ws.id) }
+                                    }
+                            }
+                        }
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: Theme.Space.s) {
@@ -103,11 +134,46 @@ private struct WelcomeTile: View {
                 Text(shortcut).font(Theme.Font.small).foregroundStyle(.tertiary)
             }
             .padding(Theme.Space.l)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: Theme.Radius.control).fill(Theme.cardFill))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.control).strokeBorder(Theme.cardBorder))
         }
         .buttonStyle(HoverFillStyle.chrome(horizontalPadding: 0))
+    }
+}
+
+/// Saved workspace: name, how many repositories, the folder it came from.
+private struct WorkspaceRow: View {
+    let workspace: Workspace
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Theme.Space.m) {
+                Image(systemName: WorkspaceStyle.symbol)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20)
+                Text(verbatim: workspace.name)
+                    .font(Theme.Font.body.weight(.medium))
+                    .lineLimit(1)
+                Text(workspace.repos.count == 1 ? L("1 repository") : String(localized: "\(workspace.repos.count) repositories"))
+                    .font(Theme.Font.small)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                if let root = workspace.scanRoot {
+                    Text(verbatim: (root as NSString).abbreviatingWithTildeInPath)
+                        .font(Theme.Font.small)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, Theme.Space.s)
+            .padding(.vertical, Theme.Space.s)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(HoverFillStyle.chrome())
     }
 }
 
