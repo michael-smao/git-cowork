@@ -84,6 +84,32 @@ enum WorkspaceDisk {
         }.value
     }
 
+    /// Uncommitted changes and commits ahead/behind of each folder, from
+    /// `git status` (no network: ahead/behind is as of the last fetch).
+    /// A few at a time, so a large workspace doesn't start dozens of gits at once.
+    static func status(of paths: [String]) async -> [String: WorktreeInfo] {
+        let git = GitRunner.shared
+        return await withTaskGroup(of: (String, WorktreeInfo?).self) { group in
+            var pending = paths[...]
+            func next() {
+                guard let path = pending.popFirst() else { return }
+                group.addTask {
+                    let out = await git.tryRun(["status", "--porcelain=v2", "-z", "--branch"], in: URL(fileURLWithPath: path))
+                    return (path, out.map { WorktreeInfo(Parsers.parseStatus($0)) })
+                }
+            }
+            for _ in 0..<statusParallel { next() }
+            var result: [String: WorktreeInfo] = [:]
+            for await (path, info) in group {
+                if let info { result[path] = info }
+                next()
+            }
+            return result
+        }
+    }
+
+    private static let statusParallel = 6
+
     static func exists(_ path: String) -> Bool {
         var isDir: ObjCBool = false
         return FileManager.default.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue

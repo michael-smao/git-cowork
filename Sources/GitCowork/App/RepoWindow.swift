@@ -347,6 +347,34 @@ enum OpenRepos {
     }
 }
 
+/// The models of the repositories shown in a tab (RepoPresence), so the
+/// workspace tree shows their changes and commits to push as the models'
+/// own refreshes, file watching and fetching update them.
+@MainActor @Observable
+final class LiveRepos {
+    static let shared = LiveRepos()
+
+    private(set) var models: [RepoModel] = []
+
+    private init() {}
+
+    func add(_ model: RepoModel) {
+        if !models.contains(where: { $0 === model }) { models.append(model) }
+    }
+
+    func remove(_ model: RepoModel) {
+        models.removeAll { $0 === model }
+    }
+
+    /// What a loaded model knows about the worktree at `path`: the model
+    /// showing it first, else the model of another worktree of its repository.
+    func info(_ path: String) -> WorktreeInfo? {
+        let loaded = models.filter(\.isLoaded)
+        if let own = loaded.first(where: { $0.root.path == path }), let info = own.worktreeInfo[path] { return info }
+        return loaded.lazy.compactMap { $0.worktreeInfo[path] }.first
+    }
+}
+
 /// Creates the model for a worktree and keeps it for the window's lifetime.
 ///
 /// A tab that stays behind another one for a while goes to sleep: its views
@@ -462,6 +490,7 @@ final class RepoPresence {
         guard !active else { return }
         active = true
         OpenRepos.add(path)
+        LiveRepos.shared.add(model)
         model.openWorktree = openHere
     }
 
@@ -469,6 +498,7 @@ final class RepoPresence {
         guard active else { return }
         active = false
         OpenRepos.remove(path)
+        LiveRepos.shared.remove(model)
         model.openWorktree = nil
         model.stopWatching()
     }

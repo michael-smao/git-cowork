@@ -255,12 +255,28 @@ struct WorktreeInfoBadges: View {
     let path: String
 
     var body: some View {
-        if let info = model.worktreeInfo[path] {
-            if info.changes > 0 {
-                CountBadge(count: info.changes, style: .warning).help("\(info.changes) uncommitted changes")
-            }
-            if info.ahead > 0 || info.behind > 0 { AheadBehind(ahead: info.ahead, behind: info.behind) }
+        if let info = model.worktreeInfo[path] { WorktreeBadges(info: info) }
+    }
+}
+
+/// Uncommitted changes and "↑2 ↓1". Shows nothing when clean and in sync.
+struct WorktreeBadges: View {
+    let info: WorktreeInfo
+
+    var body: some View {
+        if info.changes > 0 {
+            CountBadge(count: info.changes, style: .warning).help("\(info.changes) uncommitted changes")
         }
+        if info.ahead > 0 || info.behind > 0 {
+            AheadBehind(ahead: info.ahead, behind: info.behind).help(aheadBehindHelp)
+        }
+    }
+
+    private var aheadBehindHelp: String {
+        var lines: [String] = []
+        if info.ahead > 0 { lines.append(info.ahead == 1 ? L("1 commit to push") : String(localized: "\(info.ahead) commits to push")) }
+        if info.behind > 0 { lines.append(info.behind == 1 ? L("1 commit to pull") : String(localized: "\(info.behind) commits to pull")) }
+        return lines.joined(separator: "\n")
     }
 }
 

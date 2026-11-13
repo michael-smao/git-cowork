@@ -18,6 +18,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   Scan Folder Again adds repositories that appeared since.
 - File › Open Workspace, a Workspaces list on the welcome screen, and
   View › Show/Hide Workspace (⌃⌘P).
+- The workspace tree shows, next to each repository and worktree, its
+  uncommitted changes and commits to push (↑) and pull (↓), like the
+  worktrees in the sidebar.
 
 ### Changed
 - The sidebar, the inspector and the workspace tree keep the widths you drag

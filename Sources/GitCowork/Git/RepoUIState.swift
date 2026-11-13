@@ -21,12 +21,6 @@ struct HistorySearch {
     let running: Bool
 }
 
-struct WorktreeInfo: Hashable {
-    var changes = 0
-    var ahead = 0
-    var behind = 0
-}
-
 struct AlertItem: Identifiable {
     let id = UUID()
     let title: String

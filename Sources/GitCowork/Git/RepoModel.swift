@@ -302,7 +302,7 @@ final class RepoModel {
             restartWatcher()
             await refreshWorktreeInfo(paths: worktrees.map(\.path))
         } else {
-            let info = WorktreeInfo(changes: status.changeCount, ahead: status.ahead, behind: status.behind)
+            let info = WorktreeInfo(status)
             if worktreeInfo[root.path] != info {
                 worktreeInfo[root.path] = info
                 worktreeInfoVersion += 1
@@ -433,8 +433,7 @@ final class RepoModel {
                     guard let out = await git.tryRun(["status", "--porcelain=v2", "-z", "--branch"], in: URL(fileURLWithPath: path)) else {
                         return (path, nil)
                     }
-                    let st = Parsers.parseStatus(out)
-                    return (path, WorktreeInfo(changes: st.changeCount, ahead: st.ahead, behind: st.behind))
+                    return (path, WorktreeInfo(Parsers.parseStatus(out)))
                 }
             }
             // Collect first, then assign once: one view update instead of one per worktree.

@@ -41,6 +41,10 @@
 "%lld of %lld" = "%1$lld von %2$lld";
 "%lld of %lld approved" = "%1$lld von %2$lld freigegeben";
 "%lld uncommitted changes" = "%lld nicht committete Änderungen";
+"%lld commits to push" = "%lld Commits zu pushen";
+"%lld commits to pull" = "%lld Commits zu pullen";
+"1 commit to push" = "1 Commit zu pushen";
+"1 commit to pull" = "1 Commit zu pullen";
 "%lldd ago" = "vor %lld T.";
 "%lldh ago" = "vor %lld Std.";
 "%lldm ago" = "vor %lld Min.";
