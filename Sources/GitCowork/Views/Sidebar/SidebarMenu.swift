@@ -98,6 +98,9 @@ struct SidebarMenu: View {
             Divider()
         } else if !ref.isHead {
             Button("Checkout") { Task { await model.checkout(ref) } }
+            if let source = model.pullSource(for: ref) {
+                Button("Pull") { Task { await model.pull(branch: ref, from: source) } }
+            }
             Button("Push") { Task { await model.push(branch: ref.name) } }
             Button("Merge \(ref.name) into \(current)") { Task { await model.merge(ref.name) } }
             Button("Rebase \(current) onto \(ref.name)") { Task { await model.rebase(onto: ref.name) } }

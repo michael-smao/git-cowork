@@ -18,6 +18,12 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   Scan Folder Again adds repositories that appeared since.
 - File › Open Workspace, a Workspaces list on the welcome screen, and
   View › Show/Hide Workspace (⌃⌘P).
+- Pull a branch from its menu in the graph, also one that isn't checked out:
+  right-click its badge (or the remote branch's badge further up) and choose
+  "Pull <branch>". The branch moves up to its remote branch without a
+  checkout, so your working copy isn't touched. When both have new commits it
+  offers to check the branch out, where you pick merge or rebase. The same
+  "Pull" is in the sidebar's branch menu.
 
 ### Changed
 - The sidebar, the inspector and the workspace tree keep the widths you drag

@@ -240,6 +240,74 @@ enum GitActionsSelfTest {
         await sh(["switch", "-q", "main"], in: repo)
         await model.refresh()
 
+        print("8c. Pull on a branch that isn't checked out moves it up, without a checkout")
+        await sh(["push", "-q", "origin", "main:refs/heads/side"], in: repo)
+        await sh(["fetch", "-q", "origin"], in: repo)
+        await sh(["branch", "-q", "--track", "side", "origin/side"], in: repo)
+        func remoteSide() async -> String { await sh(["rev-parse", "refs/heads/side"], in: remote) }
+        func matePushesToSide(_ file: String) async {
+            await sh(["fetch", "-q", "origin"], in: mate)
+            await sh(["switch", "-q", "-C", "side", "origin/side"], in: mate)
+            write("x\n", file, in: mate)
+            await sh(["add", "."], in: mate)
+            await sh(["commit", "-qm", "mate: \(file)"], in: mate)
+            await sh(["push", "-q", "origin", "side"], in: mate)
+            await sh(["switch", "-q", "main"], in: mate)
+        }
+        await matePushesToSide("s1.txt")
+        write("one, still editing\n", "a.txt", in: repo)
+        await model.refresh()
+        if let side = model.localBranch(named: "side"), let source = model.pullSource(for: side) {
+            check(source.name == "origin/side", "pulls from the branch it follows")
+            // The graph's right-click menu offers it on both badges: the local
+            // branch's commit, and the remote one's further up.
+            let history = HistoryTableCoordinator(model: model)
+            let table = NSTableView()
+            history.table = table
+            history.sync(version: model.historyVersion, filter: "", searchVersion: 0, wipCount: model.status.changeCount,
+                         selection: nil, revealToken: 0, worktreeInfoVersion: 0, draftSummary: "")
+            func menuTitles(at sha: String) -> [String] {
+                guard let row = (0..<history.rows.count).first(where: { history.commit(atRow: $0)?.id == sha }) else { return [] }
+                return history.contextMenu(forRow: row)?.items.map(\.title) ?? []
+            }
+            check(menuTitles(at: side.target).contains("Pull side"), "the menu on side's commit has Pull side")
+            check(menuTitles(at: source.target).contains("Pull side"), "the menu on origin/side's commit has Pull side")
+            check(menuTitles(at: model.headSHA ?? "").contains("Pull main"), "the checked-out branch has Pull main")
+            await model.pull(branch: side, from: source)
+            check(await sh(["rev-parse", "side"], in: repo) == remoteSide(), "side moved up to the remote's commit")
+            check(await sh(["branch", "--show-current"], in: repo) == "main", "main stayed checked out")
+            check(read("a.txt", in: repo) == "one, still editing\n", "the uncommitted edit wasn't touched")
+            check(model.problem == nil && model.confirmation == nil && model.alert == nil, "nothing to report")
+        } else {
+            check(false, "side is listed with its remote branch")
+        }
+        await sh(["checkout", "-q", "--", "a.txt"], in: repo)
+
+        print("8d. …and offers a checkout when both sides have new commits")
+        await sh(["switch", "-q", "side"], in: repo)
+        await commitHere("s-mine.txt", "mine\n")
+        await sh(["switch", "-q", "main"], in: repo)
+        await matePushesToSide("s2.txt")
+        await model.refresh()
+        if let side = model.localBranch(named: "side"), let source = model.pullSource(for: side) {
+            let before = await sh(["rev-parse", "side"], in: repo)
+            await model.pull(branch: side, from: source)
+            let ask = model.confirmation
+            check(ask?.title == "side and origin/side both have new commits", "says both moved")
+            check(ask?.confirmTitle == "Checkout side" && ask?.destructive == false, "offers Checkout side, not as destructive")
+            check(model.problem == nil, "not shown as a failure")
+            check(await sh(["rev-parse", "side"], in: repo) == before, "side wasn't moved")
+            model.confirmation = nil
+            await ask?.action()
+            check(await sh(["branch", "--show-current"], in: repo) == "side", "Checkout side switches to it")
+            check(model.confirmation?.alternativeTitle == "Rebase", "and then asks Merge or Rebase")
+            model.confirmation = nil
+        } else {
+            check(false, "side is listed with its remote branch")
+        }
+        await sh(["switch", "-q", "main"], in: repo)
+        await model.refresh()
+
         print("9. a local-only branch says what is lost")
         await sh(["switch", "-q", "-c", "only-here"], in: repo)
         await commitHere("n.txt", "n\n")

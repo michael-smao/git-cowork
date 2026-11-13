@@ -61,6 +61,10 @@ extension HistoryTableCoordinator {
                 if !local.isHead {
                     menu.addItem(ActionItem("Checkout \(local.name)") { Task { await model.checkout(local) } })
                 }
+                // Also for a branch that isn't checked out: it moves up to its remote branch.
+                if let source = model.pullSource(for: local), local.isHead || model.sidebarOtherWorktree(for: local.name) == nil {
+                    menu.addItem(ActionItem("Pull \(local.name)") { Task { await model.pull(branch: local, from: source) } })
+                }
                 menu.addItem(ActionItem("Push \(local.name)") { Task { await model.push(branch: local.name) } })
                 // Checked out in another worktree: open or remove that one.
                 if let wt = model.sidebarOtherWorktree(for: local.name) {
@@ -78,6 +82,10 @@ extension HistoryTableCoordinator {
                     if !other.isHead {
                         let at = String(other.target.prefix(7))
                         menu.addItem(ActionItem("Checkout \(other.name) (local, at \(at))") { Task { await model.checkout(other) } })
+                    }
+                    // The remote branch is ahead here: bring the local one up to it.
+                    if other.isHead || model.sidebarOtherWorktree(for: other.name) == nil {
+                        menu.addItem(ActionItem("Pull \(other.name)") { Task { await model.pull(branch: other, from: remote) } })
                     }
                 } else {
                     menu.addItem(ActionItem("Checkout \(remote.name)") { Task { await model.checkout(remote) } })

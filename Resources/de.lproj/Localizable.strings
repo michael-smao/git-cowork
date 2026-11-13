@@ -404,6 +404,7 @@
 "Prune Stale Worktrees" = "Verwaiste Worktrees bereinigen";
 "Public" = "Öffentlich";
 "Pull" = "Pull";
+"Pull %@" = "%@ pullen";
 "Pull %lld commits from %@" = "%1$lld Commits von %2$@ holen (Pull)";
 "Pull (fast-forward only)" = "Pull (nur Fast-Forward)";
 "Pull (merge)" = "Pull (Merge)";
@@ -746,6 +747,7 @@
 "the remote branch" = "den Remote-Branch";
 "%@ and %@ both have new commits" = "%1$@ und %2$@ haben beide neue Commits";
 "%@ has %lld commits that %@ doesn't, and %@ has %lld new ones. Merge joins them with a merge commit. Rebase puts your %lld commits on top of %@. Nothing is lost either way." = "%1$@ hat %2$lld Commits, die %3$@ nicht hat, und %4$@ hat %5$lld neue. Merge verbindet beide mit einem Merge-Commit. Rebase setzt deine %6$lld Commits oben auf %7$@. In beiden Fällen geht nichts verloren.";
+"%@ has %lld commits that %@ doesn't, and %@ has %lld new ones. That needs a merge or a rebase, which only works on the checked-out branch. Check out %@ to choose one." = "%1$@ hat %2$lld Commits, die %3$@ nicht hat, und %4$@ hat %5$lld neue. Dafür braucht es einen Merge oder Rebase, und das geht nur auf dem ausgecheckten Branch. Check %6$@ aus, um einen davon zu wählen.";
 "Merge" = "Merge";
 "Rebase" = "Rebase";
 "Removing…" = "Wird entfernt …";
