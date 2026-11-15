@@ -307,7 +307,7 @@ Sources/GitCowork/
   Accounts/              tokens in the Keychain, browser sign-in, SSH keys, host APIs
   Views/                 Theme (design tokens), Components, History (NSTableView graph),
                          Diff, Inspector, Sidebar, Chrome, Sheets, Cowork (board, reviews, inbox)
-Scripts/                 build-app.sh, make-icon.swift, release, update, check-translations
+Scripts/                 build-app.sh, release, update, check-translations
 Resources/               Info.plist, translations (de.lproj)
 ```
 

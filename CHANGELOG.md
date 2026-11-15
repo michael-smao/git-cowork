@@ -14,6 +14,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   its local branches, not just the checked-out one; its tooltip lists them
   by branch. Branches without an upstream don't count.
 
+### Changed
+- New app icon.
+
 ## [0.6.0] - 2026-11-13
 
 ### Added

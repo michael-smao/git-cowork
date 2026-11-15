@@ -27,14 +27,14 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 BUILD="$(git describe --always --dirty --abbrev=7 --exclude '*' 2>/dev/null || echo unknown)"
 plutil -replace CFBundleVersion -string "$BUILD" "$APP/Contents/Info.plist"
 
-if [ ! -f .build/AppIcon.icns ]; then
-  echo "→ Drawing icon"
+# The icon is Resources/AppIcon.png (1024 px); rebuilt whenever that file changes.
+if [ ! -f .build/AppIcon.icns ] || [ Resources/AppIcon.png -nt .build/AppIcon.icns ]; then
+  echo "→ Making icon"
   ICONSET=.build/AppIcon.iconset
   rm -rf "$ICONSET"; mkdir -p "$ICONSET"
-  swift Scripts/make-icon.swift .build/icon-1024.png
   for s in 16 32 128 256 512; do
-    sips -z $s $s .build/icon-1024.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
-    sips -z $((s*2)) $((s*2)) .build/icon-1024.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+    sips -z $s $s Resources/AppIcon.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+    sips -z $((s*2)) $((s*2)) Resources/AppIcon.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
   done
   iconutil -c icns "$ICONSET" -o .build/AppIcon.icns
 fi
