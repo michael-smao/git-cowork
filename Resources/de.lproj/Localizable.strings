@@ -177,6 +177,7 @@
 "Copy ID" = "ID kopieren";
 "Copy Message" = "Nachricht kopieren";
 "Copy Name" = "Namen kopieren";
+"Copy Name of %@" = "Namen von %@ kopieren";
 "Copy Path" = "Pfad kopieren";
 "Copy Review ID" = "Review-ID kopieren";
 "Copy SHA" = "SHA kopieren";
