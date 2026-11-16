@@ -6,6 +6,11 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Right-clicking a branch badge in the history offers "Copy Name of
+  <branch>", as the sidebar does. For a branch only on the server it copies
+  the name without the remote (`feature`, not `origin/feature`).
+
 ## [0.6.3] - 2026-11-16
 
 ### Fixed

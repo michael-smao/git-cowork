@@ -112,6 +112,8 @@ extension HistoryTableCoordinator {
                     model.coworkSelection = .task(id)
                 })
             }
+            // The name without its remote, as for a branch only on the server.
+            menu.addItem(ActionItem("Copy Name of \(branch)") { External.copy(branch) })
             // Last in the group. Always asks first; for a local branch the
             // question also offers its remote branch. Not for the checked-out
             // branch, one in another worktree (that one has Remove Worktree),
