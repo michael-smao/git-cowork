@@ -6,6 +6,15 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Fixed
+- Closing the window with the red button no longer forgets its tabs. The
+  button closes all tabs at once, and each closed tab was removed from the
+  saved session, so the next window and the next launch came up empty. Now
+  the last window's tabs stay saved, as when quitting: clicking the Dock
+  icon (or File › New Window) shows them again, in the same order. Closing a
+  single tab while others stay open still forgets that tab.
+- Clicking the Dock icon with every window closed opens a window again.
+
 ## [0.6.2] - 2026-11-15
 
 ### Changed

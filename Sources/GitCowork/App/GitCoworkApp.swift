@@ -51,6 +51,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateNow
     }
 
+    /// The Dock icon, clicked while every window is closed: SwiftUI opens
+    /// none by itself. The new window shows the closed one's tabs again.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows { LaunchFolders.openWindowIfNone() }
+        return true
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         Credentials.shared.stop()   // no token stays in memory after quitting
     }
@@ -142,7 +149,41 @@ enum LaunchFolders {
     /// All tabs are there: from now on tabs load right away, and the session is saved again.
     static func finishRestore() {
         background = []
-        OpenSession.finishLaunching()
+        OpenSession.finishRestoring()
+    }
+
+    /// A new window after the last one was closed shows that window's tabs
+    /// again, as a launch does with the last session.
+    static func reopenClosedWindow() {
+        guard pending.isEmpty, let closed = OpenSession.takeClosedWindow() else { return }
+        let plan = plan(saved: closed)
+        guard !plan.open.isEmpty else {
+            OpenSession.finishRestoring()
+            return
+        }
+        pending = plan.open
+        front = plan.select
+    }
+
+    /// Opens a window unless there is one, hidden or minimized ones included.
+    static func openWindowIfNone() {
+        guard OpenSession.hasNoWindow else { return }
+        // A moment, should a window be on its way already.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            if OpenSession.hasNoWindow { newWindow() }
+        }
+    }
+
+    /// Which saved tabs and command-line folders to open: not the ones
+    /// already open or gone from disk.
+    private static func plan(saved: (tabs: [TabTarget], selected: TabTarget?), commandLine: [TabTarget] = [],
+                             alreadyOpen: Set<TabTarget> = []) -> SessionRestore.Plan<TabTarget> {
+        let real = { (t: TabTarget) in TabTarget(path: t.path.map(realPath), workspace: t.workspace) }
+        return SessionRestore.plan(saved: saved.tabs.map(real), selected: saved.selected.map(real),
+                                   commandLine: commandLine, alreadyOpen: alreadyOpen) { tab in
+            // A workspace tab whose repository is gone still shows the workspace.
+            tab.path.map(isDirectory) == true || WorkspaceStore.shared.workspace(tab.workspace) != nil
+        }
     }
 
     /// Name and folder for a tab whose repository hasn't loaded yet, read
@@ -172,17 +213,12 @@ enum LaunchFolders {
             !arg.hasPrefix("-") && isDirectory(arg)
         }.map { TabTarget(path: realPath($0)) }
         let saved: (tabs: [TabTarget], selected: TabTarget?) = Prefs.reopenRepos ? OpenSession.saved : ([], nil)
-        let real = { (t: TabTarget) in TabTarget(path: t.path.map(realPath), workspace: t.workspace) }
         // A moment for SwiftUI's first window and anything macOS restores itself.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             let alreadyOpen = OpenSession.openTargets.union(OpenRepos.paths.map { TabTarget(path: $0) })
-            let plan = SessionRestore.plan(saved: saved.tabs.map(real), selected: saved.selected.map(real),
-                                           commandLine: commandLine, alreadyOpen: alreadyOpen) { tab in
-                // A workspace tab whose repository is gone still shows the workspace.
-                tab.path.map(isDirectory) == true || WorkspaceStore.shared.workspace(tab.workspace) != nil
-            }
+            let plan = plan(saved: saved, commandLine: commandLine, alreadyOpen: alreadyOpen)
             guard !plan.open.isEmpty else {
-                OpenSession.finishLaunching()
+                OpenSession.finishRestoring()
                 return
             }
             pending = plan.open

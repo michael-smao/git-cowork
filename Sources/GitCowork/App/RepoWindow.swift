@@ -37,7 +37,7 @@ struct RepoWindow: View {
     var body: some View {
         Group {
             if let target, waitsUntilSelected {
-                UnloadedTab(target: target)
+                UnloadedTab(target: target, shown: shown)
             } else if let workspace {
                 workspaceSplit(workspace)
             } else if let path {
@@ -72,7 +72,11 @@ struct RepoWindow: View {
         // windows showing a repo decline, so SwiftUI opens a new tab instead.
         .handlesExternalEvents(preferring: target == nil ? ["*"] : [], allowing: target == nil ? ["*"] : [])
         .onAppear {
-            if target == nil { openLaunchFolders() }
+            if target == nil {
+                // The first window after the last one was closed shows its tabs again.
+                LaunchFolders.reopenClosedWindow()
+                openLaunchFolders()
+            }
             if LaunchFolders.pendingClone {
                 LaunchFolders.pendingClone = false
                 showClone = true
@@ -221,9 +225,10 @@ struct RepoWindow: View {
         if target == nil { target = start } else { openTab(start) }
     }
 
-    /// At launch (last session, command line): the front repository opens
-    /// here right away; the others join as background tabs in their order,
-    /// one after another, without coming to the front or loading yet.
+    /// At launch (last session, command line), or in the first window after
+    /// the last one was closed: the front repository opens here right away;
+    /// the others join as background tabs in their order, one after another,
+    /// without coming to the front or loading yet.
     private func openLaunchFolders() {
         let tabs = LaunchFolders.takeAll()
         guard !tabs.isEmpty else { return }
@@ -237,10 +242,16 @@ struct RepoWindow: View {
                 LaunchFolders.finishRestore()
                 return
             }
-            if target == nil { target = front } else { openTab(front) }
             // Where each tab goes: before the ones that come later in the saved order.
-            var placed: [Int] = [frontIndex]
-            for index in resolved.indices where index != frontIndex {
+            var placed: [Int] = []
+            // Something else was opened here meanwhile (a workspace from the
+            // menu, a folder from a terminal): that stays in front, and the
+            // front one joins like the others.
+            if target == nil {
+                target = front
+                placed = [frontIndex]
+            }
+            for index in resolved.indices where !placed.contains(index) {
                 guard let tab = resolved[index], !LaunchFolders.isOpen(tab) else { continue }
                 if await openBackgroundTab(tab, at: placed.filter { $0 < index }.count) { placed.append(index) }
             }
@@ -536,15 +547,30 @@ final class RepoPresence {
 @MainActor
 final class ShownRepos {
     private var all: [RepoPresence] = []
+    /// A background tab from the launch that hasn't loaded its repository
+    /// yet. It counts as open, so opening it again selects this tab.
+    private var unloaded: String?
 
     func add(_ presence: RepoPresence) {
         if !all.contains(where: { $0 === presence }) { all.append(presence) }
+    }
+
+    func addUnloaded(_ path: String) {
+        guard unloaded == nil else { return }
+        unloaded = path
+        OpenRepos.add(path)
+    }
+
+    func removeUnloaded() {
+        if let unloaded { OpenRepos.remove(unloaded) }
+        unloaded = nil
     }
 
     /// Ends all but the one showing `path`.
     func retire(except path: String?) {
         for presence in all where presence.path != path { presence.end() }
         all.removeAll { $0.path != path }
+        if unloaded != path { removeUnloaded() }
     }
 }
 
@@ -600,15 +626,16 @@ private struct SleepingTab: View {
 /// the tab strip, no repository loaded, nothing watched or fetched.
 private struct UnloadedTab: View {
     let target: TabTarget
+    let shown: ShownRepos
 
     var body: some View {
         let label = LaunchFolders.tabLabel(for: target)
         Color.clear
             .navigationTitle(label.title)
             .background(RepoTabLabelReporter(label: label))
-            // Counts as open, so opening it again selects this tab.
-            .onAppear { if let path = target.path { OpenRepos.add(path) } }
-            .onDisappear { if let path = target.path { OpenRepos.remove(path) } }
+            // The window ends it too when it closes: SwiftUI doesn't always get here.
+            .onAppear { if let path = target.path { shown.addUnloaded(path) } }
+            .onDisappear { shown.removeUnloaded() }
     }
 }
 
