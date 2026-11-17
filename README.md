@@ -104,7 +104,7 @@ then Update Now and Restart. Or run the same line again.
 brew install --cask michael-smao/tap/git-cowork
 ```
 
-Update with `brew upgrade --cask git-cowork`.
+Update with the same command.
 
 **From source** (to change the code or follow `main`), with Xcode Command
 Line Tools and Swift 6:

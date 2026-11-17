@@ -43,9 +43,9 @@ brew install --cask michael-smao/tap/git-cowork
 ```
 
 This installs `git-cowork.app` to `/Applications` and `git cowork` to
-Homebrew's `bin`. Update with `brew upgrade --cask git-cowork` (a plain
-`brew upgrade` includes it). The app still tells you when there's a new
-version, and shows that command instead of updating itself. After an update
+Homebrew's `bin`. Update with the same command. The app still tells you
+when there's a new version, and shows that command instead of updating
+itself. After an update
 macOS may ask once more for access to your folders, because each build has
 its own signature.
 

@@ -6,6 +6,12 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Changed
+- Installed with Homebrew, the update notice now shows (and copies)
+  `brew install --cask michael-smao/tap/git-cowork` instead of
+  `brew upgrade --cask git-cowork`, which didn't always find the new
+  version.
+
 ## [0.6.3] - 2026-11-16
 
 ### Fixed

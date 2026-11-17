@@ -51,7 +51,9 @@ final class Updater {
     let installedWithHomebrew = ["/opt/homebrew", "/usr/local"].contains {
         FileManager.default.fileExists(atPath: $0 + "/Caskroom/git-cowork")
     }
-    static let homebrewUpdateCommand = "brew upgrade --cask git-cowork"
+    /// The install command with the tap's full name: `brew upgrade --cask
+    /// git-cowork` didn't always find the new version.
+    static let homebrewUpdateCommand = "brew install --cask michael-smao/tap/git-cowork"
 
     // MARK: Checking
 
