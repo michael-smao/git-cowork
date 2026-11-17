@@ -181,6 +181,15 @@ struct SidebarMenu: View {
     private func tag(_ ref: Ref) -> some View {
         Button("Checkout (detached)") { Task { await model.checkout(ref) } }
         Button("Push Tag") { Task { await model.pushTag(ref.name) } }
+        if let links = model.links(for: nil) {
+            Divider()
+            if model.canCreateRelease {
+                Button("Create Release…") { model.sheet = .createRelease(tag: ref.name, sha: ref.target) }
+            } else if let url = links.newReleaseURL(tag: ref.name) {
+                Button("Create Release on \(links.host)") { External.browse(url) }
+            }
+        }
+        Divider()
         Button("Copy Name") { External.copy(ref.name) }
         Divider()
         Button("Delete…", role: .destructive) { model.deleteTag(ref.name) }

@@ -879,3 +879,22 @@
 "Copy Link to Branch" = "Link zum Branch kopieren";
 "Copy Link to %@ #%lld" = "Link zu %1$@ #%2$lld kopieren";
 "Copy Link to Commit" = "Link zum Commit kopieren";
+
+/* Releases */
+"Create Release on %@" = "Release auf %@ erstellen";
+"Create Tag and Release" = "Tag und Release erstellen";
+"Create Release" = "Release erstellen";
+"Create Release…" = "Release erstellen …";
+"Create Release for %@…" = "Release für %@ erstellen …";
+"Create Release for %@ on %@" = "Release für %1$@ auf %2$@ erstellen";
+"Create Release Here…" = "Release hier erstellen …";
+"Release notes (optional)" = "Release-Notizen (optional)";
+"Pre-release" = "Vorabversion";
+"Creates the tag %@ at %@ and pushes it to %@ first." = "Erstellt zuerst den Tag %1$@ auf %2$@ und pusht ihn nach %3$@.";
+"Pushes %@ to %@ first, if it isn't there yet." = "Pusht %1$@ zuerst nach %2$@, falls er dort noch fehlt.";
+"Couldn't create the tag %@." = "Der Tag %@ konnte nicht erstellt werden.";
+"No remote" = "Kein Remote";
+"Add a remote to push the tag to." = "Füge ein Remote hinzu, um den Tag dorthin zu pushen.";
+"Not signed in to this repository's host." = "Nicht beim Host dieses Repositorys angemeldet.";
+"%@ already has a release on %@." = "%1$@ hat auf %2$@ schon ein Release.";
+"Tag" = "Tag";

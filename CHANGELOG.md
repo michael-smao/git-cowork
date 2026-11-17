@@ -7,6 +7,14 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 ## [Unreleased]
 
 ### Added
+- Create a release on GitHub, GitLab or Gitea/Forgejo: right-click a tag
+  in the sidebar ("Create Release…"), a commit with a tag in the history
+  ("Create Release for <tag>…"), or a commit without one ("Create Release
+  Here…", which makes the tag too). Title and notes are filled in from the
+  tag and the commits since the previous tag; on GitHub and Gitea it can be
+  a draft or a pre-release. The tag is pushed first if it isn't on the
+  server, then the release's page opens. Not signed in, the menu opens the
+  host's own page for a new release instead.
 - Right-clicking a branch badge in the history offers "Copy Branch Name", as
   the sidebar does. For a branch only on the server it copies the name
   without the remote (`feature`, not `origin/feature`).

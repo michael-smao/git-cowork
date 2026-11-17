@@ -109,6 +109,8 @@ enum SheetKind: Identifiable {
     case newTask(status: TaskStatus)
     case requestReview(branch: String)
     case createPull(branch: String)
+    /// A release for `tag`, or for a new tag at `sha` when `tag` is nil.
+    case createRelease(tag: String?, sha: String)
     case team
     /// Push a branch that has no upstream yet: pick the remote and the name there.
     case pushTarget(branch: String)
@@ -129,6 +131,7 @@ enum SheetKind: Identifiable {
         case .newTask(let s): "task:\(s.rawValue)"
         case .requestReview(let b): "review:\(b)"
         case .createPull(let b): "pull:\(b)"
+        case .createRelease(let t, let s): "release:\(t ?? ""):\(s)"
         case .team: "team"
         case .pushTarget(let b): "pushTarget:\(b)"
         case .addRemote(let b): "addRemote:\(b ?? "")"

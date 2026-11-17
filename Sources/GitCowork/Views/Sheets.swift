@@ -18,6 +18,7 @@ struct RepoSheet: View {
         case .newTask(let status): NewTaskSheet(model: model, status: status)
         case .requestReview(let branch): RequestReviewSheet(model: model, branch: branch)
         case .createPull(let branch): CreatePullSheet(model: model, branch: branch)
+        case .createRelease(let tag, let sha): CreateReleaseSheet(model: model, tag: tag, sha: sha)
         case .team: TeamSheet(model: model)
         case .pushTarget(let branch): PushTargetSheet(model: model, branch: branch)
         case .addRemote(let branch): AddRemoteSheet(model: model, thenPush: branch)
