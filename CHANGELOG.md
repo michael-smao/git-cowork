@@ -10,6 +10,14 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 - Right-clicking a branch badge in the history offers "Copy Branch Name", as
   the sidebar does. For a branch only on the server it copies the name
   without the remote (`feature`, not `origin/feature`).
+- New in the history's right-click menu:
+  - "Remove Worktree and Delete <branch>…" for a branch checked out in
+    another worktree: asks once, says what is lost, and deletes the branch
+    only once the folder is gone.
+  - "Rename <branch>…" and "Set Upstream to origin/<branch>" (for a branch
+    without upstream when the remote has one of that name).
+  - "Copy Link to Commit", "Copy Link to Branch" and "Copy Link to Pull
+    Request #n".
 
 ### Changed
 - The right-click menu in the history has fixed sections, always in the
@@ -17,6 +25,10 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   rebasing, pull requests and reviews, new things from the commit, changing
   history, copying, and last whatever removes something. A commit with
   several branches shows one submenu per branch, with the same sections.
+
+### Fixed
+- A branch checked out in another worktree no longer offers "Checkout" in
+  the history's menu; git refuses that. Its worktree can be opened instead.
 
 ## [0.6.3] - 2026-11-16
 

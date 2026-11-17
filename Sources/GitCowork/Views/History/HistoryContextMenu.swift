@@ -108,23 +108,34 @@ extension HistoryTableCoordinator {
         let remote = refs.first { $0.kind == .remoteBranch && badge.refNames.contains($0.name) }
         var s = BranchSections()
         if let local {
-            if !local.isHead {
-                s.branch.append(ActionItem("Checkout \(local.name)") { Task { await model.checkout(local) } })
-            }
-            // Checked out in another worktree: open or remove that one.
+            // Checked out in another worktree: open or remove that one. Git
+            // won't check it out here as well.
             if let wt = model.sidebarOtherWorktree(for: local.name) {
                 let openHere = self.openHere, openInNewTab = self.openInNewTab
                 s.branch.append(ActionItem("Open Worktree for \(local.name)") { openHere(wt.path) })
                 s.branch.append(ActionItem("Open Worktree for \(local.name) in New Tab") { openInNewTab(wt.path) })
                 if !wt.isMain {
                     s.remove.append(ActionItem("Remove Worktree for \(local.name)…") { model.removeWorktree(wt) })
+                    s.remove.append(ActionItem("Remove Worktree and Delete \(local.name)…") {
+                        model.removeWorktreeAndDeleteBranch(wt, branch: local)
+                    })
                 }
+            } else if !local.isHead {
+                s.branch.append(ActionItem("Checkout \(local.name)") { Task { await model.checkout(local) } })
             }
             // Also for a branch that isn't checked out: it moves up to its remote branch.
             if let source = model.pullSource(for: local), local.isHead || model.sidebarOtherWorktree(for: local.name) == nil {
                 s.branch.append(ActionItem("Pull \(local.name)") { Task { await model.pull(branch: local, from: source) } })
             }
             s.branch.append(ActionItem("Push \(local.name)") { Task { await model.push(branch: local.name) } })
+            // No upstream yet (or it's gone), but a remote branch of that name: track it.
+            if local.upstream == nil || local.upstreamGone {
+                for candidate in model.remoteBranches where candidate.branchNameWithoutRemote == local.name {
+                    let name = candidate.name
+                    s.branch.append(ActionItem("Set Upstream to \(name)") { Task { await model.setUpstream(local.name, to: name) } })
+                }
+            }
+            s.branch.append(ActionItem("Rename \(local.name)…") { model.sheet = .renameBranch(local.name) })
         } else if let remote {
             // Remote-only here. If a local branch of that name exists elsewhere,
             // checking out switches to it, so say where it is.
@@ -164,6 +175,15 @@ extension HistoryTableCoordinator {
         }
         // The name without its remote, as for a branch only on the server.
         s.copy.append(ActionItem("Copy Branch Name") { External.copy(branch) })
+        if let links = model.links(for: nil) {
+            // Only for a branch the server has.
+            if remote != nil || local?.upstream != nil && local?.upstreamGone == false, let url = links.branchURL(branch) {
+                s.copy.append(ActionItem("Copy Link to Branch") { External.copy(url.absoluteString) })
+            }
+            if let pull = model.pull(forBranch: branch), let url = pull.webURL {
+                s.copy.append(ActionItem("Copy Link to \(links.pullRequestTerm) #\(pull.number)") { External.copy(url.absoluteString) })
+            }
+        }
         // Always asks first; for a local branch the question also offers its
         // remote branch. Not for the checked-out branch, one in another
         // worktree (that one has Remove Worktree), or the remote's default branch.
@@ -194,6 +214,7 @@ extension HistoryTableCoordinator {
             ActionItem("Copy Message") { External.copy(commit.subject) },
         ]
         if let links = model.links(for: nil), let url = links.commitURL(sha) {
+            copy.append(ActionItem("Copy Link to Commit") { External.copy(url.absoluteString) })
             copy.append(ActionItem("Open Commit on \(links.host)") { External.browse(url) })
         }
         return (
