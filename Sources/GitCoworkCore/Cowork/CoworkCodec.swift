@@ -56,11 +56,20 @@ public enum CoworkCodec {
         return snap
     }
 
+    // Header fields each kind of file has; anything else is kept in `extra`.
+    static let taskKeys: Set<String> = ["id", "title", "status", "assignee", "labels", "branch", "author", "created", "updated", "rank"]
+    static let reviewKeys: Set<String> = ["id", "title", "state", "branch", "base", "requester", "reviewers", "task", "created", "updated"]
+    static let commentKeys: Set<String> = ["author", "name", "created"]
+
+    static func extra(_ doc: FrontMatterDoc, known: Set<String>) -> [String: FrontMatterValue] {
+        doc.fields.filter { !known.contains($0.key) }
+    }
+
     public static func decodeTask(_ text: String, id: String) -> CoworkTask? {
         let doc = FrontMatter.parse(text)
         guard let title = doc["title"] else { return nil }
         let created = date(doc["created"]) ?? .distantPast
-        return CoworkTask(
+        var task = CoworkTask(
             id: doc["id"] ?? id,
             title: title,
             status: TaskStatus(rawValue: doc["status"] ?? "") ?? .backlog,
@@ -72,6 +81,8 @@ public enum CoworkCodec {
             updated: date(doc["updated"]) ?? created,
             body: doc.body,
             rank: doc["rank"].flatMap(Double.init))
+        task.extra = extra(doc, known: taskKeys)
+        return task
     }
 
     public static func decodeReview(_ text: String, id: String) -> ReviewRequest? {
@@ -93,7 +104,7 @@ public enum CoworkCodec {
             }
         }
         let created = date(doc["created"]) ?? .distantPast
-        return ReviewRequest(
+        var review = ReviewRequest(
             id: doc["id"] ?? id,
             title: doc["title"] ?? branch,
             branch: branch,
@@ -105,13 +116,17 @@ public enum CoworkCodec {
             created: created,
             updated: date(doc["updated"]) ?? created,
             body: doc.body)
+        review.extra = extra(doc, known: reviewKeys)
+        return review
     }
 
     public static func decodeComment(_ text: String, id: String, parent: String) -> CoworkComment? {
         let doc = FrontMatter.parse(text)
         guard let author = doc["author"] else { return nil }
-        return CoworkComment(id: id, parent: parent, author: author, authorName: doc["name"] ?? author,
-                             created: date(doc["created"]) ?? .distantPast, body: doc.body)
+        var comment = CoworkComment(id: id, parent: parent, author: author, authorName: doc["name"] ?? author,
+                                    created: date(doc["created"]) ?? .distantPast, body: doc.body)
+        comment.extra = extra(doc, known: commentKeys)
+        return comment
     }
 
     /// team.md: header-less list, one member per line: "- handle: Name <email>"
@@ -131,7 +146,7 @@ public enum CoworkCodec {
     // MARK: Encode
 
     public static func encode(_ t: CoworkTask) -> String {
-        var doc = FrontMatterDoc(body: t.body)
+        var doc = FrontMatterDoc(fields: t.extra, body: t.body)
         doc["id"] = t.id
         doc["title"] = t.title
         doc["status"] = t.status.rawValue
@@ -146,7 +161,7 @@ public enum CoworkCodec {
     }
 
     public static func encode(_ r: ReviewRequest) -> String {
-        var doc = FrontMatterDoc(body: r.body)
+        var doc = FrontMatterDoc(fields: r.extra, body: r.body)
         doc["id"] = r.id
         doc["title"] = r.title
         doc["state"] = r.status.rawValue
@@ -161,7 +176,7 @@ public enum CoworkCodec {
     }
 
     public static func encode(_ c: CoworkComment) -> String {
-        var doc = FrontMatterDoc(body: c.body)
+        var doc = FrontMatterDoc(fields: c.extra, body: c.body)
         doc["author"] = c.author
         doc["name"] = c.authorName
         doc["created"] = string(c.created)

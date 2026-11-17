@@ -49,6 +49,9 @@ public struct CoworkTask: Identifiable, Hashable, Sendable {
     public var body: String
     /// Order inside a board column; lower first. Empty means "by update time".
     public var rank: Double?
+    /// Header fields this version doesn't know, written back unchanged, so
+    /// editing with an older version keeps what a newer one added.
+    public var extra: [String: FrontMatterValue] = [:]
 
     public init(id: String, title: String, status: TaskStatus = .backlog, assignee: String? = nil,
                 labels: [String] = [], branch: String? = nil, author: String, created: Date,
@@ -86,6 +89,8 @@ public struct ReviewRequest: Identifiable, Hashable, Sendable {
     public var created: Date
     public var updated: Date
     public var body: String
+    /// Header fields this version doesn't know, written back unchanged.
+    public var extra: [String: FrontMatterValue] = [:]
 
     public init(id: String, title: String, branch: String, base: String, requester: String,
                 reviewers: [String: ReviewVerdict], status: ReviewStatus = .open, taskID: String? = nil,
@@ -114,6 +119,8 @@ public struct CoworkComment: Identifiable, Hashable, Sendable {
     public var authorName: String
     public var created: Date
     public var body: String
+    /// Header fields this version doesn't know, written back unchanged.
+    public var extra: [String: FrontMatterValue] = [:]
 
     public init(id: String, parent: String, author: String, authorName: String, created: Date, body: String) {
         self.id = id; self.parent = parent; self.author = author

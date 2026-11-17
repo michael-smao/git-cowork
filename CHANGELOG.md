@@ -6,6 +6,12 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Fixed
+- Tasks, reviews and comments keep header fields this version doesn't
+  know when you edit them. A later version can add fields (for example the
+  repositories a task belongs to), and teammates still on this version
+  won't remove them by editing a task.
+
 ## [0.7.0] - 2026-11-17
 
 ### Added
