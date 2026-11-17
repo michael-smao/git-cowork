@@ -46,6 +46,8 @@ public enum CoworkCodec {
                 if let c = decodeComment(text, id: String(parts[3].dropLast(3)), parent: parent) {
                     snap.comments[parent, default: []].append(c)
                 }
+            } else if parts.count == 2, parts[0] == "deleted", parts[1].hasSuffix(".md") {
+                if let when = date(FrontMatter.parse(text)["deleted"]) { snap.deleted[String(parts[1].dropLast(3))] = when }
             } else if path == CoworkPaths.team {
                 snap.team = decodeTeam(text)
             }
@@ -57,7 +59,7 @@ public enum CoworkCodec {
     }
 
     // Header fields each kind of file has; anything else is kept in `extra`.
-    static let taskKeys: Set<String> = ["id", "title", "status", "assignee", "labels", "branch", "author", "created", "updated", "rank"]
+    static let taskKeys: Set<String> = ["id", "title", "status", "assignee", "labels", "branch", "author", "created", "updated", "rank", "repos"]
     static let reviewKeys: Set<String> = ["id", "title", "state", "branch", "base", "requester", "reviewers", "task", "created", "updated"]
     static let commentKeys: Set<String> = ["author", "name", "created"]
 
@@ -81,6 +83,7 @@ public enum CoworkCodec {
             updated: date(doc["updated"]) ?? created,
             body: doc.body,
             rank: doc["rank"].flatMap(Double.init))
+        task.repos = doc.list("repos")
         task.extra = extra(doc, known: taskKeys)
         return task
     }
@@ -157,6 +160,7 @@ public enum CoworkCodec {
         doc["created"] = string(t.created)
         doc["updated"] = string(t.updated)
         if let rank = t.rank { doc["rank"] = String(rank) }
+        if !t.repos.isEmpty { doc.setList("repos", t.repos) }
         return FrontMatter.serialize(doc)
     }
 
@@ -180,6 +184,13 @@ public enum CoworkCodec {
         doc["author"] = c.author
         doc["name"] = c.authorName
         doc["created"] = string(c.created)
+        return FrontMatter.serialize(doc)
+    }
+
+    public static func encodeDeleted(at date: Date, by email: String) -> String {
+        var doc = FrontMatterDoc()
+        doc["deleted"] = string(date)
+        doc["by"] = email
         return FrontMatter.serialize(doc)
     }
 

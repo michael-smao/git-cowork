@@ -6,6 +6,19 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Tasks shared between repositories, e.g. a frontend and a backend. A
+  task's new "Repos" row adds another repository on this Mac: the task is
+  then also stored in that repository's tasks and shows on its board, with
+  "⧉ 2" on the card. Each board still shows only its own repository's
+  tasks. Edits, comments and deleting are carried over to every copy by
+  whoever has the repositories open (or among their recent ones): the newest
+  edit wins, comments are merged, and an edit after a delete brings the task
+  back. Removing a repository takes the task off its board.
+- "Start Task" on a shared task asks where: tick the repositories to make
+  the same branch in, optionally each in its own worktree. A repository
+  that isn't loaded here gets the branch without switching its checkout.
+
 ## [0.7.1] - 2026-11-17
 
 ### Fixed

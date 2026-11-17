@@ -50,9 +50,18 @@ public enum CoworkEdit {
         }
     }
 
-    public static func deleteTask(_ t: CoworkTask, comments: [CoworkComment]) -> CoworkWrite {
+    /// Copies of shared tasks brought in step (CoworkMirror.changes for this repository).
+    public static func mirror(_ files: [String: String?]) -> CoworkWrite {
+        CoworkWrite(paths: [], message: "Sync shared tasks") { _ in files }
+    }
+
+    /// A task shared with other repositories leaves a marker, so their
+    /// copies are deleted too (CoworkMirror).
+    public static func deleteTask(_ t: CoworkTask, comments: [CoworkComment], by me: String = "",
+                                  now: Date = Date()) -> CoworkWrite {
         var changes: [String: String?] = [t.path: nil]
         for c in comments { changes[c.path] = .some(nil) }
+        if !t.repos.isEmpty { changes[CoworkPaths.deletedTask(t.id)] = CoworkCodec.encodeDeleted(at: now, by: me) }
         return CoworkWrite(paths: [], message: "Delete \(t.id)") { _ in changes }
     }
 

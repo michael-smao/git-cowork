@@ -109,6 +109,8 @@ enum SheetKind: Identifiable {
     case newTask(status: TaskStatus)
     case requestReview(branch: String)
     case createPull(branch: String)
+    /// Start a task shared with other repositories: pick where.
+    case startTask(String, worktree: Bool)
     /// A release for `tag`, or for a new tag at `sha` when `tag` is nil.
     case createRelease(tag: String?, sha: String)
     case team
@@ -131,6 +133,7 @@ enum SheetKind: Identifiable {
         case .newTask(let s): "task:\(s.rawValue)"
         case .requestReview(let b): "review:\(b)"
         case .createPull(let b): "pull:\(b)"
+        case .startTask(let id, let w): "start:\(id):\(w)"
         case .createRelease(let t, let s): "release:\(t ?? ""):\(s)"
         case .team: "team"
         case .pushTarget(let b): "pushTarget:\(b)"

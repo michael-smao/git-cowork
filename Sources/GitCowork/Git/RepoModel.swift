@@ -166,8 +166,10 @@ final class RepoModel {
             }
         }
         cowork.remote = await resolveCoworkRemote()
+        cowork.repoID = coworkRepoID
         updateKnownAuthors()
         await cowork.load()
+        CoworkHub.shared.repositoryOpened()
         guard !isStopped else { return }
         startCoworkSync()
         autoFetcher.start()
@@ -222,6 +224,11 @@ final class RepoModel {
         }
     }
 
+    /// This repository for tasks shared between several (RepoID of the sync remote).
+    var coworkRepoID: String? {
+        cowork.remote.flatMap { name in remotes.first { $0.name == name } }.flatMap { RepoID.of(remoteURL: $0.url) }
+    }
+
     /// Remote for cowork sync: the same rule as `git cowork` (CoworkRemote),
     /// read from `git config cowork.remote`. A remote picked because it
     /// already has the team's tasks is written there, so the tool uses it too.
@@ -252,6 +259,7 @@ final class RepoModel {
 
     func syncCowork() async {
         cowork.remote = await resolveCoworkRemote()
+        cowork.repoID = coworkRepoID
         await cowork.sync()
         CoworkNotifier.shared.deliver(cowork.inbox, repo: mainWorktreePath ?? root.path, repoName: name)
     }

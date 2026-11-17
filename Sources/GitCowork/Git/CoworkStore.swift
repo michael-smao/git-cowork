@@ -24,6 +24,9 @@ final class CoworkStore {
     private(set) var version = 0
     /// Remote used for syncing (set by the repo model).
     var remote: String?
+    /// Which repository this is for tasks shared between several (RepoID of
+    /// the sync remote). Nil without a remote: then nothing can be shared.
+    var repoID: String?
     /// Unsent comment / review-note text per thing ("comment:tasks/CW-a3f9"),
     /// so it survives selection changes.
     var drafts: [String: String] = [:]
@@ -78,6 +81,8 @@ final class CoworkStore {
         for p in pending { p.change(&snap) }
         snapshot = snap
         version += 1
+        // Shared tasks may need copying to the other repositories they belong to.
+        if snap.tasks.contains(where: { !$0.repos.isEmpty }) || !snap.deleted.isEmpty { CoworkHub.shared.changed() }
     }
 
     // MARK: Writing

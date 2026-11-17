@@ -26,9 +26,9 @@ import CoworkKit
 
     @Test func taskKeepsUnknownFields() throws {
         let t = try #require(CoworkCodec.decodeTask(taskText, id: "CW-ab12"))
-        #expect(t.extra["repos"] == .list(["github.com/org/frontend", "github.com/org/backend"]))
+        #expect(t.repos == ["github.com/org/frontend", "github.com/org/backend"], "known since multi-repository tasks")
         #expect(t.extra["future"] == .string("some value"))
-        #expect(t.extra["title"] == nil && t.extra["labels"] == nil, "known fields aren't extra")
+        #expect(t.extra["title"] == nil && t.extra["labels"] == nil && t.extra["repos"] == nil, "known fields aren't extra")
         let again = try #require(CoworkCodec.decodeTask(CoworkCodec.encode(t), id: "CW-ab12"))
         #expect(again == t)
     }

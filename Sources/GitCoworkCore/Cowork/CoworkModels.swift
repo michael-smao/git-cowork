@@ -15,6 +15,9 @@ public enum CoworkPaths {
     public static func remoteRef(_ remote: String) -> String { "refs/cowork/remotes/\(remote)/main" }
 
     public static func task(_ id: String) -> String { "tasks/\(id).md" }
+    /// Left where a task shared with other repositories was deleted, so
+    /// their copies are deleted too instead of coming back (CoworkMirror).
+    public static func deletedTask(_ id: String) -> String { "deleted/\(id).md" }
     public static func review(_ id: String) -> String { "reviews/\(id).md" }
     public static let team = "team.md"
 
@@ -49,6 +52,10 @@ public struct CoworkTask: Identifiable, Hashable, Sendable {
     public var body: String
     /// Order inside a board column; lower first. Empty means "by update time".
     public var rank: Double?
+    /// The repositories the task belongs to (RepoID), when it's shared
+    /// between several; empty for a task of this repository only. The task
+    /// is stored in each of them and kept in step (CoworkMirror).
+    public var repos: [String] = []
     /// Header fields this version doesn't know, written back unchanged, so
     /// editing with an older version keeps what a newer one added.
     public var extra: [String: FrontMatterValue] = [:]
@@ -147,6 +154,8 @@ public struct CoworkSnapshot: Sendable {
     public var reviews: [ReviewRequest] = []
     public var comments: [String: [CoworkComment]] = [:]   // parent -> comments, oldest first
     public var team: [TeamMember] = []
+    /// Shared tasks deleted here: id -> when (CoworkPaths.deletedTask).
+    public var deleted: [String: Date] = [:]
 
     public init() {}
 }

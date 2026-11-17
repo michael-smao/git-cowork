@@ -33,7 +33,7 @@ extension CoworkStore {
     }
 
     func deleteTask(_ t: CoworkTask) async {
-        await write(CoworkEdit.deleteTask(t, comments: comments(on: t.commentParent))) { snap in
+        await write(CoworkEdit.deleteTask(t, comments: comments(on: t.commentParent), by: me.email)) { snap in
             snap.tasks.removeAll { $0.id == t.id }
         }
     }

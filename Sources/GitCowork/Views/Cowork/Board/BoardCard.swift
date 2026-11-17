@@ -41,6 +41,16 @@ struct BoardCard: View, Equatable {
                     .lineLimit(1)
                     .fixedSize()
                 Spacer(minLength: 0)
+                if task.repos.count > 1 {
+                    HStack(spacing: Theme.Space.s) {
+                        Image(systemName: "square.on.square")
+                            .font(.system(size: 10))
+                        Text(verbatim: "\(task.repos.count)")
+                            .font(Theme.Font.small.monospacedDigit())
+                    }
+                    .foregroundStyle(.secondary)
+                    .help(String(localized: "Shared with \(task.repos.map(RepoID.name).joined(separator: ", "))"))
+                }
                 if comments > 0 {
                     HStack(spacing: Theme.Space.s) {
                         Image(systemName: "bubble.left")

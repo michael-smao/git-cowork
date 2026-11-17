@@ -164,6 +164,10 @@ private struct TaskPanelContent: View {
                             onRemove: { l in update { $0.labels.removeAll { $0 == l } } })
                     .padding(.vertical, Theme.Space.s)
             }
+            PropertyRow(label: "Repos") {
+                TaskReposRow(store: store, task: task, update: update)
+                    .padding(.vertical, Theme.Space.s)
+            }
             PropertyRow(label: "Branch") {
                 TaskBranchRow(model: model, task: task) { b in update { $0.branch = b } }
                     .padding(.vertical, Theme.Space.s)
@@ -327,5 +331,86 @@ private struct TaskBranchRow: View {
             .help("Link an existing local branch")
         }
         .disabled(model.busy != nil)
+    }
+}
+
+/// The repositories a task belongs to. Adding one stores the task there too,
+/// so it shows on that repository's board; removing one takes it off there
+/// (CoworkHub keeps the copies in step).
+private struct TaskReposRow: View {
+    let store: CoworkStore
+    let task: CoworkTask
+    let update: (@escaping (inout CoworkTask) -> Void) -> Void
+    private var hub: CoworkHub { CoworkHub.shared }
+
+    /// This repository first, then the others.
+    private var repos: [String] {
+        guard let mine = store.repoID else { return task.repos }
+        return [mine] + task.repos.filter { $0.lowercased() != mine.lowercased() }
+    }
+
+    var body: some View {
+        if let mine = store.repoID {
+            FlowRow {
+                ForEach(repos, id: \.self) { id in
+                    if id.lowercased() == mine.lowercased() {
+                        Chip(text: RepoID.name(id), symbol: "folder").help(id)
+                    } else {
+                        Chip(text: RepoID.name(id), symbol: "folder", trailingPadding: Theme.Space.s) {
+                            Button { remove(id) } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 7, weight: .semibold))
+                                    .frame(width: 10, height: 10)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .help("Remove from this repository's board")
+                        }
+                        .help(id)
+                    }
+                }
+                addMenu(mine: mine)
+            }
+            .task { await hub.refreshKnown() }
+        } else {
+            Text("Needs a remote to share with other repositories")
+                .font(Theme.Font.small)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func addMenu(mine: String) -> some View {
+        let taken = Set(repos.map { $0.lowercased() })
+        let choices = hub.known.filter { !taken.contains($0.id.lowercased()) }
+        return Menu {
+            ForEach(choices) { repo in
+                Button(repo.name) { add(repo.id, mine: mine) }
+                    .help(repo.path)
+            }
+            if choices.isEmpty {
+                Text("Open another repository to add it here")
+            }
+        } label: {
+            Image(systemName: "plus")
+                .font(.system(size: 9, weight: .semibold))
+                .frame(width: 18, height: Theme.Metrics.chipHeight)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Also show this task on another repository's board")
+    }
+
+    private func add(_ id: String, mine: String) {
+        update { t in
+            if !t.repos.contains(where: { $0.lowercased() == mine.lowercased() }) { t.repos.insert(mine, at: 0) }
+            if !t.repos.contains(where: { $0.lowercased() == id.lowercased() }) { t.repos.append(id) }
+        }
+    }
+
+    /// Never empties the list: the task stays here, now only here.
+    private func remove(_ id: String) {
+        update { t in t.repos.removeAll { $0.lowercased() == id.lowercased() } }
     }
 }

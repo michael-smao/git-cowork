@@ -898,3 +898,22 @@
 "Not signed in to this repository's host." = "Nicht beim Host dieses Repositorys angemeldet.";
 "%@ already has a release on %@." = "%1$@ hat auf %2$@ schon ein Release.";
 "Tag" = "Tag";
+
+/* Tasks shared between repositories */
+"Repos" = "Repos";
+"Remove from this repository's board" = "Vom Board dieses Repositorys entfernen";
+"Needs a remote to share with other repositories" = "Braucht ein Remote, um mit anderen Repositorys zu teilen";
+"Open another repository to add it here" = "Öffne ein weiteres Repository, um es hier hinzuzufügen";
+"Also show this task on another repository's board" = "Diese Aufgabe auch auf dem Board eines anderen Repositorys zeigen";
+"Shared with %@" = "Geteilt mit %@";
+"Branch %@ in:" = "Branch %@ in:";
+"Couldn't start it in: %@" = "Konnte nicht gestartet werden in: %@";
+"Each in its own worktree" = "Jeweils in eigenem Worktree";
+"Start" = "Starten";
+"Start %@" = "%@ starten";
+"Starting…" = "Wird gestartet …";
+"not on this Mac" = "nicht auf diesem Mac";
+"on this Mac" = "auf diesem Mac";
+"on this Mac, branch only (no checkout)" = "auf diesem Mac, nur Branch (kein Checkout)";
+"open in another tab, checked out there" = "in einem anderen Tab offen, dort ausgecheckt";
+"this tab, checked out here" = "dieser Tab, hier ausgecheckt";
