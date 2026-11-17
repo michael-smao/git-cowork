@@ -189,7 +189,7 @@ extension HistoryTableCoordinator {
         // worktree (that one has Remove Worktree), or the remote's default branch.
         if let local, !local.isHead, model.sidebarOtherWorktree(for: local.name) == nil {
             s.remove.append(ActionItem("Delete \(local.name)…") { model.deleteBranch(local) })
-        } else if local == nil, let remote, let name = remote.remoteName, model.remoteDefaults[name] != remote.branchNameWithoutRemote {
+        } else if let remote, let name = remote.remoteName, model.remoteDefaults[name] != remote.branchNameWithoutRemote {
             s.remove.append(ActionItem("Delete \(remote.name)…") { model.deleteBranch(remote) })
         }
         return s

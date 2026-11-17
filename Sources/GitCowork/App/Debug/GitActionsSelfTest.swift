@@ -268,7 +268,9 @@ enum GitActionsSelfTest {
                          selection: nil, revealToken: 0, worktreeInfoVersion: 0, draftSummary: "")
             func menuTitles(at sha: String) -> [String] {
                 guard let row = (0..<history.rows.count).first(where: { history.commit(atRow: $0)?.id == sha }) else { return [] }
-                return history.contextMenu(forRow: row)?.items.map(\.title) ?? []
+                // With several branches on a commit, each has a submenu.
+                let items = history.contextMenu(forRow: row)?.items ?? []
+                return items.flatMap { [$0.title] + ($0.submenu?.items.map(\.title) ?? []) }
             }
             check(menuTitles(at: side.target).contains("Pull side"), "the menu on side's commit has Pull side")
             check(menuTitles(at: source.target).contains("Pull side"), "the menu on origin/side's commit has Pull side")
