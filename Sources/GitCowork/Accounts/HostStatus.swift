@@ -244,6 +244,27 @@ final class HostStatus {
         }
     }
 
+    /// Creates a release for `tag`, which must already be on the server.
+    /// Returns the release's page, if the host says where it is.
+    func createRelease(tag: String, title: String, notes: String, draft: Bool, prerelease: Bool) async throws -> URL? {
+        guard let account else { throw AccountError.noToken(links.host) }
+        guard let token = await Credentials.shared.tokens(for: account)?.access else { throw AccountError.noToken(account.host) }
+        guard let request = HostAPI.createReleaseRequest(kind: account.kind, host: account.host, path: links.path, token: token, tag: tag,
+                                                         title: title, notes: notes, draft: draft, prerelease: prerelease) else {
+            throw AccountError(message: String(localized: "\(links.path) isn't a repository path \(account.host) can use."))
+        }
+        let (data, response) = try await SignIn.send(request, host: account.host)
+        switch HostAPI.parseCreatedRelease(status: (response as? HTTPURLResponse)?.statusCode ?? 0, data: data, kind: account.kind) {
+        case .created(let page): return page
+        case .alreadyExists: throw AccountError(message: String(localized: "\(tag) already has a release on \(links.host)."))
+        case .signedOut: throw AccountError.tokenRejected(account.host)
+        case .failed(let message): throw AccountError(message: message)
+        }
+    }
+
+    /// The kind of host the release goes to, once signed in.
+    var accountKind: HostKind? { account?.kind }
+
     #if DEBUG
     /// Fills in sample data for screenshots (GITCOWORK_DEBUG_HOST).
     func showDemo(pulls: [HostPull], ci: [String: CIResult]) {

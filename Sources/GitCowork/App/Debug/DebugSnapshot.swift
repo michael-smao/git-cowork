@@ -12,7 +12,7 @@ enum DebugSnapshot {
     /// GITCOWORK_DEBUG_SELECT = "commit:<n>" (nth commit) | "diff" (first changed file) | "commitdiff:<n>"
     ///   | "stash:<n>" (nth stash) | "stashdiff:<n>" (and its last file's diff)
     /// GITCOWORK_DEBUG_FILTER = text for the history's search field, e.g. "file:Login".
-    /// GITCOWORK_DEBUG_SHEET = "addRemote" | "editRemote".
+    /// GITCOWORK_DEBUG_SHEET = "addRemote" | "editRemote" | "release".
     /// GITCOWORK_DEBUG_MODE = "board" | "reviews", optionally ":<n>" to select the nth task / review.
     /// GITCOWORK_DEBUG_LOG = "1" opens the command log.
     @MainActor
@@ -34,10 +34,12 @@ enum DebugSnapshot {
         if ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_PUSH"] != nil { await model.push() }
         // GITCOWORK_DEBUG_FILTER = "file:Login": what to put in the history's search field.
         if let filter = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_FILTER"] { model.filterText = filter }
-        // GITCOWORK_DEBUG_SHEET = "addRemote" | "editRemote" (the first remote): open that sheet.
+        // GITCOWORK_DEBUG_SHEET = "addRemote" | "editRemote" (the first remote) | "release": open that sheet.
         switch ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_SHEET"] {
         case "addRemote": model.sheet = .addRemote(thenPush: nil)
         case "editRemote": if let remote = model.remotes.first { model.sheet = .editRemote(remote.name) }
+        // Create Release with a new tag at HEAD.
+        case "release": if let sha = model.headSHA { model.sheet = .createRelease(tag: nil, sha: sha) }
         default: break
         }
         guard let sel = ProcessInfo.processInfo.environment["GITCOWORK_DEBUG_SELECT"] else { return }

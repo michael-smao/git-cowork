@@ -64,7 +64,7 @@ extension HistoryTableCoordinator {
             MenuSections.add([
                 b.branch,
                 b.integrate + commitItems.integrate,
-                b.collaborate,
+                b.collaborate + commitItems.collaborate,
                 commitItems.create,
                 commitItems.history,
                 b.copy + commitItems.copy,
@@ -85,6 +85,7 @@ extension HistoryTableCoordinator {
         MenuSections.add([
             submenus,
             commitItems.integrate,
+            commitItems.collaborate,
             commitItems.create,
             commitItems.history,
             commitItems.copy,
@@ -196,7 +197,8 @@ extension HistoryTableCoordinator {
     }
 
     /// The commit's own items, by section.
-    private func commitSections(_ commit: Commit) -> (integrate: [NSMenuItem], create: [NSMenuItem], history: [NSMenuItem], copy: [NSMenuItem]) {
+    private func commitSections(_ commit: Commit) -> (integrate: [NSMenuItem], collaborate: [NSMenuItem], create: [NSMenuItem],
+                                                      history: [NSMenuItem], copy: [NSMenuItem]) {
         let model = self.model
         let sha = commit.id
         let short = commit.shortID
@@ -217,14 +219,31 @@ extension HistoryTableCoordinator {
             copy.append(ActionItem("Copy Link to Commit") { External.copy(url.absoluteString) })
             copy.append(ActionItem("Open Commit on \(links.host)") { External.browse(url) })
         }
+        // A release for each tag here; without a tag, one with a new tag.
+        let tags = (refsByCommit[sha] ?? []).filter { $0.kind == .tag }.map(\.name).sorted()
+        var collaborate: [NSMenuItem] = []
+        var create: [NSMenuItem] = [
+            ActionItem("Create Branch Here…") { model.sheet = .newBranch(from: sha, label: short) },
+            ActionItem("Create Worktree Here…") { model.sheet = .addWorktree(base: sha) },
+            ActionItem("Create Tag Here…") { model.sheet = .newTag(sha: sha) },
+        ]
+        if let links = model.links(for: nil) {
+            for tag in tags {
+                if model.canCreateRelease {
+                    collaborate.append(ActionItem("Create Release for \(tag)…") { model.sheet = .createRelease(tag: tag, sha: sha) })
+                } else if let url = links.newReleaseURL(tag: tag) {
+                    collaborate.append(ActionItem("Create Release for \(tag) on \(links.host)") { External.browse(url) })
+                }
+            }
+            if tags.isEmpty, model.canCreateRelease {
+                create.append(ActionItem("Create Release Here…") { model.sheet = .createRelease(tag: nil, sha: sha) })
+            }
+        }
+        create.append(ActionItem("Checkout \(short) (detached)") { Task { await model.checkoutCommit(sha) } })
         return (
             integrate: [ActionItem("Cherry-pick into \(current)") { Task { await model.cherryPick(sha) } }],
-            create: [
-                ActionItem("Create Branch Here…") { model.sheet = .newBranch(from: sha, label: short) },
-                ActionItem("Create Worktree Here…") { model.sheet = .addWorktree(base: sha) },
-                ActionItem("Create Tag Here…") { model.sheet = .newTag(sha: sha) },
-                ActionItem("Checkout \(short) (detached)") { Task { await model.checkoutCommit(sha) } },
-            ],
+            collaborate: collaborate,
+            create: create,
             history: [ActionItem("Revert Commit") { Task { await model.revert(sha) } }, reset],
             copy: copy
         )

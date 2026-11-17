@@ -89,6 +89,15 @@ public struct RemoteLinks: Hashable, Sendable {
         }
     }
 
+    /// The host's page for a new release of `tag`.
+    public func newReleaseURL(tag: String) -> URL? {
+        let t = Self.escape(tag)
+        switch kind {
+        case .gitlab: return URL(string: "\(webBase)/-/releases/new?tag_name=\(t)")
+        case .gitea, .github, .none: return URL(string: "\(webBase)/releases/new?tag=\(t)")
+        }
+    }
+
     public var pullRequestTerm: String { kind == .gitlab ? "Merge Request" : "Pull Request" }
 
     static func escape(_ s: String) -> String {

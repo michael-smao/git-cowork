@@ -36,6 +36,47 @@ extension RepoModel {
         return remote == nil || remote == defaultRemote
     }
 
+    /// Whether the app can create a release itself (signed in to the host),
+    /// rather than opening the host's page.
+    var canCreateRelease: Bool { hostStatus?.canCreatePulls == true }
+
+    /// The commits since the tag before `target`, as release notes. Empty
+    /// when there's no earlier tag: then it would be the whole history.
+    func releaseNotes(upTo target: String) async -> String {
+        guard let previous = await git.tryLine(["describe", "--tags", "--abbrev=0", "--end-of-options", "\(target)^"], in: root),
+              !previous.isEmpty else { return "" }
+        let log = await git.tryRun(["log", "--no-merges", "--reverse", "--format=%s", "--end-of-options",
+                                    "refs/tags/\(previous)..\(target)"], in: root) ?? ""
+        return ReleaseDraft.notes(subjects: log.split(separator: "\n").map(String.init))
+    }
+
+    /// Pushes the tag to the default remote; nothing happens if it's there
+    /// already. False (with `lastProblem`) when it failed or there's no remote.
+    func pushTagForRelease(_ name: String) async -> Bool {
+        guard let remote = defaultRemote else {
+            lastProblem = GitProblem(title: L("No remote"), message: L("Add a remote to push the tag to."))
+            return false
+        }
+        return await perform("Push tag", ["push", remote, "refs/tags/\(name)"], quiet: true)
+    }
+
+    /// Makes the tag at `sha` if it doesn't exist yet, pushes it, and creates
+    /// the release. Returns the release's page. Throws with git's or the
+    /// host's message; a tag made here stays when a later step fails.
+    func createRelease(tag: String, at sha: String, title: String, notes: String,
+                       draft: Bool, prerelease: Bool) async throws -> URL? {
+        guard let status = hostStatus else { throw AccountError(message: L("Not signed in to this repository's host.")) }
+        if !tags.contains(where: { $0.name == tag }) {
+            guard await createTag(tag, at: sha, message: "", quiet: true) else {
+                throw AccountError(message: lastProblemText ?? String(localized: "Couldn't create the tag \(tag)."))
+            }
+        }
+        guard await pushTagForRelease(tag) else {
+            throw AccountError(message: lastProblemText ?? String(localized: "Couldn't push \(tag)."))
+        }
+        return try await status.createRelease(tag: tag, title: title, notes: notes, draft: draft, prerelease: prerelease)
+    }
+
     /// Branches a request can target, without the branch itself. Keeps `current` listed.
     func baseOptions(for branch: String, keeping current: String) -> [String] {
         var names = localBranches.map(\.name)
