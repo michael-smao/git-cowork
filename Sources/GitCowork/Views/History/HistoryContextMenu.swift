@@ -18,6 +18,10 @@ extension HistoryTableCoordinator {
         return menu.items.isEmpty ? nil : menu
     }
 
+    /// Always the same sections in the same order, so an item is always in
+    /// the same place: the branch, bringing changes together, working with
+    /// others, new things from the commit, changing history, copying, and
+    /// last whatever removes something. Empty sections are left out.
     private func fill(_ menu: NSMenu, row: Int, onlyBadge: String? = nil) {
         guard row >= 0, row < rows.count else { return }
         let model = self.model
@@ -28,111 +32,155 @@ extension HistoryTableCoordinator {
             menu.addItem(ActionItem("Stash Changes…") { model.sheet = .stash })
             return
         case .otherWIP(let path):
+            var open: [NSMenuItem] = []
+            var remove: [NSMenuItem] = []
             if let wt = model.worktrees.first(where: { $0.path == path }) {
                 let openHere = self.openHere, openInNewTab = self.openInNewTab
-                menu.addItem(ActionItem("Open Worktree") { openHere(wt.path) })
-                menu.addItem(ActionItem("Open Worktree in New Tab") { openInNewTab(wt.path) })
+                open.append(ActionItem("Open Worktree") { openHere(wt.path) })
+                open.append(ActionItem("Open Worktree in New Tab") { openInNewTab(wt.path) })
                 if !wt.isMain {
-                    menu.addItem(ActionItem("Remove Worktree…") { model.removeWorktree(wt) })
+                    remove.append(ActionItem("Remove Worktree…") { model.removeWorktree(wt) })
                 }
-                menu.addItem(.separator())
             }
-            menu.addItem(ActionItem("Open in Terminal") { External.openTerminal(path) })
-            menu.addItem(ActionItem("Open in Editor") { External.openEditor(path) })
-            menu.addItem(ActionItem("Reveal in Finder") { External.reveal(path) })
-            menu.addItem(.separator())
-            menu.addItem(ActionItem("Copy Path") { External.copy(path) })
+            MenuSections.add([
+                open,
+                [ActionItem("Open in Terminal") { External.openTerminal(path) },
+                 ActionItem("Open in Editor") { External.openEditor(path) },
+                 ActionItem("Reveal in Finder") { External.reveal(path) }],
+                [ActionItem("Copy Path") { External.copy(path) }],
+                remove,
+            ], to: menu)
             return
         case .commit(let index):
             guard index < commits.count else { return }
             i = index
         }
         let commit = commits[i]
+        let branches = badges(forCommit: i).filter { $0.kind == .branch && (onlyBadge == nil || $0.name == onlyBadge) }
+        let commitItems = commitSections(commit)
+        guard branches.count > 1 else {
+            // One branch: its items and the commit's share the sections.
+            let b = branches.first.map { branchSections($0, commit: commit) } ?? BranchSections()
+            MenuSections.add([
+                b.branch,
+                b.integrate + commitItems.integrate,
+                b.collaborate,
+                commitItems.create,
+                commitItems.history,
+                b.copy + commitItems.copy,
+                b.remove,
+            ], to: menu)
+            return
+        }
+        // Several branches: one submenu each, with its sections in the same order.
+        var submenus: [NSMenuItem] = []
+        for badge in branches {
+            let b = branchSections(badge, commit: commit)
+            let item = NSMenuItem(title: badge.name, action: nil, keyEquivalent: "")
+            let sub = NSMenu()
+            MenuSections.add([b.branch, b.integrate, b.collaborate, b.copy, b.remove], to: sub)
+            item.submenu = sub
+            submenus.append(item)
+        }
+        MenuSections.add([
+            submenus,
+            commitItems.integrate,
+            commitItems.create,
+            commitItems.history,
+            commitItems.copy,
+        ], to: menu)
+    }
+
+    /// A branch badge's items, by section. A local branch and its remote share them.
+    private struct BranchSections {
+        var branch: [NSMenuItem] = []
+        var integrate: [NSMenuItem] = []
+        var collaborate: [NSMenuItem] = []
+        var copy: [NSMenuItem] = []
+        var remove: [NSMenuItem] = []
+    }
+
+    private func branchSections(_ badge: GraphBadge, commit: Commit) -> BranchSections {
+        let model = self.model
+        let refs = refsByCommit[commit.id] ?? []
+        let current = model.currentBranch ?? "HEAD"
+        let local = refs.first { $0.kind == .localBranch && badge.refNames.contains($0.name) }
+        let remote = refs.first { $0.kind == .remoteBranch && badge.refNames.contains($0.name) }
+        var s = BranchSections()
+        if let local {
+            if !local.isHead {
+                s.branch.append(ActionItem("Checkout \(local.name)") { Task { await model.checkout(local) } })
+            }
+            // Checked out in another worktree: open or remove that one.
+            if let wt = model.sidebarOtherWorktree(for: local.name) {
+                let openHere = self.openHere, openInNewTab = self.openInNewTab
+                s.branch.append(ActionItem("Open Worktree for \(local.name)") { openHere(wt.path) })
+                s.branch.append(ActionItem("Open Worktree for \(local.name) in New Tab") { openInNewTab(wt.path) })
+                if !wt.isMain {
+                    s.remove.append(ActionItem("Remove Worktree for \(local.name)…") { model.removeWorktree(wt) })
+                }
+            }
+            // Also for a branch that isn't checked out: it moves up to its remote branch.
+            if let source = model.pullSource(for: local), local.isHead || model.sidebarOtherWorktree(for: local.name) == nil {
+                s.branch.append(ActionItem("Pull \(local.name)") { Task { await model.pull(branch: local, from: source) } })
+            }
+            s.branch.append(ActionItem("Push \(local.name)") { Task { await model.push(branch: local.name) } })
+        } else if let remote {
+            // Remote-only here. If a local branch of that name exists elsewhere,
+            // checking out switches to it, so say where it is.
+            if let other = model.localBranches.first(where: { $0.name == badge.name }) {
+                if !other.isHead {
+                    let at = String(other.target.prefix(7))
+                    s.branch.append(ActionItem("Checkout \(other.name) (local, at \(at))") { Task { await model.checkout(other) } })
+                }
+                // The remote branch is ahead here: bring the local one up to it.
+                if other.isHead || model.sidebarOtherWorktree(for: other.name) == nil {
+                    s.branch.append(ActionItem("Pull \(other.name)") { Task { await model.pull(branch: other, from: remote) } })
+                }
+            } else {
+                s.branch.append(ActionItem("Checkout \(remote.name)") { Task { await model.checkout(remote) } })
+            }
+        }
+        if !(local?.isHead ?? false) {
+            let target = local?.name ?? remote?.name ?? badge.name
+            s.integrate.append(ActionItem("Merge \(target) into \(current)") { Task { await model.merge(target) } })
+            s.integrate.append(ActionItem("Rebase \(current) onto \(target)") { Task { await model.rebase(onto: target) } })
+        }
+        let branch = badge.name
+        if let links = model.links(for: nil) {
+            if let pull = model.pull(forBranch: branch) {
+                s.collaborate.append(ActionItem("Open \(links.pullRequestTerm) #\(pull.number) on \(links.host)") { External.browse(pull.webURL) })
+            } else if branch != model.baseBranch()?.name, model.canCreatePull(remote: nil) {
+                s.collaborate.append(ActionItem("Create \(links.pullRequestTerm)…") { model.sheet = .createPull(branch: branch) })
+            }
+        }
+        s.collaborate.append(ActionItem("Request Review of \(branch)…") { model.sheet = .requestReview(branch: branch) })
+        for task in tasksByBranch[branch] ?? [] {
+            let id = task.id
+            s.collaborate.append(ActionItem("Open Task \(id)") {
+                model.centerMode = .board
+                model.coworkSelection = .task(id)
+            })
+        }
+        // The name without its remote, as for a branch only on the server.
+        s.copy.append(ActionItem("Copy Branch Name") { External.copy(branch) })
+        // Always asks first; for a local branch the question also offers its
+        // remote branch. Not for the checked-out branch, one in another
+        // worktree (that one has Remove Worktree), or the remote's default branch.
+        if let local, !local.isHead, model.sidebarOtherWorktree(for: local.name) == nil {
+            s.remove.append(ActionItem("Delete \(local.name)…") { model.deleteBranch(local) })
+        } else if local == nil, let remote, let name = remote.remoteName, model.remoteDefaults[name] != remote.branchNameWithoutRemote {
+            s.remove.append(ActionItem("Delete \(remote.name)…") { model.deleteBranch(remote) })
+        }
+        return s
+    }
+
+    /// The commit's own items, by section.
+    private func commitSections(_ commit: Commit) -> (integrate: [NSMenuItem], create: [NSMenuItem], history: [NSMenuItem], copy: [NSMenuItem]) {
+        let model = self.model
         let sha = commit.id
         let short = commit.shortID
         let current = model.currentBranch ?? "HEAD"
-        let refs = refsByCommit[sha] ?? []
-
-        // One group per branch badge: a local branch and its remote share items.
-        for badge in badges(forCommit: i) where badge.kind == .branch && (onlyBadge == nil || badge.name == onlyBadge) {
-            let local = refs.first { $0.kind == .localBranch && badge.refNames.contains($0.name) }
-            let remote = refs.first { $0.kind == .remoteBranch && badge.refNames.contains($0.name) }
-            if let local {
-                if !local.isHead {
-                    menu.addItem(ActionItem("Checkout \(local.name)") { Task { await model.checkout(local) } })
-                }
-                // Also for a branch that isn't checked out: it moves up to its remote branch.
-                if let source = model.pullSource(for: local), local.isHead || model.sidebarOtherWorktree(for: local.name) == nil {
-                    menu.addItem(ActionItem("Pull \(local.name)") { Task { await model.pull(branch: local, from: source) } })
-                }
-                menu.addItem(ActionItem("Push \(local.name)") { Task { await model.push(branch: local.name) } })
-                // Checked out in another worktree: open or remove that one.
-                if let wt = model.sidebarOtherWorktree(for: local.name) {
-                    let openHere = self.openHere, openInNewTab = self.openInNewTab
-                    menu.addItem(ActionItem("Open Worktree for \(local.name)") { openHere(wt.path) })
-                    menu.addItem(ActionItem("Open Worktree for \(local.name) in New Tab") { openInNewTab(wt.path) })
-                    if !wt.isMain {
-                        menu.addItem(ActionItem("Remove Worktree for \(local.name)…") { model.removeWorktree(wt) })
-                    }
-                }
-            } else if let remote {
-                // Remote-only here. If a local branch of that name exists elsewhere,
-                // checking out switches to it, so say where it is.
-                if let other = model.localBranches.first(where: { $0.name == badge.name }) {
-                    if !other.isHead {
-                        let at = String(other.target.prefix(7))
-                        menu.addItem(ActionItem("Checkout \(other.name) (local, at \(at))") { Task { await model.checkout(other) } })
-                    }
-                    // The remote branch is ahead here: bring the local one up to it.
-                    if other.isHead || model.sidebarOtherWorktree(for: other.name) == nil {
-                        menu.addItem(ActionItem("Pull \(other.name)") { Task { await model.pull(branch: other, from: remote) } })
-                    }
-                } else {
-                    menu.addItem(ActionItem("Checkout \(remote.name)") { Task { await model.checkout(remote) } })
-                }
-            }
-            if !(local?.isHead ?? false) {
-                let target = local?.name ?? remote?.name ?? badge.name
-                menu.addItem(ActionItem("Merge \(target) into \(current)") { Task { await model.merge(target) } })
-                menu.addItem(ActionItem("Rebase \(current) onto \(target)") { Task { await model.rebase(onto: target) } })
-            }
-            let branch = badge.name
-            menu.addItem(ActionItem("Request Review of \(branch)…") { model.sheet = .requestReview(branch: branch) })
-            if let links = model.links(for: nil) {
-                if let pull = model.pull(forBranch: branch) {
-                    menu.addItem(ActionItem("Open \(links.pullRequestTerm) #\(pull.number) on \(links.host)") { External.browse(pull.webURL) })
-                } else if branch != model.baseBranch()?.name, model.canCreatePull(remote: nil) {
-                    menu.addItem(ActionItem("Create \(links.pullRequestTerm)…") { model.sheet = .createPull(branch: branch) })
-                }
-            }
-            for task in tasksByBranch[branch] ?? [] {
-                let id = task.id
-                menu.addItem(ActionItem("Open Task \(id)") {
-                    model.centerMode = .board
-                    model.coworkSelection = .task(id)
-                })
-            }
-            // The name without its remote, as for a branch only on the server.
-            menu.addItem(ActionItem("Copy Name of \(branch)") { External.copy(branch) })
-            // Last in the group. Always asks first; for a local branch the
-            // question also offers its remote branch. Not for the checked-out
-            // branch, one in another worktree (that one has Remove Worktree),
-            // or the remote's default branch.
-            if let local, !local.isHead, model.sidebarOtherWorktree(for: local.name) == nil {
-                menu.addItem(ActionItem("Delete \(local.name)…") { model.deleteBranch(local) })
-            } else if let remote, let name = remote.remoteName, model.remoteDefaults[name] != remote.branchNameWithoutRemote {
-                menu.addItem(ActionItem("Delete \(remote.name)…") { model.deleteBranch(remote) })
-            }
-            menu.addItem(.separator())
-        }
-
-        menu.addItem(ActionItem("Checkout \(short) (detached)") { Task { await model.checkoutCommit(sha) } })
-        menu.addItem(ActionItem("Create Branch Here…") { model.sheet = .newBranch(from: sha, label: short) })
-        menu.addItem(ActionItem("Create Tag Here…") { model.sheet = .newTag(sha: sha) })
-        menu.addItem(ActionItem("Create Worktree Here…") { model.sheet = .addWorktree(base: sha) })
-        menu.addItem(.separator())
-        menu.addItem(ActionItem("Cherry-pick into \(current)") { Task { await model.cherryPick(sha) } })
-        menu.addItem(ActionItem("Revert Commit") { Task { await model.revert(sha) } })
 
         let reset = NSMenuItem(title: String(localized: "Reset \(current) to this commit"), action: nil, keyEquivalent: "")
         let sub = NSMenu()
@@ -140,13 +188,35 @@ extension HistoryTableCoordinator {
         sub.addItem(ActionItem("Mixed – keep working copy but reset index") { model.reset(to: sha, mode: .mixed) })
         sub.addItem(ActionItem("Hard – discard all changes…") { model.reset(to: sha, mode: .hard) })
         reset.submenu = sub
-        menu.addItem(reset)
 
-        menu.addItem(.separator())
-        menu.addItem(ActionItem("Copy SHA") { External.copy(sha) })
-        menu.addItem(ActionItem("Copy Message") { External.copy(commit.subject) })
+        var copy: [NSMenuItem] = [
+            ActionItem("Copy SHA") { External.copy(sha) },
+            ActionItem("Copy Message") { External.copy(commit.subject) },
+        ]
         if let links = model.links(for: nil), let url = links.commitURL(sha) {
-            menu.addItem(ActionItem("Open Commit on \(links.host)") { External.browse(url) })
+            copy.append(ActionItem("Open Commit on \(links.host)") { External.browse(url) })
+        }
+        return (
+            integrate: [ActionItem("Cherry-pick into \(current)") { Task { await model.cherryPick(sha) } }],
+            create: [
+                ActionItem("Create Branch Here…") { model.sheet = .newBranch(from: sha, label: short) },
+                ActionItem("Create Worktree Here…") { model.sheet = .addWorktree(base: sha) },
+                ActionItem("Create Tag Here…") { model.sheet = .newTag(sha: sha) },
+                ActionItem("Checkout \(short) (detached)") { Task { await model.checkoutCommit(sha) } },
+            ],
+            history: [ActionItem("Revert Commit") { Task { await model.revert(sha) } }, reset],
+            copy: copy
+        )
+    }
+}
+
+/// Fills a menu section by section, with one separator between sections
+/// that have items.
+enum MenuSections {
+    static func add(_ sections: [[NSMenuItem]], to menu: NSMenu) {
+        for section in sections where !section.isEmpty {
+            if !menu.items.isEmpty { menu.addItem(.separator()) }
+            section.forEach(menu.addItem)
         }
     }
 }

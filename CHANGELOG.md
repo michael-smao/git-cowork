@@ -7,9 +7,16 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 ## [Unreleased]
 
 ### Added
-- Right-clicking a branch badge in the history offers "Copy Name of
-  <branch>", as the sidebar does. For a branch only on the server it copies
-  the name without the remote (`feature`, not `origin/feature`).
+- Right-clicking a branch badge in the history offers "Copy Branch Name", as
+  the sidebar does. For a branch only on the server it copies the name
+  without the remote (`feature`, not `origin/feature`).
+
+### Changed
+- The right-click menu in the history has fixed sections, always in the
+  same order: the branch (checkout, worktree, pull, push), merging and
+  rebasing, pull requests and reviews, new things from the commit, changing
+  history, copying, and last whatever removes something. A commit with
+  several branches shows one submenu per branch, with the same sections.
 
 ## [0.6.3] - 2026-11-16
 
