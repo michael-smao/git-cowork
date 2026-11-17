@@ -84,6 +84,10 @@ struct SidebarMenu: View {
 
     private var current: String { model.currentBranch ?? "HEAD" }
 
+    // Branch menus have the same sections, in the same order, as the
+    // history's menu: the branch, merging and rebasing, pull requests and
+    // reviews, new things from it, copying, and last whatever removes something.
+
     @ViewBuilder
     private func localBranch(_ ref: Ref) -> some View {
         // A branch checked out in another worktree can't be switched to or deleted here.
@@ -91,40 +95,49 @@ struct SidebarMenu: View {
         if let wt = otherWorktree {
             Button("Open Worktree") { openHere(wt.path) }
             Button("Open Worktree in New Tab") { openInNewTab(wt.path) }
-            Divider()
             Button("Push") { Task { await model.push(branch: ref.name) } }
-            Button("Merge \(ref.name) into \(current)") { Task { await model.merge(ref.name) } }
-            Button("Rebase \(current) onto \(ref.name)") { Task { await model.rebase(onto: ref.name) } }
-            Divider()
         } else if !ref.isHead {
             Button("Checkout") { Task { await model.checkout(ref) } }
             if let source = model.pullSource(for: ref) {
                 Button("Pull") { Task { await model.pull(branch: ref, from: source) } }
             }
             Button("Push") { Task { await model.push(branch: ref.name) } }
-            Button("Merge \(ref.name) into \(current)") { Task { await model.merge(ref.name) } }
-            Button("Rebase \(current) onto \(ref.name)") { Task { await model.rebase(onto: ref.name) } }
-            Divider()
         } else {
             Button("Pull") { Task { await model.pull() } }
             Button("Push") { Task { await model.push() } }
+        }
+        Button("Rename…") { model.sheet = .renameBranch(ref.name) }
+        Divider()
+        if !ref.isHead {
+            Button("Merge \(ref.name) into \(current)") { Task { await model.merge(ref.name) } }
+            Button("Rebase \(current) onto \(ref.name)") { Task { await model.rebase(onto: ref.name) } }
             Divider()
         }
+        let remote = ref.upstream?.split(separator: "/").first.map(String.init)
+        pullLink(branch: ref.name, remote: remote)
+        cowork(branch: ref.name)
         Button("New Branch from \(ref.name)…") { model.sheet = .newBranch(from: ref.name, label: ref.name) }
         // Git won't add a second worktree for a branch that is already checked out somewhere.
         if !model.worktrees.contains(where: { $0.branch == ref.name }) {
             Button("Create Worktree…") { model.sheet = .addWorktree(base: ref.name) }
         }
-        Button("Rename…") { model.sheet = .renameBranch(ref.name) }
-        if otherWorktree != nil {
-            Button("Delete… (checked out in a worktree)") {}.disabled(true)
+        Divider()
+        Button("Copy Name") { External.copy(ref.name) }
+        branchLink(branch: ref.name, remote: remote)
+        if let wt = otherWorktree {
+            Divider()
+            if wt.isMain {
+                Button("Delete… (checked out in a worktree)") {}.disabled(true)
+            } else {
+                Button("Remove Worktree…", role: .destructive) { model.removeWorktree(wt) }
+                Button("Remove Worktree and Delete \(ref.name)…", role: .destructive) {
+                    model.removeWorktreeAndDeleteBranch(wt, branch: ref)
+                }
+            }
         } else if !ref.isHead {
+            Divider()
             Button("Delete…", role: .destructive) { model.deleteBranch(ref) }
         }
-        Divider()
-        cowork(branch: ref.name)
-        hostLinks(branch: ref.name, remote: ref.upstream?.split(separator: "/").first.map(String.init))
-        Button("Copy Name") { External.copy(ref.name) }
     }
 
     @ViewBuilder
@@ -135,15 +148,17 @@ struct SidebarMenu: View {
         } else {
             Button("Checkout as Local Branch") { Task { await model.checkout(ref) } }
         }
+        Divider()
         Button("Merge \(ref.name) into \(current)") { Task { await model.merge(ref.name) } }
         Button("Rebase \(current) onto \(ref.name)") { Task { await model.rebase(onto: ref.name) } }
         Divider()
-        Button("Create Worktree…") { model.sheet = .addWorktree(base: ref.name) }
-        Button("New Branch from \(ref.name)…") { model.sheet = .newBranch(from: ref.name, label: ref.name) }
-        Divider()
+        pullLink(branch: local, remote: ref.remoteName)
         cowork(branch: local)
-        hostLinks(branch: local, remote: ref.remoteName)
+        Button("New Branch from \(ref.name)…") { model.sheet = .newBranch(from: ref.name, label: ref.name) }
+        Button("Create Worktree…") { model.sheet = .addWorktree(base: ref.name) }
+        Divider()
         Button("Copy Name") { External.copy(ref.name) }
+        branchLink(branch: local, remote: ref.remoteName)
         Divider()
         Button("Delete on \(ref.remoteName ?? "remote")…", role: .destructive) { model.deleteBranch(ref) }
     }
@@ -191,10 +206,13 @@ struct SidebarMenu: View {
         Button("Open in Terminal") { External.openTerminal(wt.path) }
         Button("Open in Editor") { External.openEditor(wt.path) }
         Button("Reveal in Finder") { External.reveal(wt.path) }
+        Divider()
+        if let branch = wt.branch {
+            pullLink(branch: branch, remote: nil)
+        }
         Button("Copy Path") { External.copy(wt.path) }
         if let branch = wt.branch {
-            Divider()
-            hostLinks(branch: branch, remote: nil)
+            branchLink(branch: branch, remote: nil)
         }
         if !wt.isMain {
             Divider()
@@ -202,11 +220,18 @@ struct SidebarMenu: View {
             // This window's own worktree too: it then moves to the main worktree.
             Button("Remove Worktree…", role: .destructive) { model.removeWorktree(wt, leave: openHere) }
                 .disabled(model.sidebarIsCurrent(wt) && !model.canLeaveForMainWorktree)
+            if !model.sidebarIsCurrent(wt), let branch = wt.branch,
+               let ref = model.localBranches.first(where: { $0.name == branch }) {
+                Button("Remove Worktree and Delete \(branch)…", role: .destructive) {
+                    model.removeWorktreeAndDeleteBranch(wt, branch: ref)
+                }
+            }
         }
     }
 
+    /// The branch's pull request, or creating one.
     @ViewBuilder
-    private func hostLinks(branch: String, remote: String?) -> some View {
+    private func pullLink(branch: String, remote: String?) -> some View {
         if let links = model.links(for: remote) {
             let base = model.baseBranch()?.name
             if let pull = model.pull(forBranch: branch), remote == nil || remote == model.defaultRemote {
@@ -216,9 +241,14 @@ struct SidebarMenu: View {
             } else if branch != base, let url = links.newPullRequestURL(branch: branch, base: base) {
                 Button("Create \(links.pullRequestTerm) on \(links.host)") { External.browse(url) }
             }
-            if let url = links.branchURL(branch) {
-                Button("Open Branch on \(links.host)") { External.browse(url) }
-            }
+        }
+    }
+
+    /// The branch on the host's website.
+    @ViewBuilder
+    private func branchLink(branch: String, remote: String?) -> some View {
+        if let links = model.links(for: remote), let url = links.branchURL(branch) {
+            Button("Open Branch on \(links.host)") { External.browse(url) }
         }
     }
 }

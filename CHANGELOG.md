@@ -25,6 +25,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   rebasing, pull requests and reviews, new things from the commit, changing
   history, copying, and last whatever removes something. A commit with
   several branches shows one submenu per branch, with the same sections.
+- The sidebar's menus for branches and worktrees use the same order. A
+  branch or worktree there also offers "Remove Worktree and Delete
+  <branch>…".
 
 ### Fixed
 - A branch checked out in another worktree no longer offers "Checkout" in
