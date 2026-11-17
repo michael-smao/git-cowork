@@ -20,6 +20,7 @@ struct DiffPane: View {
     private var reloadKey: String {
         switch target {
         case .working(let f): "\(f.id)#\(model.refreshCount)"
+        case .worktree(let p, let f): "\(p):\(f.id)#\(model.refreshCount)"
         case .commit(let d, let f): "\(d.parents.first ?? "")..\(d.id):\(f.id)"
         }
     }
@@ -27,8 +28,15 @@ struct DiffPane: View {
     private var documentID: String {
         switch target {
         case .working(let f): f.id
+        case .worktree(let p, let f): "\(p):\(f.id)"
         case .commit(let d, let f): "\(d.parents.first ?? "")..\(d.id):\(f.id)"
         }
+    }
+
+    /// Folder the file lives in: another worktree's, or this repository's.
+    private var fileRoot: URL {
+        if case .worktree(let p, _) = target { return URL(fileURLWithPath: p) }
+        return model.root
     }
 
     var body: some View {
@@ -45,7 +53,7 @@ struct DiffPane: View {
                 .help("Hunk: one column. Split: old and new side by side.")
                 fileActions
                 Button {
-                    External.openEditor(model.root.appendingPathComponent(file.path).path)
+                    External.openEditor(fileRoot.appendingPathComponent(file.path).path)
                 } label: {
                     Image(systemName: "square.and.pencil")
                 }
@@ -128,6 +136,9 @@ struct DiffPane: View {
         case .working:
             let st = model.status
             return st.conflicted + st.unstaged + st.untracked + st.staged   // same order as the Changes panel
+        case .worktree(let p, _):
+            guard let st = model.worktreeChanges[p] else { return [] }
+            return st.conflicted + st.unstaged + st.untracked + st.staged   // same order as the worktree panel
         case .commit:
             return commitFiles
         }
@@ -136,6 +147,7 @@ struct DiffPane: View {
     private func open(_ f: FileChange) {
         switch target {
         case .working: model.openDiff = .working(f)
+        case .worktree(let p, _): model.openDiff = .worktree(p, f)
         case .commit(let d, _): model.openDiff = .commit(d, f)
         }
     }
@@ -156,6 +168,7 @@ struct DiffPane: View {
         let data: Data
         switch target {
         case .working(let f): data = await DiffLoader.working(f, root: model.root)
+        case .worktree(let p, let f): data = await DiffLoader.working(f, root: URL(fileURLWithPath: p))
         case .commit(let d, let f): data = await DiffLoader.commit(d, file: f, root: model.root)
         }
         guard !Task.isCancelled else { return }

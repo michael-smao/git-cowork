@@ -77,6 +77,11 @@
 "Add worktree" = "Worktree hinzufügen";
 "Add Worktree…" = "Worktree hinzufügen …";
 "Added" = "Hinzugefügt";
+"Changes in another worktree. Open it to stage and commit them." = "Änderungen in einem anderen Worktree. Öffne ihn, um sie zu stagen und zu committen.";
+"Everything in this worktree is committed." = "In diesem Worktree ist alles committet.";
+"No uncommitted changes" = "Keine offenen Änderungen";
+"Show this worktree in this tab instead" = "Diesen Worktree stattdessen in diesem Tab zeigen";
+"Switch to this worktree in a tab of its own (double-click the row)" = "Zu diesem Worktree in einem eigenen Tab wechseln (Doppelklick auf die Zeile)";
 "added" = "hinzugefügt";
 "All Labels" = "Alle Labels";
 "All open" = "Alle offenen";

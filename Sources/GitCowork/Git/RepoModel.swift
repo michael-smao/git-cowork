@@ -37,6 +37,9 @@ final class RepoModel {
     private(set) var worktreeInfo: [String: WorktreeInfo] = [:]
     /// Bumped whenever worktreeInfo changes (for views that aren't observing it directly).
     private(set) var worktreeInfoVersion = 0
+    /// Full `git status` of other worktrees whose changes are on screen
+    /// (selection `.worktree`), by path. Loaded by loadWorktreeChanges.
+    private(set) var worktreeChanges: [String: WorkingStatus] = [:]
     /// Per commit index: true when the commit is HEAD or one of its ancestors.
     /// GitKraken-style dimming of commits that aren't on the current branch.
     private(set) var headAncestry: [Bool] = []
@@ -335,6 +338,7 @@ final class RepoModel {
                 worktreeInfoVersion += 1
             }
             restartWatcher()
+            leaveMissingWorktree()
             await refreshWorktreeInfo(paths: worktrees.map(\.path))
         } else {
             let info = WorktreeInfo(status)
@@ -459,6 +463,23 @@ final class RepoModel {
         if exists("CHERRY_PICK_HEAD") { return .cherryPick }
         if exists("REVERT_HEAD") { return .revert }
         return nil
+    }
+
+    /// Reads another worktree's uncommitted files for the read-only panel.
+    func loadWorktreeChanges(_ path: String) async {
+        let out = await git.tryRun(["--no-optional-locks", "status", "--porcelain=v2", "-z", "--branch", "-uall"],
+                                   in: URL(fileURLWithPath: path))
+        guard !Task.isCancelled else { return }
+        let st = out.map(Parsers.parseStatus) ?? WorkingStatus()
+        if worktreeChanges[path] != st { worktreeChanges[path] = st }
+    }
+
+    /// The worktree on screen was removed: show this tab's changes or its commit.
+    private func leaveMissingWorktree() {
+        guard case .worktree(let path) = selection, !worktrees.contains(where: { $0.path == path }) else { return }
+        if case .worktree = openDiff { openDiff = nil }
+        worktreeChanges[path] = nil
+        selection = status.isClean ? (headSHA ?? commits.first?.id).map { .commit($0) } : .workingCopy
     }
 
     private func refreshWorktreeInfo(paths: [String]) async {

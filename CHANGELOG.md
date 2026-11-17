@@ -6,6 +6,13 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+### Added
+- Another worktree's "// WIP" row in the history can now be clicked: the
+  right panel lists its uncommitted files (click one for the diff) with
+  "Open Worktree in New Tab" and "Open Here". Read-only, since staging and
+  committing happen in the worktree's own tab. Double-clicking the row
+  switches to that worktree.
+
 ## [0.8.0] - 2026-11-17
 
 ### Added

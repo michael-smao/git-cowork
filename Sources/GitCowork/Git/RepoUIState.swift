@@ -9,6 +9,9 @@ enum HistorySelection: Hashable {
     /// A stash picked in the sidebar, by its commit (selectors like
     /// stash@{0} move whenever a stash is added or removed).
     case stash(String)
+    /// Another worktree's uncommitted changes (its "// WIP" row), by its
+    /// path. Read-only here: staging and committing happen in its own tab.
+    case worktree(String)
 }
 
 /// Commits found by the search field's `file:` / `change:` terms (RepoModel.searchHistory).
@@ -65,10 +68,12 @@ struct GitProblem: Identifiable {
 enum DiffTarget: Hashable {
     case working(FileChange)
     case commit(CommitDetail, FileChange)
+    /// An uncommitted file in another worktree (by its path), read-only.
+    case worktree(String, FileChange)
 
     var file: FileChange {
         switch self {
-        case .working(let f), .commit(_, let f): f
+        case .working(let f), .commit(_, let f), .worktree(_, let f): f
         }
     }
 }

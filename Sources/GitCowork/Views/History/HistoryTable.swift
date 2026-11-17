@@ -446,6 +446,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         case .commit(let sha):
             guard let i = commitIndex[sha] else { return nil }
             return rows.firstIndex(of: .commit(i))
+        case .worktree(let path): return rows.firstIndex(of: .otherWIP(path))
         case .stash, nil: return nil   // a stash has no row
         }
     }
@@ -465,17 +466,10 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         applyingSelection = false
     }
 
-    /// Other worktrees' WIP rows can't be selected; arrow keys step over them.
     /// Clicking empty space keeps the current selection (the inspector follows the table).
     func tableView(_ tableView: NSTableView, selectionIndexesForProposedSelection proposed: IndexSet) -> IndexSet {
         if proposed.isEmpty && !applyingSelection { return tableView.selectedRowIndexes }
-        guard let r = proposed.first, r < rows.count, case .otherWIP = rows[r] else { return proposed }
-        let isKey = NSApp.currentEvent?.type == .keyDown
-        guard isKey else { return tableView.selectedRowIndexes }
-        let step = r > tableView.selectedRow ? 1 : -1
-        var next = r
-        while next >= 0, next < rows.count, case .otherWIP = rows[next] { next += step }
-        return next >= 0 && next < rows.count ? IndexSet(integer: next) : tableView.selectedRowIndexes
+        return proposed
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
@@ -485,7 +479,9 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         // Rows map to the commits the table showed when clicked (see `commits`).
         switch rows[r] {
         case .wip: model.selection = .workingCopy
-        case .otherWIP: break
+        case .otherWIP(let path):
+            if case .worktree = model.openDiff { model.openDiff = nil }   // a file of another worktree
+            model.selection = .worktree(path)
         case .commit:
             if let c = commit(atRow: r) { model.selection = .commit(c.id) }
         }
@@ -516,6 +512,8 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     private func doubleClick(row: Int) {
         guard row >= 0, row < rows.count else { return }
         if focusSummaryIfWIP(row: row) { return }
+        // Another worktree's changes: switch to it, in a tab of its own.
+        if case .otherWIP(let path) = rows[row] { openInNewTab(path); return }
         guard let commit = commit(atRow: row) else { return }
         // Double-click a branch tip: check out that branch. A remote-only tip
         // checks out its local branch (or a new tracking one) and pulls.

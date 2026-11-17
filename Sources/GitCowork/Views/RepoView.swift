@@ -40,7 +40,7 @@ struct RepoView: View {
                     CenterColumn(model: model, openHere: openHere, openInNewTab: openInNewTab)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     ResizeDivider(width: $inspectorWidth, range: fit.inspectorRange, panelOnLeft: false)
-                    InspectorColumn(model: model)
+                    InspectorColumn(model: model, openHere: openHere, openInNewTab: openInNewTab)
                         .frame(width: fit.inspector)
                         .frame(maxHeight: .infinity)
                 }
@@ -343,6 +343,8 @@ private struct SearchNote {
 /// review on Board and Reviews.
 private struct InspectorColumn: View {
     let model: RepoModel
+    let openHere: (String) -> Void
+    let openInNewTab: (String) -> Void
 
     var body: some View {
         switch model.centerMode {
@@ -354,6 +356,9 @@ private struct InspectorColumn: View {
                 CommitPanel(model: model, sha: sha)
             case .stash(let sha):
                 StashPanel(model: model, sha: sha)
+            case .worktree(let path):
+                WorktreePanel(model: model, path: path, openHere: openHere, openInNewTab: openInNewTab)
+                    .id(path)
             case nil:
                 EmptyState(symbol: "point.3.connected.trianglepath.dotted", title: "Select a commit")
             }
