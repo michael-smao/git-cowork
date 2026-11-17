@@ -866,3 +866,16 @@
 "Workspace name" = "Name der Projektmappe";
 "Workspaces" = "Projektmappen";
 "This folder already has the workspace %@." = "Für diesen Ordner gibt es schon die Projektmappe %@.";
+
+/* History and sidebar menus: fixed sections */
+"Remove Worktree and Delete %@…" = "Worktree entfernen und %@ löschen …";
+"Remove worktree %@ and delete %@?" = "Worktree %1$@ entfernen und %2$@ löschen?";
+"Remove and Delete" = "Entfernen und löschen";
+"Deletes the folder %@." = "Löscht den Ordner %@.";
+"Deletes the folder %@. It has uncommitted changes, they will be lost for good." = "Löscht den Ordner %@. Er hat nicht committete Änderungen, sie gehen endgültig verloren.";
+"Edit > Undo brings the branch back, but not the worktree's folder." = "Bearbeiten > Widerrufen holt den Branch zurück, aber nicht den Ordner des Worktrees.";
+"Set Upstream to %@" = "Upstream auf %@ setzen";
+"Rename %@…" = "%@ umbenennen …";
+"Copy Link to Branch" = "Link zum Branch kopieren";
+"Copy Link to %@ #%lld" = "Link zu %1$@ #%2$lld kopieren";
+"Copy Link to Commit" = "Link zum Commit kopieren";

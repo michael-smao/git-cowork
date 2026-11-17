@@ -424,14 +424,7 @@ extension RepoModel {
     /// Always asks first. Says how many commits exist only on the branch, and
     /// offers deleting its remote branch too.
     private func confirmDeleteLocalBranch(_ ref: Ref) async {
-        let only = await git.tryLine(["rev-list", "--count", "refs/heads/\(ref.name)", "--not",
-                                      "--exclude=\(ref.name)", "--branches", "--remotes"], in: root)
-            .flatMap(Int.init) ?? 0
-        var message = only == 0
-            ? L("All its commits are also on other branches, so nothing is lost.")
-            : only == 1
-                ? L("1 commit exists only on this branch and goes away with it.")
-                : String(localized: "\(only) commits exist only on this branch and go away with it.")
+        var message = await commitsOnlyOnBranchMessage(ref)
         message += " " + L("Edit > Undo brings the branch back until you run another git command.")
         let remote = ref.upstream.flatMap { up in remoteBranch(fullName: up) != nil && !ref.upstreamGone ? up : nil }
         let deleteLocal: () async -> Void = { [weak self] in
@@ -448,6 +441,49 @@ extension RepoModel {
             }
         }
         confirmation = c
+    }
+
+    /// How many commits exist only on `ref`, said for a question about deleting it.
+    private func commitsOnlyOnBranchMessage(_ ref: Ref) async -> String {
+        let only = await git.tryLine(["rev-list", "--count", "refs/heads/\(ref.name)", "--not",
+                                      "--exclude=\(ref.name)", "--branches", "--remotes"], in: root)
+            .flatMap(Int.init) ?? 0
+        return only == 0
+            ? L("All its commits are also on other branches, so nothing is lost.")
+            : only == 1
+                ? L("1 commit exists only on this branch and goes away with it.")
+                : String(localized: "\(only) commits exist only on this branch and go away with it.")
+    }
+
+    /// Tracks `remote` (e.g. "origin/feature") from the local branch `local`.
+    func setUpstream(_ local: String, to remote: String) async {
+        await perform("Set upstream", ["branch", "--set-upstream-to=\(remote)", "--end-of-options", local])
+    }
+
+    /// Asks once, then removes the worktree that has `ref` checked out and,
+    /// only once its folder is gone, deletes the branch. Not for this tab's
+    /// own worktree or the main one.
+    func removeWorktreeAndDeleteBranch(_ wt: Worktree, branch ref: Ref) {
+        guard !wt.isMain, !sidebarIsCurrent(wt), !WorktreeRemovals.shared.contains(wt.path),
+              wt.branch == ref.name else { return }
+        let dirty = (worktreeInfo[wt.path]?.changes ?? 0) > 0
+        let dir = mainWorktreePath.map { URL(fileURLWithPath: $0) } ?? root
+        let args = ["worktree", "remove"] + (dirty ? ["--force"] : []) + [wt.path]
+        Task {
+            var message = dirty
+                ? String(localized: "Deletes the folder \(wt.path). It has uncommitted changes, they will be lost for good.")
+                : String(localized: "Deletes the folder \(wt.path).")
+            message += " " + (await commitsOnlyOnBranchMessage(ref))
+            message += " " + L("Edit > Undo brings the branch back, but not the worktree's folder.")
+            confirmation = Confirmation(
+                title: String(localized: "Remove worktree \(wt.displayName) and delete \(ref.name)?"),
+                message: message,
+                confirmTitle: "Remove and Delete"
+            ) { [weak self] in
+                guard let self, await self.removeInBackground(wt, args: args, in: dir, leaveFirst: nil) else { return }
+                if await self.perform("Delete branch", ["branch", "-D", ref.name]) { self.recordDeletedBranch(ref) }
+            }
+        }
     }
 
     /// Deletes a branch on the server. If it's already gone there, cleans up
@@ -878,9 +914,11 @@ extension RepoModel {
     /// Removes the worktree without taking `busy`, so pull, commit and the rest
     /// keep working meanwhile. `leaveFirst` moves this window off the worktree
     /// before its folder goes away.
-    private func removeInBackground(_ wt: Worktree, args: [String], in dir: URL, leaveFirst: (() -> Void)?) async {
+    /// Returns whether the worktree is gone.
+    @discardableResult
+    private func removeInBackground(_ wt: Worktree, args: [String], in dir: URL, leaveFirst: (() -> Void)?) async -> Bool {
         let removals = WorktreeRemovals.shared
-        guard removals.begin(wt.path) else { return }
+        guard removals.begin(wt.path) else { return false }
         defer { removals.end(wt.path) }
         if let leaveFirst {
             lastUndo = nil
@@ -889,6 +927,7 @@ extension RepoModel {
         do {
             try await git.run(args, in: dir, logged: true)
             if leaveFirst == nil { await refresh() }
+            return true
         } catch {
             let title = String(localized: "Remove worktree failed")
             if leaveFirst == nil {
@@ -897,6 +936,7 @@ extension RepoModel {
             } else {
                 WorktreeRemovals.reportFailure(title, error.localizedDescription)
             }
+            return false
         }
     }
 
