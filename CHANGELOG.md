@@ -12,6 +12,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   "Open Worktree in New Tab" and "Open Here". Read-only, since staging and
   committing happen in the worktree's own tab. Double-clicking the row
   switches to that worktree.
+- The workspace tree shows the branch each repository and worktree has checked
+  out as a badge (the commit, for a detached HEAD). Turn it off in
+  Settings › Workspaces › Show the current branch.
 
 ## [0.8.0] - 2026-11-17
 

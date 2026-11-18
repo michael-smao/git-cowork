@@ -179,15 +179,22 @@ public struct WorktreeInfo: Hashable, Sendable {
     public var changes = 0
     public var ahead = 0
     public var behind = 0
+    /// The branch checked out; nil when detached or not known.
+    public var branch: String?
+    /// The short commit of a detached HEAD; nil on a branch.
+    public var detachedAt: String?
 
-    public init(changes: Int = 0, ahead: Int = 0, behind: Int = 0) {
+    public init(changes: Int = 0, ahead: Int = 0, behind: Int = 0, branch: String? = nil, detachedAt: String? = nil) {
         self.changes = changes
         self.ahead = ahead
         self.behind = behind
+        self.branch = branch
+        self.detachedAt = detachedAt
     }
 
     public init(_ status: WorkingStatus) {
-        self.init(changes: status.changeCount, ahead: status.ahead, behind: status.behind)
+        self.init(changes: status.changeCount, ahead: status.ahead, behind: status.behind, branch: status.branch,
+                  detachedAt: status.branch == nil ? status.headOID.map { String($0.prefix(7)) } : nil)
     }
 }
 

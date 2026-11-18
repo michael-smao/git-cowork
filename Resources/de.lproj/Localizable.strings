@@ -865,6 +865,10 @@
 "Scan Folder Again" = "Ordner erneut durchsuchen";
 "Scan Folder…" = "Ordner durchsuchen …";
 "Scan depth" = "Suchtiefe";
+"Show the current branch" = "Aktuellen Branch anzeigen";
+"Each repository and worktree in the workspace tree shows the branch it has checked out as a badge." = "Jedes Repository und jeder Worktree im Projektmappen-Baum zeigt den ausgecheckten Branch als Badge.";
+"On branch %@" = "Auf Branch %@";
+"Detached HEAD at %@" = "Detached HEAD bei %@";
 "Show Workspace" = "Projektmappe einblenden";
 "Show or hide the workspace (⌃⌘P)" = "Projektmappe ein- oder ausblenden (⌃⌘P)";
 "Workspace actions" = "Aktionen der Projektmappe";

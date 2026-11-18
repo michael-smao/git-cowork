@@ -25,6 +25,8 @@ enum Prefs {
         static let workspaces = "workspaces"
         /// Folder levels Scan Folder looks below the chosen folder (RepoScan).
         static let scanDepth = "workspaces.scanDepth"
+        /// Show the checked-out branch of each repository and worktree in workspace trees.
+        static let workspaceShowBranch = "workspaces.showBranch"
         /// Fetch/push refs/cowork/main about once a minute while the app is in front.
         /// (Which remote is `git config cowork.remote` in each repo; see CoworkRemote.)
         static let coworkAutoSync = "cowork.autoSync"

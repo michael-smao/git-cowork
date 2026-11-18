@@ -12,6 +12,7 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.checkForUpdates) private var checkForUpdates = true
     @AppStorage(Prefs.Key.reopenRepos) private var reopenRepos = true
     @AppStorage(Prefs.Key.scanDepth) private var scanDepth = RepoScan.defaultDepth
+    @AppStorage(Prefs.Key.workspaceShowBranch) private var workspaceShowBranch = true
 
     var body: some View {
         Form {
@@ -54,6 +55,9 @@ struct SettingsView: View {
                     LabeledContent("Scan depth", value: scanDepth == 1 ? L("1 folder level") : String(localized: "\(scanDepth) folder levels"))
                 }
                 Text("How deep Scan Folder looks for repositories below the folder you pick. 1 finds the folder itself and its direct subfolders. Each scan can still choose its own depth.")
+                    .font(Theme.Font.small).foregroundStyle(.secondary)
+                Toggle("Show the current branch", isOn: $workspaceShowBranch)
+                Text("Each repository and worktree in the workspace tree shows the branch it has checked out as a badge.")
                     .font(Theme.Font.small).foregroundStyle(.secondary)
             }
             Section("Cowork") {
