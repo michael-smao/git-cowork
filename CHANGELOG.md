@@ -13,6 +13,11 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   committing happen in the worktree's own tab. Double-clicking the row
   switches to that worktree.
 
+### Fixed
+- The "+" in a task's "Repos" row sits level with the repository chips, as
+  a round chip of the same height, and both it and a chip's × highlight
+  while hovered.
+
 ## [0.8.0] - 2026-11-17
 
 ### Added

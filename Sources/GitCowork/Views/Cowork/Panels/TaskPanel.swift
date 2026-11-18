@@ -360,10 +360,9 @@ private struct TaskReposRow: View {
                             Button { remove(id) } label: {
                                 Image(systemName: "xmark")
                                     .font(.system(size: 7, weight: .semibold))
-                                    .frame(width: 10, height: 10)
-                                    .contentShape(Rectangle())
+                                    .frame(width: 14, height: 14)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(HoverFillStyle(hover: 0.14, pressed: 0.24, radius: 7))
                             .help("Remove from this repository's board")
                         }
                         .help(id)
@@ -391,12 +390,10 @@ private struct TaskReposRow: View {
                 Text("Open another repository to add it here")
             }
         } label: {
-            Image(systemName: "plus")
-                .font(.system(size: 9, weight: .semibold))
-                .frame(width: 18, height: Theme.Metrics.chipHeight)
-                .contentShape(Rectangle())
+            AddChipLabel()
         }
-        .menuStyle(.borderlessButton)
+        .menuStyle(.button)
+        .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
         .help("Also show this task on another repository's board")
@@ -412,5 +409,25 @@ private struct TaskReposRow: View {
     /// Never empties the list: the task stays here, now only here.
     private func remove(_ id: String) {
         update { t in t.repos.removeAll { $0.lowercased() == id.lowercased() } }
+    }
+}
+
+/// The "+" after the repository chips: a round chip of the same height,
+/// dashed like "Add label", filled while hovered.
+private struct AddChipLabel: View {
+    @State private var hovering = false
+
+    var body: some View {
+        let size = Theme.Metrics.chipHeight
+        Image(systemName: "plus")
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(hovering ? .primary : .secondary)
+            .frame(width: size, height: size)
+            .background(Circle().fill(Color.primary.opacity(hovering ? 0.10 : 0)))
+            .overlay(Circle().strokeBorder(Color(nsColor: .separatorColor),
+                                           style: StrokeStyle(lineWidth: 1, dash: hovering ? [] : [3, 2])))
+            .contentShape(Circle())
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }
