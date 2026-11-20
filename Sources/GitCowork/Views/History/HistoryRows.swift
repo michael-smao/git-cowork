@@ -5,6 +5,7 @@ import SwiftUI
 enum HistoryRow: Equatable {
     case wip                    // this worktree's uncommitted changes
     case otherWIP(String)       // another worktree's uncommitted changes (its path)
+    case stash(String)          // a stash, by its commit, above the commit it was made on
     case commit(Int)            // index into model.commits
 }
 
@@ -22,6 +23,8 @@ struct HistoryWIPInfo {
     var dashedThrough: [(lane: Int, color: Int)] = []
     var branch: String?
     var changes = 0
+    /// Stash rows: the stash shown.
+    var stash: Stash?
 }
 
 /// A dashed WIP line that enters a commit row from the top in `lane` and

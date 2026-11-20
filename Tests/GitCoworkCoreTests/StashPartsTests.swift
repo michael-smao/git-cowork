@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import GitCoworkCore
 
@@ -49,9 +50,13 @@ import Testing
     }
 
     @Test func parsesStashListOutput() {
-        let out = "aaa\u{1f}stash@{0}\u{1f}On main: one\nbbb\u{1f}stash@{1}\u{1f}WIP on main: 1234567 two\n"
+        let out = "aaa\u{1f}stash@{0}\u{1f}p1 i1\u{1f}1700000000\u{1f}On main: one\n"
+            + "bbb\u{1f}stash@{1}\u{1f}p2 i2 u2\u{1f}1700000100\u{1f}WIP on main: 1234567 two: with colon\n"
         let stashes = Parsers.parseStashes(out)
         #expect(stashes.map(\.sha) == ["aaa", "bbb"])
         #expect(stashes.map(\.title) == ["one", nil])
+        #expect(stashes.map(\.parent) == ["p1", "p2"])   // first parent: the commit it was made on
+        #expect(stashes.map(\.date) == [Date(timeIntervalSince1970: 1_700_000_000), Date(timeIntervalSince1970: 1_700_000_100)])
+        #expect(stashes[1].message == "WIP on main: 1234567 two: with colon")
     }
 }

@@ -253,13 +253,15 @@ public enum Parsers {
 
     // MARK: stash list
 
-    public static let stashFormat = "--format=%H%x1f%gd%x1f%s"
+    public static let stashFormat = "--format=%H%x1f%gd%x1f%P%x1f%ct%x1f%s"
 
     public static func parseStashes(_ output: String) -> [Stash] {
         output.split(separator: "\n").compactMap { line in
-            let f = line.split(separator: fieldSep, maxSplits: 2, omittingEmptySubsequences: false)
-            guard f.count == 3 else { return nil }
-            return Stash(sha: String(f[0]), selector: String(f[1]), message: String(f[2]))
+            let f = line.split(separator: fieldSep, maxSplits: 4, omittingEmptySubsequences: false)
+            guard f.count == 5 else { return nil }
+            return Stash(sha: String(f[0]), selector: String(f[1]), message: String(f[4]),
+                         parent: f[2].split(separator: " ").first.map(String.init),
+                         date: Double(f[3]).map { Date(timeIntervalSince1970: $0) })
         }
     }
 

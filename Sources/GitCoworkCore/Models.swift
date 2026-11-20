@@ -215,6 +215,9 @@ public struct Stash: Identifiable, Hashable, Sendable {
     public let sha: String
     public let selector: String     // stash@{0}
     public let message: String
+    /// The commit it was made on (its first parent), where the history draws it.
+    public var parent: String? = nil
+    public var date: Date? = nil
 }
 
 public struct Remote: Identifiable, Hashable, Sendable {

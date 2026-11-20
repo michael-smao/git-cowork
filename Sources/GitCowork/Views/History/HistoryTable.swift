@@ -307,6 +307,15 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
 
         // WIP rows waiting to be placed above a commit index; nil = top of the list.
         var above: [Int?: [(HistoryRow, HistoryWIPInfo)]] = [:]
+        // Stashes first, so they sit furthest from their commit, newest on top.
+        // One made on a commit that isn't loaded is left out (it's in the sidebar).
+        for stash in model.stashes {
+            guard let parent = stash.parent, let i = commitIndex[parent] else { continue }
+            var w = wipRowInfo(target: i)
+            w.stash = stash
+            w.branch = stash.branch
+            above[i, default: []].append((.stash(stash.sha), w))
+        }
         for wt in model.worktrees where wt.path != model.root.path && !wt.isBare {
             guard let changes = model.worktreeInfo[wt.path]?.changes, changes > 0,
                   let head = wt.head, let i = commitIndex[head] else { continue }
@@ -325,16 +334,24 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
             guard var list else { return }
             // Several WIP rows on one commit: the nearest keeps the commit's lane,
             // the others get free lanes to its right and join the node directly.
-            if list.count > 1, let target, target < graph.count {
-                let g = graph[target]
+            // When the commit's own lane goes on above it (a stash on an older
+            // commit), even the nearest moves aside, so that line stays solid.
+            guard let target, target < graph.count else {
+                for (row, w) in list { info[r.count] = w; r.append(row) }
+                return
+            }
+            let g = graph[target]
+            let laneGoesOn = list[0].1.passThrough.contains { $0.lane == g.lane }
+            if list.count > 1 || laneGoesOn {
                 var taken = Set(list[0].1.passThrough.map(\.lane))
                 taken.insert(g.lane)
                 var lane = g.lane
                 var joins: [HistoryWIPJoin] = []
-                for k in stride(from: list.count - 2, through: 0, by: -1) {
+                for k in stride(from: list.count - (laneGoesOn ? 1 : 2), through: 0, by: -1) {
                     repeat { lane += 1 } while taken.contains(lane)
                     list[k].1.lane = lane
-                    joins.append(HistoryWIPJoin(lane: lane, color: list[k].1.color, dimmed: list[k].0 != .wip))
+                    let dimmed: Bool = if case .otherWIP = list[k].0 { true } else { false }
+                    joins.append(HistoryWIPJoin(lane: lane, color: list[k].1.color, dimmed: dimmed))
                     maxLanes = max(maxLanes, lane + 1)
                 }
                 wipJoins[target] = joins
@@ -419,7 +436,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     func node(forRow row: Int) -> (lane: Int, color: Int)? {
         guard row >= 0, row < rows.count else { return nil }
         switch rows[row] {
-        case .wip, .otherWIP:
+        case .wip, .otherWIP, .stash:
             guard let w = wipInfo[row] else { return (0, 0) }
             return (w.lane, w.color)
         case .commit(let i):
@@ -432,7 +449,7 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
     func isDimmed(row: Int) -> Bool {
         guard row >= 0, row < rows.count else { return false }
         switch rows[row] {
-        case .wip: return false
+        case .wip, .stash: return false
         case .otherWIP: return true
         case .commit(let i): return headLoaded && i < ancestry.count && !ancestry[i]
         }
@@ -447,7 +464,9 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
             guard let i = commitIndex[sha] else { return nil }
             return rows.firstIndex(of: .commit(i))
         case .worktree(let path): return rows.firstIndex(of: .otherWIP(path))
-        case .stash, nil: return nil   // a stash has no row
+        // A stash made on a commit that isn't loaded has no row.
+        case .stash(let sha): return rows.firstIndex(of: .stash(sha))
+        case nil: return nil
         }
     }
 
@@ -482,6 +501,8 @@ final class HistoryTableCoordinator: NSObject, NSTableViewDataSource, NSTableVie
         case .otherWIP(let path):
             if case .worktree = model.openDiff { model.openDiff = nil }   // a file of another worktree
             model.selection = .worktree(path)
+        case .stash(let sha):
+            model.selection = .stash(sha)
         case .commit:
             if let c = commit(atRow: r) { model.selection = .commit(c.id) }
         }

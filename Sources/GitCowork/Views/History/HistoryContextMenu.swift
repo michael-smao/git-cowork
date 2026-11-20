@@ -51,6 +51,16 @@ extension HistoryTableCoordinator {
                 remove,
             ], to: menu)
             return
+        case .stash(let sha):
+            // Same items and order as the stash's menu in the sidebar.
+            guard let stash = model.stashes.first(where: { $0.sha == sha }) else { return }
+            MenuSections.add([
+                [ActionItem("Apply") { Task { await model.applyStash(stash) } },
+                 ActionItem("Pop") { Task { await model.popStash(stash) } }],
+                [ActionItem("Copy Stash Name") { External.copy(stash.selector) }],
+                [ActionItem("Delete…") { model.dropStash(stash) }],
+            ], to: menu)
+            return
         case .commit(let index):
             guard index < commits.count else { return }
             i = index

@@ -78,6 +78,7 @@
 "Add Worktree…" = "Worktree hinzufügen …";
 "Added" = "Hinzugefügt";
 "Changes in another worktree. Open it to stage and commit them." = "Änderungen in einem anderen Worktree. Öffne ihn, um sie zu stagen und zu committen.";
+"Copy Stash Name" = "Stash-Namen kopieren";
 "Everything in this worktree is committed." = "In diesem Worktree ist alles committet.";
 "No uncommitted changes" = "Keine offenen Änderungen";
 "Show this worktree in this tab instead" = "Diesen Worktree stattdessen in diesem Tab zeigen";
@@ -403,6 +404,7 @@
 "Open Worktree for %@ in New Tab" = "Worktree für %@ in neuem Tab öffnen";
 "Open Worktree in New Tab" = "Worktree in neuem Tab öffnen";
 "Or Enter a URL" = "Oder eine URL eingeben";
+"on %@" = "auf %@";
 "parent:" = "Eltern-Commit:";
 "parents:" = "Eltern-Commits:";
 "Path" = "Pfad";

@@ -66,6 +66,15 @@ final class HistoryCell: NSTableCellView {
             guard let w = coordinator.wipInfo[row] else { return }
             if column == .graph { drawWIPGraph(w) }
             if column == .message { drawOtherWIPMessage(w) }
+        case .stash:
+            guard let w = coordinator.wipInfo[row], let stash = w.stash else { return }
+            switch column {
+            case .graph: drawWIPGraph(w, stash: true)
+            case .message: drawStashMessage(stash)
+            case .date: if let d = stash.date { drawText(Formatters.relative(d), font: GraphStyle.Text.small, color: secondaryText) }
+            case .sha: drawText(stash.selector, font: GraphStyle.Text.sha, color: secondaryText)
+            case .refs, .author: break
+            }
         case .commit(let i):
             guard i < coordinator.commits.count else { return }
             drawCommit(i, coordinator: coordinator)
@@ -105,7 +114,9 @@ final class HistoryCell: NSTableCellView {
 
     // MARK: Working copy rows
 
-    private func drawWIPGraph(_ w: HistoryWIPInfo) {
+    /// Dashed node and line down to the commit the row belongs to. A stash
+    /// gets a dashed rounded square with a tray in it instead of a ring.
+    private func drawWIPGraph(_ w: HistoryWIPInfo, stash: Bool = false) {
         let cx = GraphStyle.nodeX(w.lane, width: bounds.width)
         let r = GraphStyle.nodeDiameter / 2 - 1
         let color = Theme.lane(w.color)
@@ -151,10 +162,38 @@ final class HistoryCell: NSTableCellView {
         }
         dashed.stroke()
 
-        let ring = NSBezierPath(ovalIn: NSRect(x: cx - r, y: midY - r, width: r * 2, height: r * 2))
+        let box = NSRect(x: cx - r, y: midY - r, width: r * 2, height: r * 2)
+        if stash {
+            let square = NSBezierPath(roundedRect: box, xRadius: 4, yRadius: 4)
+            color.withAlphaComponent(0.18).setFill()
+            square.fill()
+            square.lineWidth = 2
+            square.setLineDash(GraphStyle.wipDash, count: GraphStyle.wipDash.count, phase: 0)
+            square.stroke()
+            let size: CGFloat = 10
+            let iconWidth = GraphSymbols.width("tray.full.fill", size: size)
+            GraphSymbols.draw("tray.full.fill", x: cx - iconWidth / 2, midY: midY, size: size, color: color)
+            return
+        }
+        let ring = NSBezierPath(ovalIn: box)
         ring.lineWidth = 2
         ring.setLineDash(GraphStyle.wipDash, count: GraphStyle.wipDash.count, phase: 0)
         ring.stroke()
+    }
+
+    /// "Stash  fix login  on main": what was stashed, and where.
+    private func drawStashMessage(_ stash: Stash) {
+        let small = GraphStyle.Text.small
+        let s = NSMutableAttributedString()
+        if let title = stash.title {
+            s.append(NSAttributedString(string: title, attributes: [.font: GraphStyle.Text.body, .foregroundColor: primaryText]))
+        } else {
+            s.append(NSAttributedString(string: L("Stashed changes"), attributes: [.font: GraphStyle.Text.wip, .foregroundColor: primaryText]))
+        }
+        if let branch = stash.branch {
+            s.append(NSAttributedString(string: "  " + String(localized: "on \(branch)"), attributes: [.font: small, .foregroundColor: secondaryText]))
+        }
+        drawAttributed(s, inset: GraphStyle.Text.padding)
     }
 
     private func drawWIPMessage(_ st: WorkingStatus, summary: String) {

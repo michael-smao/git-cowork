@@ -12,6 +12,11 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   "Open Worktree in New Tab" and "Open Here". Read-only, since staging and
   committing happen in the worktree's own tab. Double-clicking the row
   switches to that worktree.
+- Stashes show in the history graph, as a dashed box with a tray just above
+  the commit they were made on, with their message, branch and date. Click
+  one for its files and Pop / Apply / Delete; right-click for the same and
+  to copy its name. One on a commit whose branch went on gets a lane of its
+  own, so the branch's line stays solid.
 
 ## [0.8.0] - 2026-11-17
 
