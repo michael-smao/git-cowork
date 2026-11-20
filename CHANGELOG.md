@@ -18,6 +18,11 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   to copy its name. One on a commit whose branch went on gets a lane of its
   own, so the branch's line stays solid.
 
+### Fixed
+- The "+" in a task's "Repos" row sits level with the repository chips, as
+  a round chip of the same height, and both it and a chip's × highlight
+  while hovered.
+
 ## [0.8.0] - 2026-11-17
 
 ### Added
