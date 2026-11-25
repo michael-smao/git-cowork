@@ -118,8 +118,11 @@ struct GraphBadge {
         for ref in refs where ref.kind == .remoteBranch {
             let short = shortRemoteName(ref.name, remoteNames: remoteNames)
             if short == "HEAD" { continue }
-            let upstreamOwner = refs.first { $0.kind == .localBranch && $0.upstream == ref.name }?.name
-            if let i = badges.firstIndex(where: { $0.kind == .branch && ($0.name == short || $0.name == upstreamOwner) }) {
+            // Only a remote branch of the same name joins the local badge. One
+            // that is merely the upstream of a differently named branch (say
+            // feat/x tracking origin/development) keeps its own badge, or the
+            // graph would hide it.
+            if let i = badges.firstIndex(where: { $0.kind == .branch && $0.name == short }) {
                 badges[i].isRemote = true
                 badges[i].refNames.append(ref.name)
             } else {
