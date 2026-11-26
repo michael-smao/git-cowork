@@ -18,6 +18,12 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   to copy its name. One on a commit whose branch went on gets a lane of its
   own, so the branch's line stays solid.
 
+### Fixed
+- Pushing a branch that follows a remote branch with another name now
+  suggests a new remote branch of its own name first. Pushing to the
+  followed branch (e.g. development) is the second choice, so a slip of
+  Return no longer lands commits on a shared branch.
+
 ## [0.8.0] - 2026-11-17
 
 ### Added
