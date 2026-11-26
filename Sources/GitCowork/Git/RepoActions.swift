@@ -232,21 +232,24 @@ extension RepoModel {
 
     /// The branch follows a remote branch with another name: push there, or
     /// to a new remote branch of the same name that it follows from now on.
+    /// The new branch is the default: such an upstream usually comes from
+    /// branching off a remote branch (`checkout -b fix origin/development`),
+    /// and a slip onto a shared branch is the worse mistake.
     private func askPushTarget(branch: String, upstream: String, remote: String, upstreamBranch: String, force: Bool) {
         confirmation = Confirmation(
             title: String(localized: "Where should \(branch) go?"),
             message: String(localized: "\(branch) follows \(upstream), a branch with another name. Push your commits there, or to a new branch \(remote)/\(branch) that it follows from now on."),
-            confirmTitle: String(localized: "Push to \(upstream)"),
+            confirmTitle: String(localized: "Push as \(remote)/\(branch)"),
             destructive: false,
-            action: { [weak self] in
+            action: { [weak self] in await self?.push(branch: branch, to: remote, as: branch) },
+            alternativeTitle: String(localized: "Push to \(upstream)"),
+            alternative: { [weak self] in
                 guard let self else { return }
                 var args = ["push"]
                 if force { args.append("--force-with-lease") }
                 args += ["--end-of-options", remote, "refs/heads/\(branch):refs/heads/\(upstreamBranch)"]
                 if await perform(force ? "Force push" : "Push", args) { noteRemoteAction(fetched: false, succeeded: true) }
-            },
-            alternativeTitle: String(localized: "Push as \(remote)/\(branch)"),
-            alternative: { [weak self] in await self?.push(branch: branch, to: remote, as: branch) }
+            }
         )
     }
 
