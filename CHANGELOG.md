@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-27
+
 ### Changed
 - Staging the file whose diff is open (with "Stage" on its row, the context
   menu or a double-click) now opens the next unstaged file, the one below it
