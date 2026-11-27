@@ -28,8 +28,14 @@ struct GitCoworkApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Needed when run straight from `swift run` (no app bundle).
+        #if DEBUG
+        // Self-tests and snapshots from a terminal don't take the focus.
+        DebugLaunch.start()
+        if !DebugLaunch.staysInBackground { NSApp.activate(ignoringOtherApps: true) }
+        #else
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        #endif
         NSWindow.allowsAutomaticWindowTabbing = true
         AppAppearance.saved.apply()
         _ = GitRunner.shared   // start resolving the login shell PATH early
@@ -41,7 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         GitActionsSelfTest.runIfRequested()
         UpdaterSelfTest.runIfRequested()
         #endif
+        #if DEBUG
+        // A self-test works on its own repositories, not the saved tabs.
+        if !DebugLaunch.isSelfTest { LaunchFolders.openFromCommandLine() }
+        #else
         LaunchFolders.openFromCommandLine()
+        #endif
         Updater.shared.startAutomaticChecks()
     }
 

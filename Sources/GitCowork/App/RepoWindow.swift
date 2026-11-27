@@ -709,6 +709,10 @@ struct WindowAccessor: NSViewRepresentable {
             guard let window, window !== configured else { return }
             configured = window
             WindowChrome.configure(window)
+            #if DEBUG
+            // Self-tests and snapshots: before it shows, so it never flashes up.
+            DebugLaunch.windowWillShow(window)
+            #endif
             if let background = WindowAccessor.pendingBackground, let parent = background.parent, parent !== window {
                 WindowAccessor.pendingBackground = nil
                 // Invisible until it is a tab, so no window flashes up on its own.
