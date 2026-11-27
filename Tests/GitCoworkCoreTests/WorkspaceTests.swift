@@ -20,8 +20,18 @@ import Testing
     @Test func worktreeInfoFromStatus() {
         let out = ["# branch.oid abc", "# branch.head main", "# branch.upstream origin/main", "# branch.ab +2 -1",
                    "1 MM N... 100644 100644 100644 h1 h2 a.swift", "? new.txt", ""].joined(separator: "\0")
-        #expect(WorktreeInfo(Parsers.parseStatus(out)) == WorktreeInfo(changes: 2, ahead: 2, behind: 1))
-        #expect(WorktreeInfo(Parsers.parseStatus("# branch.oid abc\0# branch.head main\0")) == WorktreeInfo())
+        #expect(WorktreeInfo(Parsers.parseStatus(out)) == WorktreeInfo(changes: 2, ahead: 2, behind: 1, branch: "main"))
+        #expect(WorktreeInfo(Parsers.parseStatus("# branch.oid abc\0# branch.head main\0")) == WorktreeInfo(branch: "main"))
+    }
+
+    /// The tree's branch badge: the branch checked out, or the commit of a detached HEAD.
+    @Test func worktreeInfoBranch() {
+        let detached = WorktreeInfo(Parsers.parseStatus("# branch.oid 0123456789abcdef\0# branch.head (detached)\0"))
+        #expect(detached.branch == nil)
+        #expect(detached.detachedAt == "0123456")
+        let unborn = WorktreeInfo(Parsers.parseStatus("# branch.oid (initial)\0# branch.head main\0"))
+        #expect(unborn.branch == "main")
+        #expect(unborn.detachedAt == nil)
     }
 
     @Test func addsEachRepositoryOnce() {

@@ -23,6 +23,7 @@ struct WorkspaceColumn: View {
     @State private var toggled: Set<String> = []
     @State private var selection: String?
     @State private var renaming = false
+    @AppStorage(Prefs.Key.workspaceShowBranch) private var showBranch = true
 
     var body: some View {
         let tree = WorkspaceTree.build(repos: workspace.repos, worktrees: worktrees)
@@ -170,9 +171,12 @@ struct WorkspaceColumn: View {
                 .fontWeight(isCurrent ? .semibold : .regular)
                 .truncationMode(.middle)
                 .foregroundStyle(gone ? .tertiary : .primary)
+                // The name stays readable; a long branch name is cut first.
+                .layoutPriority(1)
             Spacer(minLength: 0)
             if node.kind != .folder, !gone {
                 let info = LiveRepos.shared.info(node.id) ?? status[node.id]
+                if showBranch, let info { WorkspaceBranchBadge(info: info, current: isCurrent) }
                 // A repository's ↑ counts every branch with commits to push, not just the one checked out.
                 let branches = node.kind == .repo ? LiveRepos.shared.unpushed(node.id) ?? unpushed[node.id] : nil
                 if info != nil || branches != nil {
@@ -216,6 +220,32 @@ struct WorkspaceColumn: View {
             Button("Remove from Workspace") {
                 WorkspaceStore.shared.update(workspace.id) { $0.remove(node.id) }
             }
+        }
+    }
+}
+
+/// The branch a repository or worktree of the tree has checked out, or the
+/// commit of a detached HEAD. Nothing while its status isn't known yet.
+private struct WorkspaceBranchBadge: View {
+    let info: WorktreeInfo
+    let current: Bool
+
+    var body: some View {
+        if let name = info.branch ?? info.detachedAt {
+            HStack(spacing: 3) {
+                Image(systemName: info.branch == nil ? "smallcircle.filled.circle" : "arrow.triangle.branch")
+                    .font(.system(size: 8, weight: .semibold))
+                Text(verbatim: name)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .font(Theme.Font.small)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background((current ? Color.accentColor : Color.secondary).opacity(Theme.Tint.chip),
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.badge))
+            .help(info.branch.map { String(localized: "On branch \($0)") } ?? String(localized: "Detached HEAD at \(name)"))
         }
     }
 }
