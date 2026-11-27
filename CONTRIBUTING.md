@@ -80,6 +80,9 @@ Render the window to a PNG without screen-recording permission:
 GITCOWORK_SNAPSHOT=/tmp/shot.png GITCOWORK_SNAPSHOT_QUIT=1 .build/debug/GitCowork /path/to/repo
 ```
 
+The window opens on a screen without the mouse pointer (behind your windows
+with a single screen), and the app doesn't take the focus.
+
 - `GITCOWORK_SNAPSHOT_DELAY=<seconds>`
 - `GITCOWORK_DEBUG_SELECT=commit:<n> | diff | commitdiff:<n> | stash:<n> | stashdiff:<n>`
 - `GITCOWORK_DEBUG_FILTER=<text>` (the history's search field, e.g. `file:Login` or `change:timeout`)
@@ -106,6 +109,8 @@ deleting branches and removing worktrees (`GITCOWORK_ACTIONS_SELFTEST`).
 
 The folder must be empty or one a previous self-test created; anything else
 is refused, never deleted. Add `GITCOWORK_SELFTEST_SEED=1` for extra demo tasks.
+Self-tests show no window and no Dock icon and leave the focus where it is.
+If your global git config signs commits, run them with `GIT_CONFIG_GLOBAL=/dev/null`.
 
 You can pass several folders to `.build/debug/GitCowork a b c` to get one
 tab each.
