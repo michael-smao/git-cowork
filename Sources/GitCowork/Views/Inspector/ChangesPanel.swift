@@ -291,16 +291,21 @@ private struct FileLists: View {
         allChanges.filter { ids.contains($0.id) }
     }
 
+    /// Stages / unstages; an open diff among them moves on to the next file in its list.
     private func toggle(_ changes: [FileChange]) {
-        let other = changes.filter { $0.area != .staged }
-        // A partially staged file has a row in both lists; selecting both
-        // means "stage it", not "stage, then unstage everything".
-        let otherPaths = Set(other.map(\.path))
-        let staged = changes.filter { $0.area == .staged && !otherPaths.contains($0.path) }
-        Task {
-            if !other.isEmpty { await model.stage(other) }
-            if !staged.isEmpty { await model.unstage(staged) }
-        }
+        let shown = shownFiles
+        Task { await model.toggleStaged(changes, shown: shown) }
+    }
+
+    /// The file rows on screen, top to bottom (not those in collapsed folders or sections).
+    private var shownFiles: [FileChange] {
+        let st = model.status
+        return [("conflicts", st.conflicted), ("unstaged", unstaged), ("staged", st.staged)]
+            .filter { !collapsedSections.contains($0.0) }
+            .flatMap { scope, files in
+                FileTree.items(files, mode: mode, sort: sort, collapsed: collapsedFolders, scope: scope)
+                    .compactMap { if case .file(let c, _) = $0 { c } else { nil } }
+            }
     }
 
     /// `folder` is set for a folder row: Reveal / Copy Path then use the folder.
@@ -312,8 +317,8 @@ private struct FileLists: View {
             // Conflicted files are handled by Use Mine / Use Theirs / Mark Resolved.
             let discardable = changes.filter { $0.area == .unstaged || $0.area == .untracked }
             let conflictedOnly = !other.isEmpty && other.allSatisfy { $0.area == .conflicted }
-            if !other.isEmpty { Button(conflictedOnly ? "Mark Resolved" : "Stage") { Task { await model.stage(other) } } }
-            if !staged.isEmpty { Button("Unstage") { Task { await model.unstage(staged) } } }
+            if !other.isEmpty { Button(conflictedOnly ? "Mark Resolved" : "Stage") { toggle(other) } }
+            if !staged.isEmpty { Button("Unstage") { toggle(staged) } }
             if folder == nil, changes.count == 1, let c = changes.first, c.area == .conflicted {
                 Divider()
                 // During a rebase "mine" is the commit being replayed (git's --theirs).

@@ -611,6 +611,44 @@ extension RepoModel {
         }
     }
 
+    /// Stage on an unstaged row, Unstage on a staged one, Mark Resolved on a
+    /// conflict. `shown` is every file row of the Changes panel in the order on
+    /// screen. When the open diff is one of `changes`, it moves on to the file
+    /// below it in its list (above it at the end), so you can work down the
+    /// list. With nothing left there it follows the file to its new list.
+    func toggleStaged(_ changes: [FileChange], shown: [FileChange]) async {
+        let other = changes.filter { $0.area != .staged }
+        // A partially staged file has a row in both lists; selecting both
+        // means "stage it", not "stage, then unstage everything".
+        let otherPaths = Set(other.map(\.path))
+        let staged = changes.filter { $0.area == .staged && !otherPaths.contains($0.path) }
+        let open: FileChange? = if case .working(let f) = openDiff { f } else { nil }
+        let next = open.flatMap { Self.file(after: $0, leaving: other + staged, in: shown) }
+        if !other.isEmpty { await stage(other) }
+        if !staged.isEmpty { await unstage(staged) }
+        // Only if the file really left its list and nothing else was opened meanwhile.
+        guard let open, let next, case .working(let now) = openDiff, now.path == open.path else { return }
+        let st = status
+        let all = st.conflicted + st.unstaged + st.untracked + st.staged
+        guard !all.contains(where: { $0.id == open.id }),
+              let fresh = all.first(where: { $0.id == next.id }) else { return }
+        openDiff = .working(fresh)
+    }
+
+    /// The row to show once `moved` leave their lists: the one below `open` in
+    /// its list in `shown`, or the one above it. nil if `open` isn't moving or
+    /// is the last one left.
+    static func file(after open: FileChange, leaving moved: [FileChange], in shown: [FileChange]) -> FileChange? {
+        let movedIDs = Set(moved.map(\.id))
+        guard movedIDs.contains(open.id) else { return nil }
+        // Untracked files share the "Unstaged files" list.
+        func list(_ a: ChangeArea) -> ChangeArea { a == .untracked ? .unstaged : a }
+        let rows = shown.filter { list($0.area) == list(open.area) }
+        guard let i = rows.firstIndex(where: { $0.id == open.id }) else { return nil }
+        let stays = { (f: FileChange) in !movedIDs.contains(f.id) }
+        return rows[(i + 1)...].first(where: stays) ?? rows[..<i].last(where: stays)
+    }
+
     func unstageAll() async {
         if headSHA == nil {
             await perform("Unstage all", ["rm", "--cached", "-r", "-q", "."])
