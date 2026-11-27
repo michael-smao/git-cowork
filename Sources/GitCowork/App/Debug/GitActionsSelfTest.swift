@@ -502,16 +502,18 @@ enum GitActionsSelfTest {
         await model.push()
         let whereAsk = model.confirmation
         check(whereAsk?.alternative != nil && whereAsk?.destructive == false, "asks: the upstream, or a new branch of the same name")
+        check(whereAsk?.confirmTitle == "Push as origin/feat-local" && whereAsk?.alternativeTitle == "Push to origin/feat/remote-name",
+              "the new branch is the default, the upstream the second choice")
         check(await sh(["rev-parse", "refs/heads/feat/remote-name"], in: remote) != (await head()), "nothing pushed before answering")
         model.confirmation = nil
-        await whereAsk?.action()
+        await whereAsk?.alternative?()
         check(await sh(["rev-parse", "refs/heads/feat/remote-name"], in: remote) == (await head()), "pushed to the upstream")
-        await commitHere("i.txt", "i\n")
+        await commitHere("h2.txt", "h2\n")
         await model.refresh()
         await model.push()
         let secondAsk = model.confirmation
         model.confirmation = nil
-        await secondAsk?.alternative?()
+        await secondAsk?.action()
         check(await sh(["rev-parse", "refs/heads/feat-local"], in: remote) == (await head()), "or to a new branch of the same name")
         await model.refresh()
         check(model.status.upstream == "origin/feat-local", "which it follows from now on")
