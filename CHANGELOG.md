@@ -19,6 +19,9 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
   own, so the branch's line stays solid.
 
 ### Fixed
+- The "+" in a task's "Repos" row sits level with the repository chips, as
+  a round chip of the same height, and both it and a chip's × highlight
+  while hovered.
 - Pushing a branch that follows a remote branch with another name now
   suggests a new remote branch of its own name first. Pushing to the
   followed branch (e.g. development) is the second choice, so a slip of
