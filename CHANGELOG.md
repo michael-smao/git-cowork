@@ -6,6 +6,8 @@ How to update: see [INSTALL.md](INSTALL.md#quick-install) (or [from source](INST
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-27
+
 ### Added
 - Another worktree's "// WIP" row in the history can now be clicked: the
   right panel lists its uncommitted files (click one for the diff) with
