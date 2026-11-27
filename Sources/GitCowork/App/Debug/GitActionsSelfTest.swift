@@ -520,6 +520,40 @@ enum GitActionsSelfTest {
         await model.push()
         check(model.confirmation == nil && model.problem == nil, "then pushes without asking")
 
+        print("18. staging or unstaging the open file opens the next one in its list")
+        write("h, edited\n", "h.txt", in: repo)
+        write("n1\n", "n1.txt", in: repo)
+        write("n2\n", "n2.txt", in: repo)
+        await model.refresh()
+        func shown() -> [FileChange] { let st = model.status; return st.conflicted + st.unstaged + st.untracked + st.staged }
+        func row(_ path: String, _ area: ChangeArea) -> FileChange? { shown().first { $0.path == path && $0.area == area } }
+        func openID() -> String? { if case .working(let f) = model.openDiff { f.id } else { nil } }
+        /// Opens `path` in `area`, then presses the Stage / Unstage button of `pressing` (default: the same file).
+        func toggleOpen(_ path: String, _ area: ChangeArea, pressing other: String? = nil) async {
+            guard let open = row(path, area) else { check(false, "\(path) is listed as \(area.rawValue)"); return }
+            model.openDiff = .working(open)
+            let pressed = other.flatMap { row($0, area) } ?? open
+            await model.toggleStaged([pressed], shown: shown())
+        }
+        check(shown().map(\.id) == ["unstaged:h.txt", "untracked:n1.txt", "untracked:n2.txt"], "h.txt is changed, n1 and n2 are new")
+        await toggleOpen("n1.txt", .untracked)
+        check(openID() == "untracked:n2.txt", "staging n1 opens the file below it, n2")
+        await toggleOpen("n2.txt", .untracked)
+        check(openID() == "unstaged:h.txt", "staging the last one opens the one above it, h.txt")
+        await toggleOpen("h.txt", .unstaged)
+        check(model.status.unstaged.isEmpty && model.status.untracked.isEmpty, "everything is staged")
+        check(openID() == "unstaged:h.txt", "with nothing left to stage, the diff stays on h.txt (the panel follows it to Staged files)")
+        check(model.status.staged.map(\.path) == ["h.txt", "n1.txt", "n2.txt"], "all three are in Staged files")
+        await toggleOpen("n1.txt", .staged)
+        check(openID() == "staged:n2.txt", "unstaging n1 opens the staged file below it, n2")
+        await toggleOpen("h.txt", .staged, pressing: "n2.txt")
+        check(openID() == "staged:h.txt", "unstaging another file leaves the open diff alone")
+        check(row("n2.txt", .untracked) != nil, "and n2 is unstaged")
+        model.openDiff = nil
+        await sh(["reset", "-q", "--hard"], in: repo)
+        await sh(["clean", "-qfd"], in: repo)
+        await model.refresh()
+
         model.stopWatching()
         return failures == 0
     }
